@@ -355,7 +355,7 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 	al.sessions.AddMessage(opts.SessionKey, "user", opts.UserMessage)
 
 	// 4. Run LLM iteration loop
-	finalContent, iteration, err := al.runLLMIteration(ctx, messages, opts)
+	finalContent, iteration, tokenCount, err := al.runLLMIteration(ctx, messages, opts)
 	if err != nil {
 		return "", err
 	}
@@ -374,7 +374,7 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 
 	// 7. Optional: summarization
 	if opts.EnableSummary {
-		al.maybeSummarize(opts.SessionKey)
+		al.maybeSummarize(opts.SessionKey, tokenCount)
 	}
 
 	// 8. Optional: send response via bus
@@ -405,10 +405,11 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 }
 
 // runLLMIteration executes the LLM call loop with tool handling.
-// Returns the final content, iteration count, and any error.
-func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.Message, opts processOptions) (string, int, error) {
+// Returns the final content, iteration count, last known token count, and any error.
+func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.Message, opts processOptions) (string, int, int, error) {
 	iteration := 0
 	var finalContent string
+	var lastTokenCount int
 
 	for iteration < al.maxIterations {
 		iteration++
@@ -448,7 +449,11 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 				Message:   fmt.Sprintf("LLM error on iteration #%d", iteration),
 				Detail:    map[string]any{"error": err.Error()},
 			})
-			return "", iteration, fmt.Errorf("LLM call failed: %w", err)
+			return "", iteration, lastTokenCount, fmt.Errorf("LLM call failed: %w", err)
+		}
+
+		if response.Usage != nil {
+			lastTokenCount = response.Usage.PromptTokens + response.Usage.CompletionTokens
 		}
 
 		// Check if no tool calls - we're done
@@ -554,7 +559,7 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 		}
 	}
 
-	return finalContent, iteration, nil
+	return finalContent, iteration, lastTokenCount, nil
 }
 
 // updateToolContexts updates the context for tools that need channel/chatID info.
@@ -578,12 +583,14 @@ func (al *AgentLoop) updateToolContexts(channel, chatID string) {
 }
 
 // maybeSummarize triggers summarization if the session history exceeds thresholds.
-func (al *AgentLoop) maybeSummarize(sessionKey string) {
+func (al *AgentLoop) maybeSummarize(sessionKey string, tokenCount int) {
 	newHistory := al.sessions.GetHistory(sessionKey)
-	tokenEstimate := al.estimateTokens(newHistory)
+	if tokenCount == 0 {
+		tokenCount = al.estimateTokens(newHistory)
+	}
 	threshold := al.contextWindow * 75 / 100
 
-	if len(newHistory) > 20 || tokenEstimate > threshold {
+	if len(newHistory) > 20 || tokenCount > threshold {
 		if _, loading := al.summarizing.LoadOrStore(sessionKey, true); !loading {
 			go func() {
 				defer al.summarizing.Delete(sessionKey)
