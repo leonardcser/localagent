@@ -36,6 +36,11 @@ func DetectMIMEType(filename string) string {
 	}
 }
 
+// IsPDFFile checks if a file is a PDF based on its filename extension.
+func IsPDFFile(filename string) bool {
+	return strings.ToLower(filepath.Ext(filename)) == ".pdf"
+}
+
 // SanitizeFilename removes potentially dangerous characters from a filename
 // and returns a safe version for local filesystem storage.
 func SanitizeFilename(filename string) string {

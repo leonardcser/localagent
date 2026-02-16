@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -18,11 +19,17 @@ import (
 	"localagent/pkg/utils"
 )
 
+type PDFService struct {
+	URL    string
+	APIKey string
+}
+
 type ContextBuilder struct {
 	workspace    string
 	skillsLoader *skills.SkillsLoader
 	memory       *MemoryStore
 	tools        *tools.ToolRegistry // Direct reference to tool registry
+	pdf          *PDFService
 }
 
 func getGlobalConfigDir() string {
@@ -55,6 +62,11 @@ func (cb *ContextBuilder) GetMemoryStore() *MemoryStore {
 // SetToolsRegistry sets the tools registry for dynamic tool summary generation.
 func (cb *ContextBuilder) SetToolsRegistry(registry *tools.ToolRegistry) {
 	cb.tools = registry
+}
+
+// SetPDFService configures the PDF-to-text service for auto-converting uploaded PDFs.
+func (cb *ContextBuilder) SetPDFService(url, apiKey string) {
+	cb.pdf = &PDFService{URL: url, APIKey: apiKey}
 }
 
 func (cb *ContextBuilder) getIdentity() string {
@@ -200,6 +212,23 @@ func (cb *ContextBuilder) buildUserMessage(text string, media []string) provider
 				Type:     "image_url",
 				ImageURL: &providers.ImageURL{URL: dataURL},
 			})
+		} else if utils.IsPDFFile(mediaPath) && cb.pdf != nil {
+			filename := filepath.Base(mediaPath)
+			ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+			pdfText, err := tools.ConvertPDF(ctx, mediaPath, cb.pdf.URL, cb.pdf.APIKey)
+			cancel()
+			if err != nil {
+				logger.Warn("PDF conversion failed for %s: %v", filename, err)
+				parts = append(parts, providers.ContentPart{
+					Type: "text",
+					Text: fmt.Sprintf("[PDF conversion failed for %s: %v]", filename, err),
+				})
+			} else {
+				parts = append(parts, providers.ContentPart{
+					Type: "text",
+					Text: fmt.Sprintf("\n--- PDF: %s ---\n%s\n--- End of %s ---", filename, pdfText, filename),
+				})
+			}
 		} else if utf8.Valid(data) {
 			// Include text-based files inline
 			filename := filepath.Base(mediaPath)

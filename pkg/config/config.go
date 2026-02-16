@@ -82,8 +82,21 @@ type WebToolsConfig struct {
 	DuckDuckGo DuckDuckGoConfig `json:"duckduckgo"`
 }
 
+type PDFConfig struct {
+	URL       string `json:"url"`
+	APIKeyEnv string `json:"api_key_env"`
+}
+
+func (p PDFConfig) ResolveAPIKey() string {
+	if p.APIKeyEnv == "" {
+		return ""
+	}
+	return os.Getenv(p.APIKeyEnv)
+}
+
 type ToolsConfig struct {
 	Web WebToolsConfig `json:"web"`
+	PDF PDFConfig      `json:"pdf"`
 }
 
 func DefaultConfig() *Config {

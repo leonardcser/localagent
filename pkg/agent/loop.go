@@ -84,6 +84,10 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 
 	registry.Register(tools.NewMessageTool(msgBus))
 
+	if cfg.Tools.PDF.URL != "" {
+		registry.Register(tools.NewPDFToTextTool(workspace, cfg.Tools.PDF.URL, cfg.Tools.PDF.ResolveAPIKey()))
+	}
+
 	return registry
 }
 
@@ -116,6 +120,9 @@ func NewAgentLoop(cfg *config.Config, msgBus *bus.MessageBus, provider providers
 	// Create context builder and set tools registry
 	contextBuilder := NewContextBuilder(workspace)
 	contextBuilder.SetToolsRegistry(toolsRegistry)
+	if cfg.Tools.PDF.URL != "" {
+		contextBuilder.SetPDFService(cfg.Tools.PDF.URL, cfg.Tools.PDF.ResolveAPIKey())
+	}
 
 	return &AgentLoop{
 		bus:            msgBus,
