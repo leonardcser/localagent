@@ -93,9 +93,14 @@ $effect(() => {
 	};
 });
 
+let dragCounter = 0;
+
 function handleDragEnter(e: DragEvent) {
 	e.preventDefault();
-	chat.dragging = true;
+	dragCounter++;
+	if (dragCounter === 1 && e.dataTransfer?.types.includes("Files")) {
+		chat.dragging = true;
+	}
 }
 
 function handleDragOver(e: DragEvent) {
@@ -103,11 +108,16 @@ function handleDragOver(e: DragEvent) {
 }
 
 function handleDragLeave(e: DragEvent) {
-	if (e.relatedTarget === null) chat.dragging = false;
+	e.preventDefault();
+	dragCounter--;
+	if (dragCounter === 0) {
+		chat.dragging = false;
+	}
 }
 
 function handleDrop(e: DragEvent) {
 	e.preventDefault();
+	dragCounter = 0;
 	if (e.dataTransfer?.files) {
 		chat.handleDrop(e.dataTransfer.files);
 	}
