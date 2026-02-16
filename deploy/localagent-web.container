@@ -1,0 +1,23 @@
+[Unit]
+Description=localagent gateway (web tools enabled)
+After=network-online.target
+
+[Container]
+Image=localhost/localagent:latest
+ContainerName=localagent-gateway-web
+Exec=gateway
+PodmanArgs=--runtime=krun
+Network=pasta
+PublishPort=18790:18790
+PublishPort=18791:18791
+Environment=LOCALAGENT_WEB_ENABLED=true
+Volume=%h/.localagent/config.json:/home/localagent/.localagent/config.json:ro,Z
+Volume=localagent-workspace:/home/localagent/.localagent/workspace:Z
+AutoUpdate=local
+
+[Service]
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

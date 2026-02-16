@@ -1,0 +1,232 @@
+<script lang="ts">
+import { renderMarkdown } from "$lib/markdown";
+
+const COPY_LABEL = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+const CHECK_LABEL = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+
+let {
+	role,
+	content,
+	timestamp,
+}: { role: string; content: string; timestamp: string } = $props();
+
+let html = $state("");
+
+$effect(() => {
+	renderMarkdown(content).then((result) => {
+		html = result;
+	});
+});
+
+function handleClick(e: MouseEvent) {
+	const btn = (e.target as HTMLElement).closest(".copy-btn") as HTMLButtonElement | null;
+	if (!btn?.dataset.code) return;
+	navigator.clipboard.writeText(btn.dataset.code);
+	btn.innerHTML = CHECK_LABEL;
+	setTimeout(() => {
+		btn.innerHTML = COPY_LABEL;
+	}, 1500);
+}
+</script>
+
+{#if role === "user"}
+	<div class="flex flex-col items-end self-end max-w-[85%] sm:max-w-[75%]">
+		<div class="user-msg rounded-2xl rounded-br-md bg-user-bubble px-3.5 py-2.5 text-[14px] leading-relaxed text-user-bubble-text">
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div class="msg-content" onclick={handleClick} onkeydown={() => {}}>{@html html}</div>
+		</div>
+		<span class="mt-1 text-[10px] font-mono text-text-muted">{timestamp}</span>
+	</div>
+{:else}
+	<div class="flex flex-col items-start self-start max-w-[95%] sm:max-w-[85%]">
+		<div class="assistant-msg rounded-2xl rounded-bl-md bg-bg-secondary px-3.5 py-2.5 text-[14px] leading-relaxed text-text-primary">
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div class="msg-content" onclick={handleClick} onkeydown={() => {}}>{@html html}</div>
+		</div>
+		<span class="mt-1 text-[10px] font-mono text-text-muted">{timestamp}</span>
+	</div>
+{/if}
+
+<style>
+	.msg-content :global(p) {
+		margin: 0 0 0.5em;
+	}
+
+	.msg-content :global(p:last-child) {
+		margin-bottom: 0;
+	}
+
+	.msg-content :global(.code-block-wrapper) {
+		border-radius: 0.5rem;
+		overflow: hidden;
+		margin: 0.5rem 0;
+		border: 1px solid var(--color-border-light);
+	}
+
+	.msg-content :global(.code-header) {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.1rem 0.5rem;
+		background: rgba(255, 255, 255, 0.04);
+		border-bottom: 1px solid var(--color-border-light);
+		font-size: 0.75rem;
+	}
+
+	.msg-content :global(.code-lang) {
+		color: var(--color-text-muted);
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+	}
+
+	.msg-content :global(.copy-btn) {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		margin-left: auto;
+		padding: 0.15rem 0.4rem;
+		color: var(--color-text-muted);
+		background: transparent;
+		border: none;
+		border-radius: 0.25rem;
+		cursor: pointer;
+		font-family: inherit;
+		font-size: 0.7rem;
+		transition: color 0.15s, background 0.15s;
+	}
+
+	.msg-content :global(.copy-btn:hover) {
+		color: var(--color-text-primary);
+		background: rgba(255, 255, 255, 0.06);
+	}
+
+	.msg-content :global(pre) {
+		border-radius: 0;
+		overflow-x: auto;
+		margin: 0;
+		font-size: 0.8125rem;
+	}
+
+	.msg-content :global(.shiki) {
+		padding: 0.5rem 0.75rem;
+		border-radius: 0;
+		overflow-x: auto;
+		margin: 0;
+		font-size: 0.8125rem;
+		line-height: 1.5;
+	}
+
+	.msg-content :global(code) {
+		font-family: var(--font-mono);
+		font-size: 0.8125rem;
+	}
+
+	.msg-content :global(code:not(pre code)) {
+		background: rgba(255, 255, 255, 0.08);
+		padding: 0.15rem 0.35rem;
+		border-radius: 0.25rem;
+		font-size: 0.85em;
+	}
+
+	.user-msg .msg-content :global(code:not(pre code)) {
+		background: rgba(255, 255, 255, 0.18);
+	}
+
+	.msg-content :global(a) {
+		color: var(--color-accent);
+		text-decoration: none;
+	}
+
+	.msg-content :global(a:hover) {
+		text-decoration: underline;
+	}
+
+	.user-msg .msg-content :global(a) {
+		color: inherit;
+		text-decoration: underline;
+		text-decoration-color: rgba(255, 255, 255, 0.4);
+	}
+
+	.msg-content :global(ul) {
+		padding-left: 1.5em;
+		margin: 0.25em 0;
+		list-style: disc;
+	}
+
+	.msg-content :global(ol) {
+		padding-left: 1.5em;
+		margin: 0.25em 0;
+		list-style: decimal;
+	}
+
+	.msg-content :global(li) {
+		margin: 0.15em 0;
+	}
+
+	.msg-content :global(blockquote) {
+		border-left: 3px solid var(--color-border-light);
+		padding-left: 0.75rem;
+		margin: 0.5em 0;
+		color: var(--color-text-secondary);
+	}
+
+	.msg-content :global(h1),
+	.msg-content :global(h2),
+	.msg-content :global(h3),
+	.msg-content :global(h4) {
+		margin: 0.75em 0 0.35em;
+		font-weight: 600;
+		line-height: 1.3;
+	}
+
+	.msg-content :global(h1) {
+		font-size: 1.25em;
+	}
+
+	.msg-content :global(h2) {
+		font-size: 1.125em;
+	}
+
+	.msg-content :global(h3) {
+		font-size: 1em;
+	}
+
+	.msg-content :global(hr) {
+		border: none;
+		border-top: 1px solid var(--color-border);
+		margin: 0.75em 0;
+	}
+
+	.msg-content :global(table) {
+		border-collapse: separate;
+		border-spacing: 0;
+		margin: 0.5em 0;
+		font-size: 0.875em;
+		width: 100%;
+		border: 1px solid var(--color-border-light);
+		border-radius: 0.5rem;
+		overflow: hidden;
+	}
+
+	.msg-content :global(th),
+	.msg-content :global(td) {
+		border-bottom: 1px solid var(--color-border-light);
+		border-right: 1px solid var(--color-border-light);
+		padding: 0.4em 0.6em;
+		text-align: left;
+	}
+
+	.msg-content :global(th:last-child),
+	.msg-content :global(td:last-child) {
+		border-right: none;
+	}
+
+	.msg-content :global(tr:last-child td) {
+		border-bottom: none;
+	}
+
+	.msg-content :global(th) {
+		background: var(--color-surface);
+		font-weight: 600;
+	}
+</style>

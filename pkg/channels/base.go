@@ -1,0 +1,103 @@
+package channels
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"localagent/pkg/bus"
+)
+
+type Channel interface {
+	Name() string
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+	Send(ctx context.Context, msg bus.OutboundMessage) error
+	IsRunning() bool
+	IsAllowed(senderID string) bool
+}
+
+type BaseChannel struct {
+	config    any
+	bus       *bus.MessageBus
+	running   bool
+	name      string
+	allowList []string
+}
+
+func NewBaseChannel(name string, config any, bus *bus.MessageBus, allowList []string) *BaseChannel {
+	return &BaseChannel{
+		config:    config,
+		bus:       bus,
+		name:      name,
+		allowList: allowList,
+		running:   false,
+	}
+}
+
+func (c *BaseChannel) Name() string {
+	return c.name
+}
+
+func (c *BaseChannel) IsRunning() bool {
+	return c.running
+}
+
+func (c *BaseChannel) IsAllowed(senderID string) bool {
+	if len(c.allowList) == 0 {
+		return true
+	}
+
+	idPart := senderID
+	userPart := ""
+	if idx := strings.Index(senderID, "|"); idx > 0 {
+		idPart = senderID[:idx]
+		userPart = senderID[idx+1:]
+	}
+
+	for _, allowed := range c.allowList {
+		trimmed := strings.TrimPrefix(allowed, "@")
+		allowedID := trimmed
+		allowedUser := ""
+		if idx := strings.Index(trimmed, "|"); idx > 0 {
+			allowedID = trimmed[:idx]
+			allowedUser = trimmed[idx+1:]
+		}
+
+		if senderID == allowed ||
+			idPart == allowed ||
+			senderID == trimmed ||
+			idPart == trimmed ||
+			idPart == allowedID ||
+			(allowedUser != "" && senderID == allowedUser) ||
+			(userPart != "" && (userPart == allowed || userPart == trimmed || userPart == allowedUser)) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (c *BaseChannel) HandleMessage(senderID, chatID, content string, media []string, metadata map[string]string) {
+	if !c.IsAllowed(senderID) {
+		return
+	}
+
+	sessionKey := fmt.Sprintf("%s:%s", c.name, chatID)
+
+	msg := bus.InboundMessage{
+		Channel:    c.name,
+		SenderID:   senderID,
+		ChatID:     chatID,
+		Content:    content,
+		Media:      media,
+		SessionKey: sessionKey,
+		Metadata:   metadata,
+	}
+
+	c.bus.PublishInbound(msg)
+}
+
+func (c *BaseChannel) SetRunning(running bool) {
+	c.running = running
+}

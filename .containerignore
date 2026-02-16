@@ -1,0 +1,9 @@
+.git
+.gitignore
+build/
+.localagent/
+config/
+.env
+.env.*
+*.md
+LICENSE
