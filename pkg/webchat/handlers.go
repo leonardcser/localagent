@@ -88,8 +88,19 @@ func (s *Server) handleUpload(c *echo.Context) error {
 	}
 
 	safeName := utils.SanitizeFilename(file.Filename)
-	prefix := utils.RandHex(8)
-	localPath := filepath.Join(mediaDir, prefix+"_"+safeName)
+	localPath := filepath.Join(mediaDir, safeName)
+
+	if _, err := os.Stat(localPath); err == nil {
+		ext := filepath.Ext(safeName)
+		base := strings.TrimSuffix(safeName, ext)
+		for i := 1; ; i++ {
+			candidate := filepath.Join(mediaDir, fmt.Sprintf("%s_%d%s", base, i, ext))
+			if _, err := os.Stat(candidate); os.IsNotExist(err) {
+				localPath = candidate
+				break
+			}
+		}
+	}
 
 	src, err := file.Open()
 	if err != nil {
