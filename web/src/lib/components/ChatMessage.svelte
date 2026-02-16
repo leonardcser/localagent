@@ -1,10 +1,8 @@
 <script lang="ts">
-import { renderMarkdown } from "$lib/markdown";
+import { renderMarkdown, COPY_SVG, CHECK_SVG } from "$lib/markdown";
+import { filename } from "$lib/utils";
 import { Icon } from "svelte-icons-pack";
 import { FiFile } from "svelte-icons-pack/fi";
-
-const COPY_LABEL = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
-const CHECK_LABEL = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
 
 let {
 	role,
@@ -12,10 +10,6 @@ let {
 	timestamp,
 	media,
 }: { role: string; content: string; timestamp: string; media?: string[] } = $props();
-
-function filename(path: string): string {
-	return path.split("/").pop() || path;
-}
 
 let html = $state("");
 
@@ -29,9 +23,9 @@ function handleClick(e: MouseEvent) {
 	const btn = (e.target as HTMLElement).closest(".copy-btn") as HTMLButtonElement | null;
 	if (!btn?.dataset.code) return;
 	navigator.clipboard.writeText(btn.dataset.code);
-	btn.innerHTML = CHECK_LABEL;
+	btn.innerHTML = CHECK_SVG;
 	setTimeout(() => {
-		btn.innerHTML = COPY_LABEL;
+		btn.innerHTML = COPY_SVG;
 	}, 1500);
 }
 </script>

@@ -97,12 +97,11 @@ $effect(() => {
 		border-top: 1px solid var(--color-border);
 	}
 
-	.action-btn {
+	.action-btn,
+	.action-btn-round {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 34px;
-		height: 34px;
 		flex-shrink: 0;
 		cursor: pointer;
 		border: none;
@@ -111,24 +110,17 @@ $effect(() => {
 		transition: color 0.15s, background 0.15s;
 	}
 
-	.action-btn:hover {
-		background: var(--color-border);
+	.action-btn {
+		width: 34px;
+		height: 34px;
 	}
 
 	.action-btn-round {
-		display: flex;
-		align-items: center;
-		justify-content: center;
 		width: 42px;
 		height: 42px;
-		flex-shrink: 0;
-		cursor: pointer;
-		border: none;
-		background: none;
-		border-radius: 50%;
-		transition: all 0.15s;
 	}
 
+	.action-btn:hover,
 	.action-btn-round:hover {
 		background: var(--color-border);
 	}

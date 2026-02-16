@@ -29,6 +29,8 @@ export type MockTimelineItem =
 	| { kind: "message"; role: string; content: string; timestamp: string; media?: string[] }
 	| ({ kind: "activity" } & ActivityEventData);
 
+import { nowTimestamp } from "$lib/utils";
+
 const DEV = import.meta.env.DEV;
 
 // --- Mock data for dev mode ---
@@ -283,7 +285,7 @@ function mockSSE(
 	setTimeout(() => {
 		onActivity({
 			event_type: "processing_start",
-			timestamp: new Date().toLocaleTimeString("en-GB", { hour12: false }),
+			timestamp: nowTimestamp(),
 			message: "Processing message from web:web-user",
 			detail: { channel: "web", sender: "web-user", preview: "Hello!" },
 		});
@@ -292,7 +294,7 @@ function mockSSE(
 	setTimeout(() => {
 		onActivity({
 			event_type: "llm_request",
-			timestamp: new Date().toLocaleTimeString("en-GB", { hour12: false }),
+			timestamp: nowTimestamp(),
 			message: "LLM request #1 (gpt-4o)",
 			detail: { iteration: 1, model: "gpt-4o", messages: 4, tools: 12 },
 		});
@@ -301,13 +303,13 @@ function mockSSE(
 	setTimeout(() => {
 		onActivity({
 			event_type: "llm_response",
-			timestamp: new Date().toLocaleTimeString("en-GB", { hour12: false }),
+			timestamp: nowTimestamp(),
 			message: "LLM response #1 (128 chars)",
 			detail: { iteration: 1, chars: 128 },
 		});
 		onActivity({
 			event_type: "complete",
-			timestamp: new Date().toLocaleTimeString("en-GB", { hour12: false }),
+			timestamp: nowTimestamp(),
 			message: "Complete (1 iteration, 128 chars)",
 			detail: { session: "web:default", iterations: 1, length: 128 },
 		});

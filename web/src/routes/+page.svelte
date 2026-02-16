@@ -1,6 +1,6 @@
 <script lang="ts">
 import { onMount, onDestroy } from "svelte";
-import { chat, type TimelineItem } from "$lib/stores/chat.svelte";
+import { chat, type MessageTimelineItem, type ActivityTimelineItem } from "$lib/stores/chat.svelte";
 import ChatMessage from "$lib/components/ChatMessage.svelte";
 import ActivityGroup from "$lib/components/ActivityGroup.svelte";
 import LoadingBubble from "$lib/components/LoadingBubble.svelte";
@@ -9,17 +9,15 @@ import DropOverlay from "$lib/components/DropOverlay.svelte";
 import { Icon } from "svelte-icons-pack";
 import { FiChevronDown } from "svelte-icons-pack/fi";
 
-type MessageItem = { kind: "message"; id: number; role: string; content: string; timestamp: string; media?: string[] };
-type ActivityItem_ = Extract<TimelineItem, { kind: "activity" }>;
 type GroupedItem =
-	| MessageItem
-	| { kind: "activity-group"; id: number; items: ActivityItem_[] };
+	| MessageTimelineItem
+	| { kind: "activity-group"; id: number; items: ActivityTimelineItem[] };
 
 let groups = $derived.by(() => {
 	const result: GroupedItem[] = [];
 	for (const item of chat.timeline) {
 		if (item.kind === "message") {
-			result.push(item as MessageItem);
+			result.push(item as MessageTimelineItem);
 		} else {
 			const last = result[result.length - 1];
 			if (last?.kind === "activity-group") {

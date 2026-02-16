@@ -1,9 +1,7 @@
 <script lang="ts">
 import { fade } from "svelte/transition";
 import ActivityItem from "./ActivityItem.svelte";
-import type { TimelineItem } from "$lib/stores/chat.svelte";
-
-type ActivityTimelineItem = Extract<TimelineItem, { kind: "activity" }>;
+import type { ActivityTimelineItem } from "$lib/stores/chat.svelte";
 
 let {
 	items,

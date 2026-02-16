@@ -7,10 +7,14 @@ import {
 	sendMessage,
 	uploadFile,
 } from "$lib/api";
+import { nowTimestamp } from "$lib/utils";
 
 export type TimelineItem =
 	| { kind: "message"; id: number; role: string; content: string; timestamp: string; media?: string[] }
 	| ({ kind: "activity"; id: number } & ActivityEventData);
+
+export type MessageTimelineItem = Extract<TimelineItem, { kind: "message" }>;
+export type ActivityTimelineItem = Extract<TimelineItem, { kind: "activity" }>;
 
 let nextId = 0;
 
@@ -24,13 +28,9 @@ function createChat() {
 	let eventSource: EventSource | null = null;
 	let mediaRecorder: MediaRecorder | null = null;
 
-	function now() {
-		return new Date().toLocaleTimeString("en-GB", { hour12: false });
-	}
-
 	function addMessage(msg: HistoryMessage) {
 		if (!msg.content) return;
-		timeline.push({ kind: "message", ...msg, timestamp: now(), id: ++nextId });
+		timeline.push({ kind: "message", ...msg, timestamp: nowTimestamp(), id: ++nextId });
 	}
 
 	function addActivity(evt: ActivityEventData) {
@@ -87,7 +87,7 @@ function createChat() {
 		const media = [...pendingMedia];
 		if (!content && media.length === 0) return;
 
-		timeline.push({ kind: "message", role: "user", content, timestamp: now(), id: ++nextId, media: media.length > 0 ? media : undefined });
+		timeline.push({ kind: "message", role: "user", content, timestamp: nowTimestamp(), id: ++nextId, media: media.length > 0 ? media : undefined });
 		input = "";
 		pendingMedia = [];
 		loading = true;

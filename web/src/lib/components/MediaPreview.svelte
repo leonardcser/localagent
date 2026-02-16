@@ -1,4 +1,5 @@
 <script lang="ts">
+import { filename } from "$lib/utils";
 import { Icon } from "svelte-icons-pack";
 import { FiFile, FiX } from "svelte-icons-pack/fi";
 
@@ -6,10 +7,6 @@ let {
 	media,
 	onRemove,
 }: { media: string[]; onRemove: (index: number) => void } = $props();
-
-function filename(path: string): string {
-	return path.split("/").pop() || path;
-}
 </script>
 
 <div class="mb-2 flex flex-wrap gap-1.5">
