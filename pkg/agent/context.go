@@ -1,17 +1,21 @@
 package agent
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"localagent/pkg/logger"
+	"localagent/pkg/prompts"
 	"localagent/pkg/providers"
 	"localagent/pkg/skills"
 	"localagent/pkg/tools"
+	"localagent/pkg/utils"
 )
 
 type ContextBuilder struct {
@@ -56,37 +60,12 @@ func (cb *ContextBuilder) SetToolsRegistry(registry *tools.ToolRegistry) {
 func (cb *ContextBuilder) getIdentity() string {
 	now := time.Now().Format("2006-01-02 15:04 (Monday)")
 	workspacePath, _ := filepath.Abs(filepath.Join(cb.workspace))
-	runtime := fmt.Sprintf("%s %s, Go %s", runtime.GOOS, runtime.GOARCH, runtime.Version())
+	rt := fmt.Sprintf("%s %s, Go %s", runtime.GOOS, runtime.GOARCH, runtime.Version())
 
-	// Build tools section dynamically
 	toolsSection := cb.buildToolsSection()
 
-	return fmt.Sprintf(`# localagent
-
-You are localagent, a helpful AI assistant.
-
-## Current Time
-%s
-
-## Runtime
-%s
-
-## Workspace
-Your workspace is at: %s
-- Memory: %s/memory/MEMORY.md
-- Daily Notes: %s/memory/YYYYMM/YYYYMMDD.md
-- Skills: %s/skills/{skill-name}/SKILL.md
-
-%s
-
-## Important Rules
-
-1. **ALWAYS use tools** - When you need to perform an action (schedule reminders, send messages, execute commands, etc.), you MUST call the appropriate tool. Do NOT just say you'll do it or pretend to do it.
-
-2. **Be helpful and accurate** - When using tools, briefly explain what you're doing.
-
-3. **Memory** - When remembering something, write to %s/memory/MEMORY.md`,
-		now, runtime, workspacePath, workspacePath, workspacePath, workspacePath, toolsSection, workspacePath)
+	return fmt.Sprintf(prompts.SystemIdentity,
+		now, rt, workspacePath, workspacePath, workspacePath, workspacePath, toolsSection, workspacePath)
 }
 
 func (cb *ContextBuilder) buildToolsSection() string {
@@ -100,9 +79,8 @@ func (cb *ContextBuilder) buildToolsSection() string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString("## Available Tools\n\n")
-	sb.WriteString("**CRITICAL**: You MUST use tools to perform actions. Do NOT pretend to execute commands or schedule tasks.\n\n")
-	sb.WriteString("You have access to the following tools:\n\n")
+	sb.WriteString(prompts.ToolsSection)
+	sb.WriteString("\n")
 	for _, s := range summaries {
 		sb.WriteString(s)
 		sb.WriteString("\n")
@@ -126,11 +104,7 @@ func (cb *ContextBuilder) BuildSystemPrompt() string {
 	// Skills - show summary, AI can read full content with read_file tool
 	skillsSummary := cb.skillsLoader.BuildSkillsSummary()
 	if skillsSummary != "" {
-		parts = append(parts, fmt.Sprintf(`# Skills
-
-The following skills extend your capabilities. To use a skill, read its SKILL.md file using the read_file tool.
-
-%s`, skillsSummary))
+		parts = append(parts, fmt.Sprintf(prompts.SkillsSection, skillsSummary))
 	}
 
 	// Memory context
@@ -190,12 +164,80 @@ func (cb *ContextBuilder) BuildMessages(history []providers.Message, summary str
 
 	messages = append(messages, history...)
 
-	messages = append(messages, providers.Message{
-		Role:    "user",
-		Content: currentMessage,
-	})
+	// Build user message, with multimodal content parts if media is attached
+	userMsg := cb.buildUserMessage(currentMessage, media)
+	messages = append(messages, userMsg)
 
 	return messages
+}
+
+// buildUserMessage constructs a user message, adding multimodal content parts
+// when media files are attached.
+func (cb *ContextBuilder) buildUserMessage(text string, media []string) providers.Message {
+	if len(media) == 0 {
+		return providers.Message{Role: "user", Content: text}
+	}
+
+	var parts []providers.ContentPart
+
+	// Add text part (use a default if empty)
+	if text != "" {
+		parts = append(parts, providers.ContentPart{Type: "text", Text: text})
+	}
+
+	for _, mediaPath := range media {
+		data, err := os.ReadFile(mediaPath)
+		if err != nil {
+			logger.Warn("failed to read media file %s: %v", mediaPath, err)
+			continue
+		}
+
+		if utils.IsImageFile(mediaPath) {
+			// Encode image as base64 data URL
+			mimeType := utils.DetectMIMEType(mediaPath)
+			dataURL := fmt.Sprintf("data:%s;base64,%s", mimeType, base64.StdEncoding.EncodeToString(data))
+			parts = append(parts, providers.ContentPart{
+				Type:     "image_url",
+				ImageURL: &providers.ImageURL{URL: dataURL},
+			})
+		} else if utf8.Valid(data) {
+			// Include text-based files inline
+			filename := filepath.Base(mediaPath)
+			parts = append(parts, providers.ContentPart{
+				Type: "text",
+				Text: fmt.Sprintf("\n--- File: %s ---\n%s\n--- End of %s ---", filename, string(data), filename),
+			})
+		} else {
+			// Binary file - just note it
+			filename := filepath.Base(mediaPath)
+			parts = append(parts, providers.ContentPart{
+				Type: "text",
+				Text: fmt.Sprintf("[Attached binary file: %s]", filename),
+			})
+		}
+	}
+
+	if len(parts) == 0 {
+		return providers.Message{Role: "user", Content: text}
+	}
+
+	// Ensure there's at least one text part (required by most APIs)
+	hasText := false
+	for _, p := range parts {
+		if p.Type == "text" {
+			hasText = true
+			break
+		}
+	}
+	if !hasText {
+		parts = append([]providers.ContentPart{{Type: "text", Text: "The user has shared the attached file(s)."}}, parts...)
+	}
+
+	return providers.Message{
+		Role:         "user",
+		Content:      text,
+		ContentParts: parts,
+	}
 }
 
 func (cb *ContextBuilder) AddToolResult(messages []providers.Message, toolCallID, toolName, result string) []providers.Message {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"localagent/pkg/bus"
+	"localagent/pkg/prompts"
 	"localagent/pkg/providers"
 )
 
@@ -88,9 +89,7 @@ func (sm *SubagentManager) runTask(ctx context.Context, task *SubagentTask, call
 	task.Status = "running"
 	task.Created = time.Now().UnixMilli()
 
-	systemPrompt := `You are a subagent. Complete the given task independently and report the result.
-You have access to tools - use them as needed to complete your task.
-After completing the task, provide a clear summary of what was done.`
+	systemPrompt := prompts.SubagentAsync
 
 	messages := []providers.Message{
 		{Role: "system", Content: systemPrompt},
@@ -239,7 +238,7 @@ func (t *SubagentTool) Execute(ctx context.Context, args map[string]any) *ToolRe
 	}
 
 	messages := []providers.Message{
-		{Role: "system", Content: "You are a subagent. Complete the given task independently and provide a clear, concise result."},
+		{Role: "system", Content: prompts.SubagentSync},
 		{Role: "user", Content: task},
 	}
 

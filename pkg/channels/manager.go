@@ -122,13 +122,6 @@ func (m *Manager) dispatchOutbound(ctx context.Context) {
 	}
 }
 
-func (m *Manager) GetChannel(name string) (Channel, bool) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	channel, ok := m.channels[name]
-	return channel, ok
-}
-
 func (m *Manager) GetStatus() map[string]any {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

@@ -21,6 +21,7 @@ CONTAINER_IMAGE?=localagent
 CONTAINER_TAG?=$(VERSION)
 CONTAINER_NAME?=localagent-gateway
 CONFIG_FILE?=$(HOME)/.localagent/config.json
+WORKSPACE_DIR?=$(CURDIR)/.localagent/workspace
 TZ?=$(shell cat /etc/timezone 2>/dev/null || readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||' || echo UTC)
 CA_CERT?=
 ENV_PASS?=
@@ -123,6 +124,7 @@ container:
 
 ## container-gateway: Run gateway (local network only, no web tools)
 container-gateway:
+	@mkdir -p $(WORKSPACE_DIR)
 	@echo "Starting localagent gateway (local network only)..."
 	@$(CONTAINER_ENGINE) run -d \
 		--name $(CONTAINER_NAME) \
@@ -133,7 +135,7 @@ container-gateway:
 		$(foreach v,$(ENV_PASS),-e $(v)) \
 		$(if $(CA_CERT),-v $(CA_CERT):/usr/local/share/ca-certificates/custom-ca.crt:ro$(comma)Z) \
 		-v $(CONFIG_FILE):/home/localagent/.localagent/config.json:ro,Z \
-		-v localagent-workspace:/home/localagent/.localagent/workspace:Z \
+		-v $(WORKSPACE_DIR):/home/localagent/.localagent/workspace:Z \
 		-p 18790:18790 \
 		-p 18791:18791 \
 		$(CONTAINER_IMAGE):latest gateway
@@ -141,6 +143,7 @@ container-gateway:
 
 ## container-gateway-web: Run gateway with web tools enabled
 container-gateway-web:
+	@mkdir -p $(WORKSPACE_DIR)
 	@echo "Starting localagent gateway (web tools enabled)..."
 	@$(CONTAINER_ENGINE) run -d \
 		--name $(CONTAINER_NAME) \
@@ -152,7 +155,7 @@ container-gateway-web:
 		$(foreach v,$(ENV_PASS),-e $(v)) \
 		$(if $(CA_CERT),-v $(CA_CERT):/usr/local/share/ca-certificates/custom-ca.crt:ro$(comma)Z) \
 		-v $(CONFIG_FILE):/home/localagent/.localagent/config.json:ro,Z \
-		-v localagent-workspace:/home/localagent/.localagent/workspace:Z \
+		-v $(WORKSPACE_DIR):/home/localagent/.localagent/workspace:Z \
 		-p 18790:18790 \
 		-p 18791:18791 \
 		$(CONTAINER_IMAGE):latest gateway
@@ -181,6 +184,7 @@ help:
 	@echo "  CONTAINER_ENGINE   Container runtime (default: podman)"
 	@echo "  CONTAINER_IMAGE    Image name (default: localagent)"
 	@echo "  CONFIG_FILE        Config file path (default: ~/.localagent/config.json)"
+	@echo "  WORKSPACE_DIR      Workspace directory (default: ./.localagent/workspace)"
 	@echo ""
 	@echo "Current Configuration:"
 	@echo "  Platform: $(PLATFORM)/$(ARCH)"

@@ -1,0 +1,5 @@
+## Available Tools
+
+**CRITICAL**: You MUST use tools to perform actions. Do NOT pretend to execute commands or schedule tasks.
+
+You have access to the following tools:

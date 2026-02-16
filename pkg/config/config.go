@@ -8,37 +8,6 @@ import (
 	"sync"
 )
 
-// FlexibleStringSlice is a []string that also accepts JSON numbers,
-// so allow_from can contain both "123" and 123.
-type FlexibleStringSlice []string
-
-func (f *FlexibleStringSlice) UnmarshalJSON(data []byte) error {
-	var ss []string
-	if err := json.Unmarshal(data, &ss); err == nil {
-		*f = ss
-		return nil
-	}
-
-	var raw []any
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-
-	result := make([]string, 0, len(raw))
-	for _, v := range raw {
-		switch val := v.(type) {
-		case string:
-			result = append(result, val)
-		case float64:
-			result = append(result, fmt.Sprintf("%.0f", val))
-		default:
-			result = append(result, fmt.Sprintf("%v", val))
-		}
-	}
-	*f = result
-	return nil
-}
-
 type WebChatConfig struct {
 	Host string `json:"host"`
 	Port int    `json:"port"`

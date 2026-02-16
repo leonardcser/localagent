@@ -17,6 +17,7 @@ import (
 	"localagent/pkg/config"
 	"localagent/pkg/constants"
 	"localagent/pkg/logger"
+	"localagent/pkg/prompts"
 	"localagent/pkg/providers"
 	"localagent/pkg/session"
 	"localagent/pkg/state"
@@ -42,14 +43,15 @@ type AgentLoop struct {
 
 // processOptions configures how a message is processed
 type processOptions struct {
-	SessionKey      string // Session identifier for history/context
-	Channel         string // Target channel for tool execution
-	ChatID          string // Target chat ID for tool execution
-	UserMessage     string // User message content (may include prefix)
-	DefaultResponse string // Response when LLM returns empty
-	EnableSummary   bool   // Whether to trigger summarization
-	SendResponse    bool   // Whether to send response via bus
-	NoHistory       bool   // If true, don't load session history (for heartbeat)
+	SessionKey      string   // Session identifier for history/context
+	Channel         string   // Target channel for tool execution
+	ChatID          string   // Target chat ID for tool execution
+	UserMessage     string   // User message content (may include prefix)
+	Media           []string // Media file paths attached to the message
+	DefaultResponse string   // Response when LLM returns empty
+	EnableSummary   bool     // Whether to trigger summarization
+	SendResponse    bool     // Whether to send response via bus
+	NoHistory       bool     // If true, don't load session history (for heartbeat)
 }
 
 // createToolRegistry creates a tool registry with common tools.
@@ -264,6 +266,7 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 		Channel:         msg.Channel,
 		ChatID:          msg.ChatID,
 		UserMessage:     msg.Content,
+		Media:           msg.Media,
 		DefaultResponse: "I've completed processing but have no response to give.",
 		EnableSummary:   true,
 		SendResponse:    false,
@@ -335,7 +338,7 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 		history,
 		summary,
 		opts.UserMessage,
-		nil,
+		opts.Media,
 		opts.Channel,
 		opts.ChatID,
 	)
@@ -627,12 +630,12 @@ func (al *AgentLoop) memoryFlush(sessionKey string) {
 
 	systemMsg := providers.Message{
 		Role:    "system",
-		Content: "You are a memory manager. Store important context from the conversation to daily notes before it gets summarized and details are lost. Write concise, useful notes — decisions, preferences, key facts, action items. Use append_file to write to: " + todayPath,
+		Content: strings.TrimSpace(prompts.MemoryFlushSystem) + " " + todayPath,
 	}
 
 	userMsg := providers.Message{
 		Role:    "user",
-		Content: "Review the conversation and save any important context to the daily notes file. Be concise. Only save information worth remembering.",
+		Content: strings.TrimSpace(prompts.MemoryFlushUser),
 	}
 
 	messages := []providers.Message{systemMsg}
@@ -772,7 +775,7 @@ func (al *AgentLoop) summarizeSession(sessionKey string) {
 		s2, _ := al.summarizeBatch(ctx, part2, "")
 
 		// Merge them
-		mergePrompt := fmt.Sprintf("Merge these two conversation summaries into one cohesive summary:\n\n1: %s\n\n2: %s", s1, s2)
+		mergePrompt := fmt.Sprintf(prompts.SummarizeMerge, s1, s2)
 		resp, err := al.provider.Chat(ctx, []providers.Message{{Role: "user", Content: mergePrompt}}, nil, al.model, map[string]any{
 			"max_tokens":  1024,
 			"temperature": 0.3,
@@ -800,7 +803,7 @@ func (al *AgentLoop) summarizeSession(sessionKey string) {
 // summarizeBatch summarizes a batch of messages.
 func (al *AgentLoop) summarizeBatch(ctx context.Context, batch []providers.Message, existingSummary string) (string, error) {
 	var prompt strings.Builder
-	prompt.WriteString("Provide a concise summary of this conversation segment, preserving core context and key points.\n")
+	prompt.WriteString(strings.TrimSpace(prompts.SummarizeBatch) + "\n")
 	if existingSummary != "" {
 		prompt.WriteString("Existing context: " + existingSummary + "\n")
 	}

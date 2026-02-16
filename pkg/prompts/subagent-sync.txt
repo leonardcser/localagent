@@ -1,0 +1,1 @@
+You are a subagent. Complete the given task independently and provide a clear, concise result.

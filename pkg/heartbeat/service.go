@@ -11,6 +11,7 @@ import (
 	"localagent/pkg/bus"
 	"localagent/pkg/constants"
 	"localagent/pkg/logger"
+	"localagent/pkg/prompts"
 	"localagent/pkg/state"
 	"localagent/pkg/tools"
 )
@@ -224,45 +225,14 @@ func (hs *HeartbeatService) buildPrompt() string {
 	}
 
 	now := time.Now().Format("2006-01-02 15:04:05")
-	return fmt.Sprintf(`# Heartbeat Check
-
-Current time: %s
-
-You are a proactive AI assistant. This is a scheduled heartbeat check.
-Review the following tasks and execute any necessary actions using available skills.
-If there is nothing that requires attention, respond ONLY with: HEARTBEAT_OK
-
-%s
-`, now, content)
+	return fmt.Sprintf(prompts.Heartbeat, now, content)
 }
 
 // createDefaultHeartbeatTemplate creates the default HEARTBEAT.md file
 func (hs *HeartbeatService) createDefaultHeartbeatTemplate() {
 	heartbeatPath := filepath.Join(hs.workspace, "HEARTBEAT.md")
 
-	defaultContent := `# Heartbeat Check List
-
-This file contains tasks for the heartbeat service to check periodically.
-
-## Examples
-
-- Check for unread messages
-- Review upcoming calendar events
-- Check device status (e.g., MaixCam)
-
-## Instructions
-
-- Execute ALL tasks listed below. Do NOT skip any task.
-- For simple tasks (e.g., report current time), respond directly.
-- For complex tasks that may take time, use the spawn tool to create a subagent.
-- The spawn tool is async - subagent results will be sent to the user automatically.
-- After spawning a subagent, CONTINUE to process remaining tasks.
-- Only respond with HEARTBEAT_OK when ALL tasks are done AND nothing needs attention.
-
----
-
-Add your heartbeat tasks below this line:
-`
+	defaultContent := prompts.HeartbeatTemplate
 
 	if err := os.WriteFile(heartbeatPath, []byte(defaultContent), 0644); err != nil {
 		hs.logError("Failed to create default HEARTBEAT.md: %v", err)
