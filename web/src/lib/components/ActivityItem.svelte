@@ -42,7 +42,7 @@ function label(t: string): string {
 	onclick={() => { if (onclick) { onclick(); } else if (detail) { expanded = !expanded; } }}
 >
 	<span class="text-[10px] font-bold font-mono tracking-wide shrink-0 w-12 {labelColor(event_type)}">{label(event_type)}</span>
-	<span class="text-[11px] text-text-muted leading-4.5 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+	<span class="text-[11px] text-text-muted leading-4.5 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" title={message}>
 		{message}
 	</span>
 	<span class="ml-auto pl-2 text-[10px] text-text-muted/50 font-mono shrink-0">{timestamp}</span>

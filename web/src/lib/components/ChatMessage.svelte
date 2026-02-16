@@ -38,7 +38,7 @@ function handleClick(e: MouseEvent) {
 					{#each media as path (path)}
 						<span class="inline-flex items-center gap-1.5 rounded-md bg-white/15 px-2 py-1 text-[11px] text-user-bubble-text/80">
 							<Icon src={FiFile} size="12" />
-							<span class="max-w-30 truncate">{filename(path)}</span>
+							<span class="max-w-30 truncate" title={filename(path)}>{filename(path)}</span>
 						</span>
 					{/each}
 				</div>
