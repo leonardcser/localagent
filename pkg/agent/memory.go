@@ -32,8 +32,8 @@ func NewMemoryStore(workspace string) *MemoryStore {
 	}
 }
 
-// getTodayFile returns the path to today's daily note file (memory/YYYYMM/YYYYMMDD.md).
-func (ms *MemoryStore) getTodayFile() string {
+// GetTodayFile returns the path to today's daily note file (memory/YYYYMM/YYYYMMDD.md).
+func (ms *MemoryStore) GetTodayFile() string {
 	today := time.Now().Format("20060102") // YYYYMMDD
 	monthDir := today[:6]                  // YYYYMM
 	filePath := filepath.Join(ms.memoryDir, monthDir, today+".md")
@@ -57,7 +57,7 @@ func (ms *MemoryStore) WriteLongTerm(content string) error {
 // ReadToday reads today's daily note.
 // Returns empty string if the file doesn't exist.
 func (ms *MemoryStore) ReadToday() string {
-	todayFile := ms.getTodayFile()
+	todayFile := ms.GetTodayFile()
 	if data, err := os.ReadFile(todayFile); err == nil {
 		return string(data)
 	}
@@ -67,7 +67,7 @@ func (ms *MemoryStore) ReadToday() string {
 // AppendToday appends content to today's daily note.
 // If the file doesn't exist, it creates a new file with a date header.
 func (ms *MemoryStore) AppendToday(content string) error {
-	todayFile := ms.getTodayFile()
+	todayFile := ms.GetTodayFile()
 
 	// Ensure month directory exists
 	monthDir := filepath.Dir(todayFile)

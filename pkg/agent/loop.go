@@ -600,10 +600,58 @@ func (al *AgentLoop) maybeSummarize(sessionKey string) {
 		if _, loading := al.summarizing.LoadOrStore(sessionKey, true); !loading {
 			go func() {
 				defer al.summarizing.Delete(sessionKey)
+				al.memoryFlush(sessionKey)
 				al.summarizeSession(sessionKey)
 			}()
 		}
 	}
+}
+
+// memoryFlush runs a mini agent turn to persist important conversation context
+// to daily notes before summarization truncates the history.
+func (al *AgentLoop) memoryFlush(sessionKey string) {
+	history := al.sessions.GetHistory(sessionKey)
+	if len(history) == 0 {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	registry := tools.NewToolRegistry()
+	registry.Register(tools.NewWriteFileTool(al.workspace))
+	registry.Register(tools.NewAppendFileTool(al.workspace))
+	registry.Register(tools.NewReadFileTool(al.workspace))
+
+	todayPath := al.contextBuilder.GetMemoryStore().GetTodayFile()
+
+	systemMsg := providers.Message{
+		Role:    "system",
+		Content: "You are a memory manager. Store important context from the conversation to daily notes before it gets summarized and details are lost. Write concise, useful notes — decisions, preferences, key facts, action items. Use append_file to write to: " + todayPath,
+	}
+
+	userMsg := providers.Message{
+		Role:    "user",
+		Content: "Review the conversation and save any important context to the daily notes file. Be concise. Only save information worth remembering.",
+	}
+
+	messages := []providers.Message{systemMsg}
+	messages = append(messages, history...)
+	messages = append(messages, userMsg)
+
+	result, err := tools.RunToolLoop(ctx, tools.ToolLoopConfig{
+		Provider:      al.provider,
+		Model:         al.model,
+		Tools:         registry,
+		MaxIterations: 3,
+	}, messages, "", "")
+
+	if err != nil {
+		logger.Warn("memory flush failed for session %s: %v", sessionKey, err)
+		return
+	}
+
+	logger.Info("memory flush completed for session %s: %d iterations", sessionKey, result.Iterations)
 }
 
 // GetStartupInfo returns information about loaded tools and skills for logging.

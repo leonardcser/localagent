@@ -43,6 +43,11 @@ func NewContextBuilder(workspace string) *ContextBuilder {
 	}
 }
 
+// GetMemoryStore returns the memory store for direct access (e.g. memory flush).
+func (cb *ContextBuilder) GetMemoryStore() *MemoryStore {
+	return cb.memory
+}
+
 // SetToolsRegistry sets the tools registry for dynamic tool summary generation.
 func (cb *ContextBuilder) SetToolsRegistry(registry *tools.ToolRegistry) {
 	cb.tools = registry
