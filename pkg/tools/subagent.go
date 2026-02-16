@@ -181,29 +181,19 @@ func (sm *SubagentManager) ListTasks() []*SubagentTask {
 	return tasks
 }
 
-type SubagentTool struct {
+// subagentBase holds the shared fields and methods for SpawnTool and SubagentTool.
+type subagentBase struct {
 	manager       *SubagentManager
 	originChannel string
 	originChatID  string
 }
 
-func NewSubagentTool(manager *SubagentManager) *SubagentTool {
-	return &SubagentTool{
-		manager:       manager,
-		originChannel: "cli",
-		originChatID:  "direct",
-	}
+func (b *subagentBase) SetContext(channel, chatID string) {
+	b.originChannel = channel
+	b.originChatID = chatID
 }
 
-func (t *SubagentTool) Name() string {
-	return "subagent"
-}
-
-func (t *SubagentTool) Description() string {
-	return "Execute a subagent task synchronously and return the result. Use this for delegating specific tasks to an independent agent instance."
-}
-
-func (t *SubagentTool) Parameters() map[string]any {
+func subagentParameters() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
@@ -220,9 +210,30 @@ func (t *SubagentTool) Parameters() map[string]any {
 	}
 }
 
-func (t *SubagentTool) SetContext(channel, chatID string) {
-	t.originChannel = channel
-	t.originChatID = chatID
+type SubagentTool struct {
+	subagentBase
+}
+
+func NewSubagentTool(manager *SubagentManager) *SubagentTool {
+	return &SubagentTool{
+		subagentBase: subagentBase{
+			manager:       manager,
+			originChannel: "cli",
+			originChatID:  "direct",
+		},
+	}
+}
+
+func (t *SubagentTool) Name() string {
+	return "subagent"
+}
+
+func (t *SubagentTool) Description() string {
+	return "Execute a subagent task synchronously and return the result. Use this for delegating specific tasks to an independent agent instance."
+}
+
+func (t *SubagentTool) Parameters() map[string]any {
+	return subagentParameters()
 }
 
 func (t *SubagentTool) Execute(ctx context.Context, args map[string]any) *ToolResult {

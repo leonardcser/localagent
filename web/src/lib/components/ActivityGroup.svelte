@@ -29,7 +29,7 @@ let count = $derived(items.length);
 		{/each}
 		{#if count > 1}
 			<button
-				class="flex items-baseline px-1 py-px w-full text-left cursor-pointer bg-transparent border-none font-[inherit]"
+				class="flex items-baseline py-px w-full text-left cursor-pointer bg-transparent border-none font-[inherit]"
 				onclick={() => (expanded = false)}
 			>
 				<span class="shrink-0 w-12"></span>

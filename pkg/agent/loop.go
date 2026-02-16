@@ -137,6 +137,14 @@ func (al *AgentLoop) SetActivityEmitter(e activity.Emitter) {
 	al.activity = e
 }
 
+// emitActivity broadcasts an activity event via SSE and persists it to the session.
+func (al *AgentLoop) emitActivity(sessionKey string, evt activity.Event) {
+	al.activity.Emit(evt)
+	if sessionKey != "" {
+		al.sessions.AddActivity(sessionKey, evt)
+	}
+}
+
 func (al *AgentLoop) Run(ctx context.Context) error {
 	al.running.Store(true)
 
@@ -244,7 +252,7 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 	}
 	logger.Info("processing message from %s:%s session=%s: %s", msg.Channel, msg.SenderID, msg.SessionKey, logContent)
 
-	al.activity.Emit(activity.Event{
+	al.emitActivity(msg.SessionKey, activity.Event{
 		Type:      activity.ProcessingStart,
 		Timestamp: time.Now(),
 		Message:   fmt.Sprintf("Processing message from %s:%s", msg.Channel, msg.SenderID),
@@ -382,7 +390,7 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 	responsePreview := utils.Truncate(finalContent, 120)
 	logger.Info("response: %s (session=%s iterations=%d len=%d)", responsePreview, opts.SessionKey, iteration, len(finalContent))
 
-	al.activity.Emit(activity.Event{
+	al.emitActivity(opts.SessionKey, activity.Event{
 		Type:      activity.Complete,
 		Timestamp: time.Now(),
 		Message:   fmt.Sprintf("Complete (%d iterations, %d chars)", iteration, len(finalContent)),
@@ -414,7 +422,7 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 		logger.Debug("LLM request: iteration=%d model=%s messages=%d tools=%d", iteration, al.model, len(messages), len(providerToolDefs))
 		logger.Debug("full LLM request: iteration=%d messages=%s tools=%s", iteration, formatMessagesForLog(messages), formatToolsForLog(providerToolDefs))
 
-		al.activity.Emit(activity.Event{
+		al.emitActivity(opts.SessionKey, activity.Event{
 			Type:      activity.LLMRequest,
 			Timestamp: time.Now(),
 			Message:   fmt.Sprintf("LLM request #%d (%s)", iteration, al.model),
@@ -434,7 +442,7 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 
 		if err != nil {
 			logger.Error("LLM call failed: iteration=%d: %v", iteration, err)
-			al.activity.Emit(activity.Event{
+			al.emitActivity(opts.SessionKey, activity.Event{
 				Type:      activity.LLMError,
 				Timestamp: time.Now(),
 				Message:   fmt.Sprintf("LLM error on iteration #%d", iteration),
@@ -447,7 +455,7 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 		if len(response.ToolCalls) == 0 {
 			finalContent = response.Content
 			logger.Info("LLM response (direct answer): iteration=%d chars=%d", iteration, len(finalContent))
-			al.activity.Emit(activity.Event{
+			al.emitActivity(opts.SessionKey, activity.Event{
 				Type:      activity.LLMResponse,
 				Timestamp: time.Now(),
 				Message:   fmt.Sprintf("LLM response #%d (%d chars)", iteration, len(finalContent)),
@@ -466,7 +474,7 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 		}
 		logger.Info("LLM requested tool calls: %v (count=%d iteration=%d)", toolNames, len(response.ToolCalls), iteration)
 
-		al.activity.Emit(activity.Event{
+		al.emitActivity(opts.SessionKey, activity.Event{
 			Type:      activity.ToolCall,
 			Timestamp: time.Now(),
 			Message:   fmt.Sprintf("Calling %d tool(s): %s", len(response.ToolCalls), strings.Join(toolNames, ", ")),
@@ -478,21 +486,7 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 		})
 
 		// Build assistant message with tool calls
-		assistantMsg := providers.Message{
-			Role:    "assistant",
-			Content: response.Content,
-		}
-		for _, tc := range response.ToolCalls {
-			argumentsJSON, _ := json.Marshal(tc.Arguments)
-			assistantMsg.ToolCalls = append(assistantMsg.ToolCalls, providers.ToolCall{
-				ID:   tc.ID,
-				Type: "function",
-				Function: &providers.FunctionCall{
-					Name:      tc.Name,
-					Arguments: string(argumentsJSON),
-				},
-			})
-		}
+		assistantMsg := tools.BuildAssistantToolCallMessage(response.Content, response.ToolCalls)
 		messages = append(messages, assistantMsg)
 
 		// Save assistant message with tool calls to session
@@ -505,7 +499,7 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 			argsPreview := utils.Truncate(string(argsJSON), 200)
 			logger.Info("tool call: %s(%s) iteration=%d", tc.Name, argsPreview, iteration)
 
-			al.activity.Emit(activity.Event{
+			al.emitActivity(opts.SessionKey, activity.Event{
 				Type:      activity.ToolCall,
 				Timestamp: time.Now(),
 				Message:   fmt.Sprintf("Tool: %s", tc.Name),
@@ -531,7 +525,7 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 			if toolResult.Err != nil {
 				status = "error"
 			}
-			al.activity.Emit(activity.Event{
+			al.emitActivity(opts.SessionKey, activity.Event{
 				Type:      activity.ToolResult,
 				Timestamp: time.Now(),
 				Message:   fmt.Sprintf("Tool result: %s (%s)", tc.Name, status),
@@ -552,17 +546,7 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 				logger.Debug("sent tool result to user: %s content_len=%d", tc.Name, len(toolResult.ForUser))
 			}
 
-			// Determine content for LLM based on tool result
-			contentForLLM := toolResult.ForLLM
-			if contentForLLM == "" && toolResult.Err != nil {
-				contentForLLM = toolResult.Err.Error()
-			}
-
-			toolResultMsg := providers.Message{
-				Role:       "tool",
-				Content:    contentForLLM,
-				ToolCallID: tc.ID,
-			}
+			toolResultMsg := tools.BuildToolResultMessage(tc.ID, toolResult)
 			messages = append(messages, toolResultMsg)
 
 			// Save tool result message to session

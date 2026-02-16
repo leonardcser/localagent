@@ -1,8 +1,6 @@
 package cron
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -13,6 +11,7 @@ import (
 	"github.com/adhocore/gronx"
 
 	"localagent/pkg/logger"
+	"localagent/pkg/utils"
 )
 
 type CronSchedule struct {
@@ -333,7 +332,7 @@ func (cs *CronService) AddJob(name string, schedule CronSchedule, message string
 	deleteAfterRun := (schedule.Kind == "at")
 
 	job := CronJob{
-		ID:       generateID(),
+		ID:       utils.RandHex(8),
 		Name:     name,
 		Enabled:  true,
 		Schedule: schedule,
@@ -444,10 +443,3 @@ func (cs *CronService) ListJobs(includeDisabled bool) []CronJob {
 	return enabled
 }
 
-func generateID() string {
-	b := make([]byte, 8)
-	if _, err := rand.Read(b); err != nil {
-		return fmt.Sprintf("%d", time.Now().UnixNano())
-	}
-	return hex.EncodeToString(b)
-}

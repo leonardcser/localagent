@@ -9,7 +9,7 @@ import {
 } from "$lib/api";
 
 export type TimelineItem =
-	| { kind: "message"; id: number; role: string; content: string; timestamp: string }
+	| { kind: "message"; id: number; role: string; content: string; timestamp: string; media?: string[] }
 	| ({ kind: "activity"; id: number } & ActivityEventData);
 
 let nextId = 0;
@@ -44,14 +44,28 @@ function createChat() {
 		} else {
 			try {
 				const history = await getHistory();
-				timeline = history
-					.filter((m) => m.content)
-					.map((m) => ({
-						kind: "message" as const,
-						...m,
-						timestamp: now(),
-						id: ++nextId,
-					}));
+				timeline = history.items
+					.map((item): TimelineItem | null => {
+						if (item.type === "message") {
+							if (!item.content) return null;
+							return {
+								kind: "message",
+								role: item.role!,
+								content: item.content,
+								timestamp: item.timestamp,
+								id: ++nextId,
+							};
+						}
+						return {
+							kind: "activity",
+							event_type: item.event_type!,
+							timestamp: item.timestamp,
+							message: item.message!,
+							detail: item.detail,
+							id: ++nextId,
+						};
+					})
+					.filter((item): item is TimelineItem => item !== null);
 			} catch {
 				// ignore
 			}
@@ -73,7 +87,7 @@ function createChat() {
 		const media = [...pendingMedia];
 		if (!content && media.length === 0) return;
 
-		addMessage({ role: "user", content });
+		timeline.push({ kind: "message", role: "user", content, timestamp: now(), id: ++nextId, media: media.length > 0 ? media : undefined });
 		input = "";
 		pendingMedia = [];
 		loading = true;

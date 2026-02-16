@@ -1,5 +1,7 @@
 <script lang="ts">
 import { renderMarkdown } from "$lib/markdown";
+import { Icon } from "svelte-icons-pack";
+import { FiFile } from "svelte-icons-pack/fi";
 
 const COPY_LABEL = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
 const CHECK_LABEL = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
@@ -8,7 +10,12 @@ let {
 	role,
 	content,
 	timestamp,
-}: { role: string; content: string; timestamp: string } = $props();
+	media,
+}: { role: string; content: string; timestamp: string; media?: string[] } = $props();
+
+function filename(path: string): string {
+	return path.split("/").pop() || path;
+}
 
 let html = $state("");
 
@@ -32,6 +39,16 @@ function handleClick(e: MouseEvent) {
 {#if role === "user"}
 	<div class="flex flex-col items-end self-end max-w-[85%] sm:max-w-[75%]">
 		<div class="user-msg rounded-2xl rounded-br-md bg-user-bubble px-3.5 py-2.5 text-[14px] leading-relaxed text-user-bubble-text">
+			{#if media && media.length > 0}
+				<div class="mb-1.5 flex flex-wrap gap-1.5">
+					{#each media as path (path)}
+						<span class="inline-flex items-center gap-1.5 rounded-md bg-white/15 px-2 py-1 text-[11px] text-user-bubble-text/80">
+							<Icon src={FiFile} size="12" />
+							<span class="max-w-30 truncate">{filename(path)}</span>
+						</span>
+					{/each}
+				</div>
+			{/if}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div class="msg-content" onclick={handleClick} onkeydown={() => {}}>{@html html}</div>
 		</div>

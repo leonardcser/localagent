@@ -6,17 +6,17 @@ import (
 )
 
 type SpawnTool struct {
-	manager       *SubagentManager
-	originChannel string
-	originChatID  string
-	callback      AsyncCallback // For async completion notification
+	subagentBase
+	callback AsyncCallback // For async completion notification
 }
 
 func NewSpawnTool(manager *SubagentManager) *SpawnTool {
 	return &SpawnTool{
-		manager:       manager,
-		originChannel: "cli",
-		originChatID:  "direct",
+		subagentBase: subagentBase{
+			manager:       manager,
+			originChannel: "cli",
+			originChatID:  "direct",
+		},
 	}
 }
 
@@ -34,25 +34,7 @@ func (t *SpawnTool) Description() string {
 }
 
 func (t *SpawnTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"task": map[string]any{
-				"type":        "string",
-				"description": "The task for subagent to complete",
-			},
-			"label": map[string]any{
-				"type":        "string",
-				"description": "Optional short label for the task (for display)",
-			},
-		},
-		"required": []string{"task"},
-	}
-}
-
-func (t *SpawnTool) SetContext(channel, chatID string) {
-	t.originChannel = channel
-	t.originChatID = chatID
+	return subagentParameters()
 }
 
 func (t *SpawnTool) Execute(ctx context.Context, args map[string]any) *ToolResult {

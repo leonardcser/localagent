@@ -9,7 +9,7 @@ import DropOverlay from "$lib/components/DropOverlay.svelte";
 import { Icon } from "svelte-icons-pack";
 import { FiChevronDown } from "svelte-icons-pack/fi";
 
-type MessageItem = { kind: "message"; id: number; role: string; content: string; timestamp: string };
+type MessageItem = { kind: "message"; id: number; role: string; content: string; timestamp: string; media?: string[] };
 type ActivityItem_ = Extract<TimelineItem, { kind: "activity" }>;
 type GroupedItem =
 	| MessageItem
@@ -142,7 +142,7 @@ onDestroy(() => {
 	>
 		{#each groups as group (group.id)}
 			{#if group.kind === "message"}
-				<ChatMessage role={group.role} content={group.content} timestamp={group.timestamp} />
+				<ChatMessage role={group.role} content={group.content} timestamp={group.timestamp} media={group.media} />
 			{:else}
 				<ActivityGroup items={group.items} />
 			{/if}

@@ -38,7 +38,7 @@ function label(t: string): string {
 </script>
 
 <button
-	class="flex w-full items-baseline py-px px-1 text-left cursor-pointer bg-transparent border-none font-[inherit]"
+	class="flex w-full items-baseline py-px text-left cursor-pointer bg-transparent border-none font-[inherit]"
 	onclick={() => { if (onclick) { onclick(); } else if (detail) { expanded = !expanded; } }}
 >
 	<span class="text-[10px] font-bold font-mono tracking-wide shrink-0 w-12 {labelColor(event_type)}">{label(event_type)}</span>

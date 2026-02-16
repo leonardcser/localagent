@@ -22,6 +22,39 @@ type ToolLoopResult struct {
 	Iterations int
 }
 
+// BuildAssistantToolCallMessage builds an assistant message with serialized tool call arguments.
+func BuildAssistantToolCallMessage(content string, toolCalls []providers.ToolCall) providers.Message {
+	msg := providers.Message{
+		Role:    "assistant",
+		Content: content,
+	}
+	for _, tc := range toolCalls {
+		argumentsJSON, _ := json.Marshal(tc.Arguments)
+		msg.ToolCalls = append(msg.ToolCalls, providers.ToolCall{
+			ID:   tc.ID,
+			Type: "function",
+			Function: &providers.FunctionCall{
+				Name:      tc.Name,
+				Arguments: string(argumentsJSON),
+			},
+		})
+	}
+	return msg
+}
+
+// BuildToolResultMessage builds a tool result message with ForLLM/Err fallback logic.
+func BuildToolResultMessage(toolCallID string, result *ToolResult) providers.Message {
+	contentForLLM := result.ForLLM
+	if contentForLLM == "" && result.Err != nil {
+		contentForLLM = result.Err.Error()
+	}
+	return providers.Message{
+		Role:       "tool",
+		Content:    contentForLLM,
+		ToolCallID: toolCallID,
+	}
+}
+
 func RunToolLoop(ctx context.Context, config ToolLoopConfig, messages []providers.Message, channel, chatID string) (*ToolLoopResult, error) {
 	iteration := 0
 	var finalContent string
@@ -56,22 +89,7 @@ func RunToolLoop(ctx context.Context, config ToolLoopConfig, messages []provider
 
 		logger.Info("toolloop: LLM requested %d tool call(s)", len(response.ToolCalls))
 
-		assistantMsg := providers.Message{
-			Role:    "assistant",
-			Content: response.Content,
-		}
-		for _, tc := range response.ToolCalls {
-			argumentsJSON, _ := json.Marshal(tc.Arguments)
-			assistantMsg.ToolCalls = append(assistantMsg.ToolCalls, providers.ToolCall{
-				ID:   tc.ID,
-				Type: "function",
-				Function: &providers.FunctionCall{
-					Name:      tc.Name,
-					Arguments: string(argumentsJSON),
-				},
-			})
-		}
-		messages = append(messages, assistantMsg)
+		messages = append(messages, BuildAssistantToolCallMessage(response.Content, response.ToolCalls))
 
 		for _, tc := range response.ToolCalls {
 			argsJSON, _ := json.Marshal(tc.Arguments)
@@ -88,17 +106,7 @@ func RunToolLoop(ctx context.Context, config ToolLoopConfig, messages []provider
 				toolResult = ErrorResult("No tools available")
 			}
 
-			contentForLLM := toolResult.ForLLM
-			if contentForLLM == "" && toolResult.Err != nil {
-				contentForLLM = toolResult.Err.Error()
-			}
-
-			toolResultMsg := providers.Message{
-				Role:       "tool",
-				Content:    contentForLLM,
-				ToolCallID: tc.ID,
-			}
-			messages = append(messages, toolResultMsg)
+			messages = append(messages, BuildToolResultMessage(tc.ID, toolResult))
 		}
 	}
 

@@ -1,8 +1,6 @@
 package webchat
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -27,9 +25,19 @@ type uploadResponse struct {
 	Path string `json:"path"`
 }
 
-type historyMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+type historyResponse struct {
+	Summary string         `json:"summary,omitempty"`
+	Items   []timelineItem `json:"items"`
+}
+
+type timelineItem struct {
+	Type      string         `json:"type"`
+	Role      string         `json:"role,omitempty"`
+	Content   string         `json:"content,omitempty"`
+	EventType string         `json:"event_type,omitempty"`
+	Message   string         `json:"message,omitempty"`
+	Detail    map[string]any `json:"detail,omitempty"`
+	Timestamp string         `json:"timestamp"`
 }
 
 func (s *Server) handleSPA(c *echo.Context) error {
@@ -80,7 +88,7 @@ func (s *Server) handleUpload(c *echo.Context) error {
 	}
 
 	safeName := utils.SanitizeFilename(file.Filename)
-	prefix := randHex(8)
+	prefix := utils.RandHex(8)
 	localPath := filepath.Join(mediaDir, prefix+"_"+safeName)
 
 	src, err := file.Open()
@@ -106,25 +114,45 @@ func (s *Server) handleUpload(c *echo.Context) error {
 
 func (s *Server) handleHistory(c *echo.Context) error {
 	if s.channel.sessions == nil {
-		return c.JSON(http.StatusOK, []historyMessage{})
+		return c.JSON(http.StatusOK, historyResponse{Items: []timelineItem{}})
 	}
 
-	history := s.channel.sessions.GetHistory("web:default")
-	messages := make([]historyMessage, 0, len(history))
-	for _, msg := range history {
-		if msg.Role == "user" || msg.Role == "assistant" {
-			messages = append(messages, historyMessage{
-				Role:    msg.Role,
-				Content: msg.Content,
+	timeline := s.channel.sessions.GetTimeline("web:default")
+	summary := s.channel.sessions.GetSummary("web:default")
+
+	items := make([]timelineItem, 0, len(timeline))
+	for _, entry := range timeline {
+		if entry.Kind == "message" {
+			msg := entry.Message
+			if msg.Role != "user" && msg.Role != "assistant" {
+				continue
+			}
+			items = append(items, timelineItem{
+				Type:      "message",
+				Role:      msg.Role,
+				Content:   msg.Content,
+				Timestamp: entry.Timestamp.Format("15:04:05"),
+			})
+		} else if entry.Activity != nil {
+			evt := entry.Activity
+			items = append(items, timelineItem{
+				Type:      "activity",
+				EventType: string(evt.Type),
+				Message:   evt.Message,
+				Detail:    evt.Detail,
+				Timestamp: entry.Timestamp.Format("15:04:05"),
 			})
 		}
 	}
 
-	return c.JSON(http.StatusOK, messages)
+	return c.JSON(http.StatusOK, historyResponse{
+		Summary: summary,
+		Items:   items,
+	})
 }
 
 func (s *Server) handleSSE(c *echo.Context) error {
-	clientID := randHex(16)
+	clientID := utils.RandHex(16)
 	client := s.channel.registerClient(clientID)
 
 	w := c.Response()
@@ -157,8 +185,3 @@ func (s *Server) handleSSE(c *echo.Context) error {
 	}
 }
 
-func randHex(n int) string {
-	b := make([]byte, n)
-	rand.Read(b)
-	return hex.EncodeToString(b)
-}

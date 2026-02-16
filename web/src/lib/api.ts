@@ -3,6 +3,21 @@ export interface HistoryMessage {
 	content: string;
 }
 
+export interface HistoryItem {
+	type: "message" | "activity";
+	role?: string;
+	content?: string;
+	event_type?: string;
+	message?: string;
+	detail?: Record<string, unknown>;
+	timestamp: string;
+}
+
+export interface HistoryResponse {
+	summary?: string;
+	items: HistoryItem[];
+}
+
 export interface ActivityEventData {
 	event_type: string;
 	timestamp: string;
@@ -11,7 +26,7 @@ export interface ActivityEventData {
 }
 
 export type MockTimelineItem =
-	| { kind: "message"; role: string; content: string; timestamp: string }
+	| { kind: "message"; role: string; content: string; timestamp: string; media?: string[] }
 	| ({ kind: "activity" } & ActivityEventData);
 
 const DEV = import.meta.env.DEV;
@@ -25,6 +40,7 @@ const mockTimeline: MockTimelineItem[] = [
 		role: "user",
 		content: "What files are in the workspace?",
 		timestamp: "14:20:11",
+		media: ["/uploads/screenshot.png"],
 	},
 	{
 		kind: "activity",
@@ -336,9 +352,10 @@ export async function uploadFile(
 	}
 }
 
-export async function getHistory(): Promise<HistoryMessage[]> {
-	if (DEV) return [];
+export async function getHistory(): Promise<HistoryResponse> {
+	if (DEV) return { items: [] };
 	const res = await fetch("/api/history");
+	if (!res.ok) return { items: [] };
 	return res.json();
 }
 
