@@ -108,13 +108,6 @@ func (hs *HeartbeatService) Stop() {
 	hs.stopChan = nil
 }
 
-// IsRunning returns whether the service is running
-func (hs *HeartbeatService) IsRunning() bool {
-	hs.mu.RLock()
-	defer hs.mu.RUnlock()
-	return hs.stopChan != nil
-}
-
 // runLoop runs the heartbeat ticker
 func (hs *HeartbeatService) runLoop(stopChan chan struct{}) {
 	ticker := time.NewTicker(hs.interval)

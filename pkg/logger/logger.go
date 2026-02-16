@@ -3,23 +3,9 @@ package logger
 import (
 	"fmt"
 	"os"
-	"strings"
 	"sync/atomic"
 	"time"
 )
-
-var noopFunc = func() {}
-
-func Trace(name string) func() {
-	gl := globalLoggerPtr.Load()
-	if gl == nil || !gl.shouldLog(LevelTrace) {
-		return noopFunc
-	}
-	start := time.Now()
-	return func() {
-		gl.logWithLevel(LevelTrace, "%s: %v", name, time.Since(start))
-	}
-}
 
 var defaultLogger = &Logger{
 	level: LevelInfo,
@@ -49,23 +35,6 @@ func (l Level) String() string {
 		return "ERROR"
 	default:
 		return "UNKNOWN"
-	}
-}
-
-func ParseLevel(s string) Level {
-	switch strings.ToUpper(s) {
-	case "TRACE":
-		return LevelTrace
-	case "DEBUG":
-		return LevelDebug
-	case "INFO":
-		return LevelInfo
-	case "WARN", "WARNING":
-		return LevelWarn
-	case "ERROR":
-		return LevelError
-	default:
-		return LevelInfo
 	}
 }
 
@@ -105,11 +74,6 @@ func (l *Logger) Info(format string, v ...any)  { l.logWithLevel(LevelInfo, form
 func (l *Logger) Warn(format string, v ...any)  { l.logWithLevel(LevelWarn, format, v...) }
 func (l *Logger) Error(format string, v ...any) { l.logWithLevel(LevelError, format, v...) }
 
-func (l *Logger) Fatal(format string, v ...any) {
-	l.logWithLevel(LevelError, format, v...)
-	os.Exit(1)
-}
-
 func getLogger() *Logger {
 	if gl := globalLoggerPtr.Load(); gl != nil {
 		return gl
@@ -121,4 +85,3 @@ func Debug(format string, v ...any) { getLogger().Debug(format, v...) }
 func Info(format string, v ...any)  { getLogger().Info(format, v...) }
 func Warn(format string, v ...any)  { getLogger().Warn(format, v...) }
 func Error(format string, v ...any) { getLogger().Error(format, v...) }
-func Fatal(format string, v ...any) { getLogger().Fatal(format, v...) }

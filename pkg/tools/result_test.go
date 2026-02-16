@@ -74,27 +74,6 @@ func TestErrorResult(t *testing.T) {
 	}
 }
 
-func TestUserResult(t *testing.T) {
-	content := "user visible message"
-	result := UserResult(content)
-
-	if result.ForLLM != content {
-		t.Errorf("Expected ForLLM '%s', got '%s'", content, result.ForLLM)
-	}
-	if result.ForUser != content {
-		t.Errorf("Expected ForUser '%s', got '%s'", content, result.ForUser)
-	}
-	if result.Silent {
-		t.Error("Expected Silent to be false")
-	}
-	if result.IsError {
-		t.Error("Expected IsError to be false")
-	}
-	if result.Async {
-		t.Error("Expected Async to be false")
-	}
-}
-
 func TestToolResultJSONSerialization(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -115,10 +94,6 @@ func TestToolResultJSONSerialization(t *testing.T) {
 		{
 			name:   "error result",
 			result: ErrorResult("error content"),
-		},
-		{
-			name:   "user result",
-			result: UserResult("user content"),
 		},
 	}
 
@@ -184,7 +159,8 @@ func TestToolResultWithErrors(t *testing.T) {
 }
 
 func TestToolResultJSONStructure(t *testing.T) {
-	result := UserResult("test content")
+	result := NewToolResult("test content")
+	result.ForUser = "test content"
 
 	data, err := json.Marshal(result)
 	if err != nil {

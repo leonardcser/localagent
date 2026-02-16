@@ -254,6 +254,25 @@ func gatewayCmd() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	healthServer := health.NewServer(cfg.Gateway.Host, cfg.Gateway.Port)
+	healthServer.RegisterCheck("llm", func() (bool, string) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.Provider.APIBase+"/v1/models", nil)
+		if err != nil {
+			return false, err.Error()
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return false, err.Error()
+		}
+		resp.Body.Close()
+		return resp.StatusCode < 500, fmt.Sprintf("status %d", resp.StatusCode)
+	})
+	go func() {
+		if err := healthServer.StartContext(ctx); err != nil && err != http.ErrServerClosed {
+			logger.Error("health server error: %v", err)
+		}
+	}()
+
 	if err := cronService.Start(); err != nil {
 		fmt.Printf("Error starting cron service: %v\n", err)
 	}
@@ -266,23 +285,18 @@ func gatewayCmd() {
 		fmt.Printf("Error starting channels: %v\n", err)
 	}
 
-	healthServer := health.NewServer(cfg.Gateway.Host, cfg.Gateway.Port)
-	go func() {
-		if err := healthServer.Start(); err != nil && err != http.ErrServerClosed {
-			logger.Error("health server error: %v", err)
-		}
-	}()
+	go agentLoop.Run(ctx)
 
+	healthServer.SetReady(true)
 	fmt.Printf("Gateway started on %s:%d\n", cfg.Gateway.Host, cfg.Gateway.Port)
 	fmt.Println("Press Ctrl+C to stop")
-
-	go agentLoop.Run(ctx)
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)
 	<-sigChan
 
 	fmt.Println("\nShutting down...")
+	healthServer.SetReady(false)
 	cancel()
 	healthServer.Stop(context.Background())
 	heartbeatService.Stop()

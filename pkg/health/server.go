@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"sync"
 	"time"
@@ -13,7 +14,7 @@ type Server struct {
 	server    *http.Server
 	mu        sync.RWMutex
 	ready     bool
-	checks    map[string]Check
+	checkFns  map[string]func() (bool, string)
 	startTime time.Time
 }
 
@@ -34,7 +35,7 @@ func NewServer(host string, port int) *Server {
 	mux := http.NewServeMux()
 	s := &Server{
 		ready:     false,
-		checks:    make(map[string]Check),
+		checkFns:  make(map[string]func() (bool, string)),
 		startTime: time.Now(),
 	}
 
@@ -53,17 +54,10 @@ func NewServer(host string, port int) *Server {
 }
 
 func (s *Server) Start() error {
-	s.mu.Lock()
-	s.ready = true
-	s.mu.Unlock()
 	return s.server.ListenAndServe()
 }
 
 func (s *Server) StartContext(ctx context.Context) error {
-	s.mu.Lock()
-	s.ready = true
-	s.mu.Unlock()
-
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- s.server.ListenAndServe()
@@ -93,14 +87,26 @@ func (s *Server) SetReady(ready bool) {
 func (s *Server) RegisterCheck(name string, checkFn func() (bool, string)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.checkFns[name] = checkFn
+}
 
-	status, msg := checkFn()
-	s.checks[name] = Check{
-		Name:      name,
-		Status:    statusString(status),
-		Message:   msg,
-		Timestamp: time.Now(),
+func (s *Server) runChecks() map[string]Check {
+	s.mu.RLock()
+	fns := make(map[string]func() (bool, string), len(s.checkFns))
+	maps.Copy(fns, s.checkFns)
+	s.mu.RUnlock()
+
+	checks := make(map[string]Check, len(fns))
+	for name, fn := range fns {
+		ok, msg := fn()
+		checks[name] = Check{
+			Name:      name,
+			Status:    statusString(ok),
+			Message:   msg,
+			Timestamp: time.Now(),
+		}
 	}
+	return checks
 }
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -121,11 +127,9 @@ func (s *Server) readyHandler(w http.ResponseWriter, r *http.Request) {
 
 	s.mu.RLock()
 	ready := s.ready
-	checks := make(map[string]Check)
-	for k, v := range s.checks {
-		checks[k] = v
-	}
 	s.mu.RUnlock()
+
+	checks := s.runChecks()
 
 	if !ready {
 		w.WriteHeader(http.StatusServiceUnavailable)

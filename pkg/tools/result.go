@@ -99,27 +99,6 @@ func ErrorResult(message string) *ToolResult {
 	}
 }
 
-// UserResult creates a ToolResult with content for both LLM and user.
-// Both ForLLM and ForUser are set to the same content.
-//
-// Use this when the user needs to see the result directly:
-// - Command execution output
-// - Fetched web content
-// - Query results
-//
-// Example:
-//
-//	result := UserResult("Total files found: 42")
-func UserResult(content string) *ToolResult {
-	return &ToolResult{
-		ForLLM:  content,
-		ForUser: content,
-		Silent:  false,
-		IsError: false,
-		Async:   false,
-	}
-}
-
 // MarshalJSON implements custom JSON serialization.
 // The Err field is excluded from JSON output via the json:"-" tag.
 func (tr *ToolResult) MarshalJSON() ([]byte, error) {
