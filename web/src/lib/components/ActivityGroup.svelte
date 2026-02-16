@@ -1,4 +1,5 @@
 <script lang="ts">
+import { fade } from "svelte/transition";
 import ActivityItem from "./ActivityItem.svelte";
 import type { TimelineItem } from "$lib/stores/chat.svelte";
 
@@ -36,12 +37,27 @@ let count = $derived(items.length);
 			</button>
 		{/if}
 	{:else}
-		<ActivityItem
-			event_type={latest.event_type}
-			timestamp={latest.timestamp}
-			message={count > 1 ? `${latest.message} (+${count - 1} more)` : latest.message}
-			detail={latest.detail}
-			onclick={count > 1 ? () => (expanded = true) : undefined}
-		/>
+		<div class="activity-latest">
+			{#key latest.id}
+				<div in:fade={{ duration: 200 }}>
+					<ActivityItem
+						event_type={latest.event_type}
+						timestamp={latest.timestamp}
+						message={count > 1 ? `${latest.message} (+${count - 1} more)` : latest.message}
+						detail={latest.detail}
+						onclick={count > 1 ? () => (expanded = true) : undefined}
+					/>
+				</div>
+			{/key}
+		</div>
 	{/if}
 </div>
+
+<style>
+	.activity-latest {
+		display: grid;
+	}
+	.activity-latest > :global(div) {
+		grid-area: 1 / 1;
+	}
+</style>
