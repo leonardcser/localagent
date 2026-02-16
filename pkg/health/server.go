@@ -53,10 +53,6 @@ func NewServer(host string, port int) *Server {
 	return s
 }
 
-func (s *Server) Start() error {
-	return s.server.ListenAndServe()
-}
-
 func (s *Server) StartContext(ctx context.Context) error {
 	errCh := make(chan error, 1)
 	go func() {

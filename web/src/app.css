@@ -42,19 +42,20 @@ body {
 	color: var(--color-text-primary);
 }
 
-.messages-scroll::-webkit-scrollbar {
+::-webkit-scrollbar {
 	width: 6px;
+	height: 0;
 }
 
-.messages-scroll::-webkit-scrollbar-track {
+::-webkit-scrollbar-track {
 	background: transparent;
 }
 
-.messages-scroll::-webkit-scrollbar-thumb {
+::-webkit-scrollbar-thumb {
 	background: rgba(255, 255, 255, 0.1);
 	border-radius: 3px;
 }
 
-.messages-scroll::-webkit-scrollbar-thumb:hover {
+::-webkit-scrollbar-thumb:hover {
 	background: rgba(255, 255, 255, 0.18);
 }

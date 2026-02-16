@@ -2,6 +2,7 @@ package utils
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -39,6 +40,12 @@ func DetectMIMEType(filename string) string {
 // IsPDFFile checks if a file is a PDF based on its filename extension.
 func IsPDFFile(filename string) bool {
 	return strings.ToLower(filepath.Ext(filename)) == ".pdf"
+}
+
+// IsAudioFile checks if a file is an audio file based on its filename extension.
+func IsAudioFile(filename string) bool {
+	audioExtensions := []string{".mp3", ".wav", ".ogg", ".flac", ".m4a", ".webm", ".aac", ".opus"}
+	return slices.Contains(audioExtensions, strings.ToLower(filepath.Ext(filename)))
 }
 
 // SanitizeFilename removes potentially dangerous characters from a filename

@@ -1,6 +1,10 @@
 <script lang="ts">
 import { onMount, onDestroy } from "svelte";
-import { chat, type MessageTimelineItem, type ActivityTimelineItem } from "$lib/stores/chat.svelte";
+import {
+	chat,
+	type MessageTimelineItem,
+	type ActivityTimelineItem,
+} from "$lib/stores/chat.svelte";
 import ChatMessage from "$lib/components/ChatMessage.svelte";
 import ActivityGroup from "$lib/components/ActivityGroup.svelte";
 import LoadingBubble from "$lib/components/LoadingBubble.svelte";

@@ -94,9 +94,22 @@ func (p PDFConfig) ResolveAPIKey() string {
 	return os.Getenv(p.APIKeyEnv)
 }
 
+type WhisperConfig struct {
+	URL       string `json:"url"`
+	APIKeyEnv string `json:"api_key_env"`
+}
+
+func (w WhisperConfig) ResolveAPIKey() string {
+	if w.APIKeyEnv == "" {
+		return ""
+	}
+	return os.Getenv(w.APIKeyEnv)
+}
+
 type ToolsConfig struct {
-	Web WebToolsConfig `json:"web"`
-	PDF PDFConfig      `json:"pdf"`
+	Web     WebToolsConfig `json:"web"`
+	PDF     PDFConfig      `json:"pdf"`
+	Whisper WhisperConfig  `json:"whisper"`
 }
 
 func DefaultConfig() *Config {

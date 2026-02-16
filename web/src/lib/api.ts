@@ -27,7 +27,13 @@ export interface ActivityEventData {
 }
 
 export type MockTimelineItem =
-	| { kind: "message"; role: string; content: string; timestamp: string; media?: string[] }
+	| {
+			kind: "message";
+			role: string;
+			content: string;
+			timestamp: string;
+			media?: string[];
+	  }
 	| ({ kind: "activity" } & ActivityEventData);
 
 import { nowTimestamp } from "$lib/utils";
@@ -355,6 +361,23 @@ export async function uploadFile(
 	}
 }
 
+export async function transcribeAudio(file: File): Promise<string | null> {
+	if (DEV) return "mock transcription";
+	const form = new FormData();
+	form.append("file", file);
+	try {
+		const res = await fetch("/api/transcribe", {
+			method: "POST",
+			body: form,
+		});
+		if (!res.ok) return null;
+		const data = await res.json();
+		return data.text || null;
+	} catch {
+		return null;
+	}
+}
+
 export async function getHistory(): Promise<HistoryResponse> {
 	if (DEV) return { items: [] };
 	const res = await fetch("/api/history");
@@ -365,6 +388,7 @@ export async function getHistory(): Promise<HistoryResponse> {
 export function connectSSE(
 	onMessage: (msg: HistoryMessage) => void,
 	onActivity: (evt: ActivityEventData) => void,
+	onStatus: (processing: boolean) => void,
 ): EventSource {
 	if (DEV) return mockSSE(onMessage, onActivity);
 
@@ -372,7 +396,9 @@ export function connectSSE(
 	es.onmessage = (e) => {
 		try {
 			const data = JSON.parse(e.data);
-			if (data.type === "activity" && data.event) {
+			if (data.type === "status" && typeof data.processing === "boolean") {
+				onStatus(data.processing);
+			} else if (data.type === "activity" && data.event) {
 				onActivity(data.event);
 			} else if (data.role && data.content) {
 				onMessage({ role: data.role, content: data.content });

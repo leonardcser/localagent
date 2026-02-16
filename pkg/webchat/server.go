@@ -46,6 +46,8 @@ func (s *Server) setupRoutes() {
 	s.echo.POST("/api/upload", s.handleUpload)
 	s.echo.GET("/api/history", s.handleHistory)
 	s.echo.GET("/api/events", s.handleSSE)
+	s.echo.GET("/api/media/:filename", s.handleMedia)
+	s.echo.POST("/api/transcribe", s.handleTranscribe)
 
 	s.echo.GET("/*", s.handleSPA)
 }

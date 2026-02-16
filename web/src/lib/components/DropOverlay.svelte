@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Icon } from "svelte-icons-pack";
-	import { FiUpload } from "svelte-icons-pack/fi";
+import { Icon } from "svelte-icons-pack";
+import { FiUpload } from "svelte-icons-pack/fi";
 </script>
 
 <div

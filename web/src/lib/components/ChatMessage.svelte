@@ -1,6 +1,6 @@
 <script lang="ts">
 import { renderMarkdown, COPY_SVG, CHECK_SVG } from "$lib/markdown";
-import { filename } from "$lib/utils";
+import { filename, isAudio, mediaUrl } from "$lib/utils";
 import { Icon } from "svelte-icons-pack";
 import { FiFile } from "svelte-icons-pack/fi";
 
@@ -9,7 +9,8 @@ let {
 	content,
 	timestamp,
 	media,
-}: { role: string; content: string; timestamp: string; media?: string[] } = $props();
+}: { role: string; content: string; timestamp: string; media?: string[] } =
+	$props();
 
 let html = $state("");
 
@@ -20,7 +21,9 @@ $effect(() => {
 });
 
 function handleClick(e: MouseEvent) {
-	const btn = (e.target as HTMLElement).closest(".copy-btn") as HTMLButtonElement | null;
+	const btn = (e.target as HTMLElement).closest(
+		".copy-btn",
+	) as HTMLButtonElement | null;
 	if (!btn?.dataset.code) return;
 	navigator.clipboard.writeText(btn.dataset.code);
 	btn.innerHTML = CHECK_SVG;
@@ -31,26 +34,34 @@ function handleClick(e: MouseEvent) {
 </script>
 
 {#if role === "user"}
-	<div class="flex flex-col items-end self-end max-w-[85%] sm:max-w-[75%]">
-		<div class="user-msg rounded-2xl rounded-br-md bg-user-bubble px-3.5 py-2.5 text-[14px] leading-relaxed text-user-bubble-text">
+	<div class="flex flex-col items-end self-end min-w-0 max-w-[85%] sm:max-w-[75%]">
+		<div class="user-msg max-w-full overflow-hidden rounded-2xl rounded-br-md bg-user-bubble px-3.5 py-2.5 text-[14px] leading-relaxed text-user-bubble-text">
 			{#if media && media.length > 0}
-				<div class="mb-1.5 flex flex-wrap gap-1.5">
+				<div class="flex flex-col gap-1.5 {content ? 'mb-1.5' : ''}">
 					{#each media as path (path)}
-						<span class="inline-flex items-center gap-1.5 rounded-md bg-white/15 px-2 py-1 text-[11px] text-user-bubble-text/80">
-							<Icon src={FiFile} size="12" />
-							<span class="max-w-30 truncate" title={filename(path)}>{filename(path)}</span>
-						</span>
+						{#if isAudio(path)}
+							<audio class="audio-player" controls preload="metadata" src={mediaUrl(path)}>
+								<track kind="captions" />
+							</audio>
+						{:else}
+							<span class="inline-flex items-center gap-1.5 rounded-md bg-white/15 px-2 py-1 text-[11px] text-user-bubble-text/80">
+								<Icon src={FiFile} size="12" />
+								<span class="max-w-30 truncate" title={filename(path)}>{filename(path)}</span>
+							</span>
+						{/if}
 					{/each}
 				</div>
 			{/if}
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div class="msg-content" onclick={handleClick} onkeydown={() => {}}>{@html html}</div>
+			{#if content}
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div class="msg-content" onclick={handleClick} onkeydown={() => {}}>{@html html}</div>
+			{/if}
 		</div>
 		<span class="mt-1 text-[10px] font-mono text-text-muted">{timestamp}</span>
 	</div>
 {:else}
-	<div class="flex flex-col items-start self-start max-w-[95%] sm:max-w-[85%]">
-		<div class="assistant-msg rounded-2xl rounded-bl-md bg-bg-secondary px-3.5 py-2.5 text-[14px] leading-relaxed text-text-primary">
+	<div class="flex flex-col items-start self-start min-w-0 max-w-[95%] sm:max-w-[85%]">
+		<div class="assistant-msg max-w-full overflow-hidden rounded-2xl rounded-bl-md bg-bg-secondary px-3.5 py-2.5 text-[14px] leading-relaxed text-text-primary">
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div class="msg-content" onclick={handleClick} onkeydown={() => {}}>{@html html}</div>
 		</div>
@@ -59,6 +70,20 @@ function handleClick(e: MouseEvent) {
 {/if}
 
 <style>
+	.audio-player {
+		width: 100%;
+		min-width: 200px;
+		max-width: 300px;
+		height: 36px;
+		border-radius: 0.5rem;
+		opacity: 0.9;
+	}
+
+	.msg-content {
+		min-width: 0;
+		overflow: hidden;
+	}
+
 	.msg-content :global(p) {
 		margin: 0 0 0.5em;
 	}

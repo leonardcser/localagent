@@ -2,6 +2,7 @@ import {
 	connectSSE,
 	getHistory,
 	getMockTimeline,
+	transcribeAudio,
 	type ActivityEventData,
 	type HistoryMessage,
 	sendMessage,
@@ -10,7 +11,14 @@ import {
 import { nowTimestamp } from "$lib/utils";
 
 export type TimelineItem =
-	| { kind: "message"; id: number; role: string; content: string; timestamp: string; media?: string[] }
+	| {
+			kind: "message";
+			id: number;
+			role: string;
+			content: string;
+			timestamp: string;
+			media?: string[];
+	  }
 	| ({ kind: "activity"; id: number } & ActivityEventData);
 
 export type MessageTimelineItem = Extract<TimelineItem, { kind: "message" }>;
@@ -30,7 +38,12 @@ function createChat() {
 
 	function addMessage(msg: HistoryMessage) {
 		if (!msg.content) return;
-		timeline.push({ kind: "message", ...msg, timestamp: nowTimestamp(), id: ++nextId });
+		timeline.push({
+			kind: "message",
+			...msg,
+			timestamp: nowTimestamp(),
+			id: ++nextId,
+		});
 	}
 
 	function addActivity(evt: ActivityEventData) {
@@ -80,6 +93,9 @@ function createChat() {
 			(evt) => {
 				addActivity(evt);
 			},
+			(processing) => {
+				loading = processing;
+			},
 		);
 	}
 
@@ -88,7 +104,14 @@ function createChat() {
 		const media = [...pendingMedia];
 		if (!content && media.length === 0) return;
 
-		timeline.push({ kind: "message", role: "user", content, timestamp: nowTimestamp(), id: ++nextId, media: media.length > 0 ? media : undefined });
+		timeline.push({
+			kind: "message",
+			role: "user",
+			content,
+			timestamp: nowTimestamp(),
+			id: ++nextId,
+			media: media.length > 0 ? media : undefined,
+		});
 		input = "";
 		pendingMedia = [];
 		loading = true;
@@ -99,6 +122,8 @@ function createChat() {
 			loading = false;
 		}
 	}
+
+	let transcribing = $state(false);
 
 	async function toggleRecording() {
 		if (recording) {
@@ -118,8 +143,12 @@ function createChat() {
 				stream.getTracks().forEach((t) => t.stop());
 				const blob = new Blob(chunks, { type: "audio/webm" });
 				const file = new File([blob], "voice.webm", { type: "audio/webm" });
-				const path = await uploadFile(file, "voice");
-				if (path) pendingMedia.push(path);
+				transcribing = true;
+				const text = await transcribeAudio(file);
+				transcribing = false;
+				if (text) {
+					input = input ? input + " " + text : text;
+				}
 			};
 			mediaRecorder.start();
 			recording = true;
@@ -163,6 +192,9 @@ function createChat() {
 		},
 		get recording() {
 			return recording;
+		},
+		get transcribing() {
+			return transcribing;
 		},
 		get pendingMedia() {
 			return pendingMedia;

@@ -88,6 +88,10 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 		registry.Register(tools.NewPDFToTextTool(workspace, cfg.Tools.PDF.URL, cfg.Tools.PDF.ResolveAPIKey()))
 	}
 
+	if cfg.Tools.Whisper.URL != "" {
+		registry.Register(tools.NewTranscribeAudioTool(workspace, cfg.Tools.Whisper.URL, cfg.Tools.Whisper.ResolveAPIKey()))
+	}
+
 	return registry
 }
 
@@ -123,6 +127,9 @@ func NewAgentLoop(cfg *config.Config, msgBus *bus.MessageBus, provider providers
 	contextBuilder.SetToolsRegistry(toolsRegistry)
 	if cfg.Tools.PDF.URL != "" {
 		contextBuilder.SetPDFService(cfg.Tools.PDF.URL, cfg.Tools.PDF.ResolveAPIKey())
+	}
+	if cfg.Tools.Whisper.URL != "" {
+		contextBuilder.SetWhisperService(cfg.Tools.Whisper.URL, cfg.Tools.Whisper.ResolveAPIKey())
 	}
 
 	return &AgentLoop{
@@ -376,28 +383,7 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 		finalContent = opts.DefaultResponse
 	}
 
-	// 6. Save final assistant message to session
-	al.sessions.AddMessage(opts.SessionKey, "assistant", finalContent)
-	al.sessions.Save(opts.SessionKey)
-
-	// 7. Optional: summarization
-	if opts.EnableSummary {
-		al.maybeSummarize(opts.SessionKey, tokenCount)
-	}
-
-	// 8. Optional: send response via bus
-	if opts.SendResponse {
-		al.bus.PublishOutbound(bus.OutboundMessage{
-			Channel: opts.Channel,
-			ChatID:  opts.ChatID,
-			Content: finalContent,
-		})
-	}
-
-	// 9. Log response
-	responsePreview := utils.Truncate(finalContent, 120)
-	logger.Info("response: %s (session=%s iterations=%d len=%d)", responsePreview, opts.SessionKey, iteration, len(finalContent))
-
+	// 6. Emit completion activity (before saving message so it sorts earlier in timeline)
 	al.emitActivity(opts.SessionKey, activity.Event{
 		Type:      activity.Complete,
 		Timestamp: time.Now(),
@@ -408,6 +394,28 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 			"length":     len(finalContent),
 		},
 	})
+
+	// 7. Save final assistant message to session
+	al.sessions.AddMessage(opts.SessionKey, "assistant", finalContent)
+	al.sessions.Save(opts.SessionKey)
+
+	// 8. Optional: summarization
+	if opts.EnableSummary {
+		al.maybeSummarize(opts.SessionKey, tokenCount)
+	}
+
+	// 9. Optional: send response via bus
+	if opts.SendResponse {
+		al.bus.PublishOutbound(bus.OutboundMessage{
+			Channel: opts.Channel,
+			ChatID:  opts.ChatID,
+			Content: finalContent,
+		})
+	}
+
+	// 10. Log response
+	responsePreview := utils.Truncate(finalContent, 120)
+	logger.Info("response: %s (session=%s iterations=%d len=%d)", responsePreview, opts.SessionKey, iteration, len(finalContent))
 
 	return finalContent, nil
 }
@@ -431,15 +439,21 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 		logger.Debug("LLM request: iteration=%d model=%s messages=%d tools=%d", iteration, al.model, len(messages), len(providerToolDefs))
 		logger.Debug("full LLM request: iteration=%d messages=%s tools=%s", iteration, formatMessagesForLog(messages), formatToolsForLog(providerToolDefs))
 
+		lastMsgPreview := ""
+		if len(messages) > 0 {
+			last := messages[len(messages)-1]
+			lastMsgPreview = utils.Truncate(last.Content, 300)
+		}
 		al.emitActivity(opts.SessionKey, activity.Event{
 			Type:      activity.LLMRequest,
 			Timestamp: time.Now(),
 			Message:   fmt.Sprintf("LLM request #%d (%s)", iteration, al.model),
 			Detail: map[string]any{
-				"iteration": iteration,
-				"model":     al.model,
-				"messages":  len(messages),
-				"tools":     len(providerToolDefs),
+				"iteration":    iteration,
+				"model":        al.model,
+				"messages":     len(messages),
+				"tools":        len(providerToolDefs),
+				"last_message": lastMsgPreview,
 			},
 		})
 
@@ -468,14 +482,23 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 		if len(response.ToolCalls) == 0 {
 			finalContent = response.Content
 			logger.Info("LLM response (direct answer): iteration=%d chars=%d", iteration, len(finalContent))
+			responseDetail := map[string]any{
+				"iteration": iteration,
+				"chars":     len(finalContent),
+				"content":   utils.Truncate(finalContent, 500),
+			}
+			if response.Usage != nil {
+				responseDetail["usage"] = map[string]any{
+					"prompt_tokens":     response.Usage.PromptTokens,
+					"completion_tokens": response.Usage.CompletionTokens,
+					"total_tokens":      response.Usage.TotalTokens,
+				}
+			}
 			al.emitActivity(opts.SessionKey, activity.Event{
 				Type:      activity.LLMResponse,
 				Timestamp: time.Now(),
 				Message:   fmt.Sprintf("LLM response #%d (%d chars)", iteration, len(finalContent)),
-				Detail: map[string]any{
-					"iteration": iteration,
-					"chars":     len(finalContent),
-				},
+				Detail:    responseDetail,
 			})
 			break
 		}
@@ -517,8 +540,8 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 				Timestamp: time.Now(),
 				Message:   fmt.Sprintf("Tool: %s", tc.Name),
 				Detail: map[string]any{
-					"tool": tc.Name,
-					"args": argsPreview,
+					"tool":   tc.Name,
+					"params": utils.Truncate(string(argsJSON), 500),
 				},
 			})
 
@@ -535,18 +558,19 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 			toolResult := al.tools.ExecuteWithContext(ctx, tc.Name, tc.Arguments, opts.Channel, opts.ChatID, asyncCallback)
 
 			status := "success"
-			if toolResult.Err != nil {
+			if toolResult.IsError {
 				status = "error"
+			}
+			resultDetail := map[string]any{
+				"tool":    tc.Name,
+				"status":  status,
+				"content": utils.Truncate(toolResult.ForLLM, 500),
 			}
 			al.emitActivity(opts.SessionKey, activity.Event{
 				Type:      activity.ToolResult,
 				Timestamp: time.Now(),
-				Message:   fmt.Sprintf("Tool result: %s (%s)", tc.Name, status),
-				Detail: map[string]any{
-					"tool":           tc.Name,
-					"status":         status,
-					"content_length": len(toolResult.ForLLM),
-				},
+				Message:   fmt.Sprintf("Tool result: %s", tc.Name),
+				Detail:    resultDetail,
 			})
 
 			// Send ForUser content to user immediately if not Silent
@@ -598,7 +622,7 @@ func (al *AgentLoop) maybeSummarize(sessionKey string, tokenCount int) {
 	}
 	threshold := al.contextWindow * 75 / 100
 
-	if len(newHistory) > 20 || tokenCount > threshold {
+	if len(newHistory) > 50 || tokenCount > threshold {
 		if _, loading := al.summarizing.LoadOrStore(sessionKey, true); !loading {
 			go func() {
 				defer al.summarizing.Delete(sessionKey)

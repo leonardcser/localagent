@@ -24,12 +24,18 @@ type PDFService struct {
 	APIKey string
 }
 
+type WhisperService struct {
+	URL    string
+	APIKey string
+}
+
 type ContextBuilder struct {
 	workspace    string
 	skillsLoader *skills.SkillsLoader
 	memory       *MemoryStore
 	tools        *tools.ToolRegistry // Direct reference to tool registry
 	pdf          *PDFService
+	whisper      *WhisperService
 }
 
 func getGlobalConfigDir() string {
@@ -67,6 +73,11 @@ func (cb *ContextBuilder) SetToolsRegistry(registry *tools.ToolRegistry) {
 // SetPDFService configures the PDF-to-text service for auto-converting uploaded PDFs.
 func (cb *ContextBuilder) SetPDFService(url, apiKey string) {
 	cb.pdf = &PDFService{URL: url, APIKey: apiKey}
+}
+
+// SetWhisperService configures the Whisper service for auto-transcribing uploaded audio.
+func (cb *ContextBuilder) SetWhisperService(url, apiKey string) {
+	cb.whisper = &WhisperService{URL: url, APIKey: apiKey}
 }
 
 func (cb *ContextBuilder) getIdentity() string {
@@ -227,6 +238,23 @@ func (cb *ContextBuilder) buildUserMessage(text string, media []string) provider
 				parts = append(parts, providers.ContentPart{
 					Type: "text",
 					Text: fmt.Sprintf("\n--- PDF: %s ---\n%s\n--- End of %s ---", filename, pdfText, filename),
+				})
+			}
+		} else if utils.IsAudioFile(mediaPath) && cb.whisper != nil {
+			filename := filepath.Base(mediaPath)
+			ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+			audioText, err := tools.TranscribeAudio(ctx, mediaPath, cb.whisper.URL, cb.whisper.APIKey)
+			cancel()
+			if err != nil {
+				logger.Warn("audio transcription failed for %s: %v", filename, err)
+				parts = append(parts, providers.ContentPart{
+					Type: "text",
+					Text: fmt.Sprintf("[Audio transcription failed for %s: %v]", filename, err),
+				})
+			} else {
+				parts = append(parts, providers.ContentPart{
+					Type: "text",
+					Text: fmt.Sprintf("\n--- Audio: %s ---\n%s\n--- End of %s ---", filename, audioText, filename),
 				})
 			}
 		} else if utf8.Valid(data) {

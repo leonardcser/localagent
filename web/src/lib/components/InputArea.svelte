@@ -2,7 +2,7 @@
 import { chat } from "$lib/stores/chat.svelte";
 import MediaPreview from "./MediaPreview.svelte";
 import { Icon } from "svelte-icons-pack";
-import { FiPaperclip, FiMic } from "svelte-icons-pack/fi";
+import { FiPaperclip, FiMic, FiArrowUp } from "svelte-icons-pack/fi";
 
 let textarea: HTMLTextAreaElement;
 let fileInput: HTMLInputElement;
@@ -63,7 +63,7 @@ $effect(() => {
 			></textarea>
 			<button
 				type="button"
-				class="action-btn mb-1 mr-1 text-text-muted hover:text-text-secondary"
+				class="mb-1 mr-1 flex size-8.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-muted transition-[color,background] duration-150 hover:bg-border hover:text-text-secondary"
 				onclick={handleAttach}
 				title="Attach file"
 			>
@@ -79,12 +79,23 @@ $effect(() => {
 		/>
 		<button
 			type="button"
-			class="action-btn-round text-text-muted hover:text-text-primary"
-			class:recording={chat.recording}
+			class="flex size-10.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-muted transition-[color,background] duration-150 hover:bg-border hover:text-text-primary {chat.recording ? 'recording' : ''} {chat.loading ? 'transcribing' : ''}"
 			onclick={() => chat.toggleRecording()}
+			disabled={chat.loading}
 			title="Voice"
 		>
-			<Icon src={FiMic} size="18" />
+			{#if chat.recording}
+				<span class="block size-3.5 rounded-xs bg-current"></span>
+			{:else}
+				<Icon src={FiMic} size="18" />
+			{/if}
+		</button>
+		<button
+			type="submit"
+			class="send-btn flex size-10.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-muted opacity-40 pointer-events-none transition-[color,background,opacity] duration-150 {chat.input.trim().length > 0 || chat.pendingMedia.length > 0 ? 'has-input' : ''}"
+			title="Send"
+		>
+			<Icon src={FiArrowUp} size="18" />
 		</button>
 	</form>
 </div>
@@ -97,38 +108,27 @@ $effect(() => {
 		border-top: 1px solid var(--color-border);
 	}
 
-	.action-btn,
-	.action-btn-round {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-		cursor: pointer;
-		border: none;
-		background: none;
-		border-radius: 50%;
-		transition: color 0.15s, background 0.15s;
-	}
-
-	.action-btn {
-		width: 34px;
-		height: 34px;
-	}
-
-	.action-btn-round {
-		width: 42px;
-		height: 42px;
-	}
-
-	.action-btn:hover,
-	.action-btn-round:hover {
-		background: var(--color-border);
-	}
-
-	.action-btn-round.recording {
-		background: var(--color-danger);
-		color: white;
+	.recording {
+		background: var(--color-danger) !important;
+		color: white !important;
 		animation: pulse-ring 1.5s infinite;
+	}
+
+	.transcribing {
+		background: rgba(255, 255, 255, 0.15) !important;
+		color: rgba(255, 255, 255, 0.5) !important;
+		cursor: not-allowed;
+	}
+
+	.send-btn.has-input {
+		opacity: 1;
+		pointer-events: auto;
+		background: var(--color-text-primary);
+		color: var(--color-bg);
+	}
+
+	.send-btn.has-input:hover {
+		background: var(--color-text-secondary);
 	}
 
 	@keyframes pulse-ring {

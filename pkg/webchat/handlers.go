@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"localagent/pkg/logger"
+	"localagent/pkg/tools"
 	"localagent/pkg/utils"
 
 	"github.com/labstack/echo/v5"
@@ -124,6 +125,61 @@ func (s *Server) handleUpload(c *echo.Context) error {
 	return c.JSON(http.StatusOK, uploadResponse{Path: localPath})
 }
 
+func (s *Server) handleMedia(c *echo.Context) error {
+	name := c.Param("filename")
+	if name == "" || strings.Contains(name, "/") || strings.Contains(name, "..") {
+		return echo.ErrNotFound
+	}
+	filePath := filepath.Join(s.channel.workspace, "media", name)
+	return c.File(filePath)
+}
+
+func (s *Server) handleTranscribe(c *echo.Context) error {
+	file, err := c.FormFile("file")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "no file provided"})
+	}
+
+	whisper := s.channel.whisper
+	if whisper.URL == "" {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "whisper not configured"})
+	}
+
+	tmpDir := filepath.Join(s.channel.workspace, "media")
+	if err := os.MkdirAll(tmpDir, 0700); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create temp directory"})
+	}
+
+	tmpFile, err := os.CreateTemp(tmpDir, "transcribe-*"+filepath.Ext(file.Filename))
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create temp file"})
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+
+	src, err := file.Open()
+	if err != nil {
+		tmpFile.Close()
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to open uploaded file"})
+	}
+
+	if _, err := io.Copy(tmpFile, src); err != nil {
+		src.Close()
+		tmpFile.Close()
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to write temp file"})
+	}
+	src.Close()
+	tmpFile.Close()
+
+	text, err := tools.TranscribeAudio(c.Request().Context(), tmpPath, whisper.URL, whisper.ResolveAPIKey())
+	if err != nil {
+		logger.Error("transcription failed: %v", err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "transcription failed"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"text": text})
+}
+
 func (s *Server) handleHistory(c *echo.Context) error {
 	if s.channel.sessions == nil {
 		return c.JSON(http.StatusOK, historyResponse{Items: []timelineItem{}})
@@ -175,6 +231,13 @@ func (s *Server) handleSSE(c *echo.Context) error {
 	w.WriteHeader(http.StatusOK)
 
 	rc := http.NewResponseController(w)
+
+	// Send initial processing status
+	processing := s.channel.processing.Load()
+	statusEvent := OutgoingEvent{Type: "status", Processing: &processing}
+	if data, err := json.Marshal(statusEvent); err == nil {
+		fmt.Fprintf(w, "data: %s\n\n", data)
+	}
 	rc.Flush()
 
 	ctx := c.Request().Context()

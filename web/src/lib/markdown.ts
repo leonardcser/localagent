@@ -46,7 +46,9 @@ export async function renderMarkdown(source: string): Promise<string> {
 	for (const [placeholder, { promise, text, lang }] of codeBlocks) {
 		const highlighted = await promise;
 		const escapedText = escapeHtml(text);
-		const langLabel = lang ? `<span class="code-lang">${escapeHtml(lang)}</span>` : "";
+		const langLabel = lang
+			? `<span class="code-lang">${escapeHtml(lang)}</span>`
+			: "";
 		const wrapper = `<div class="code-block-wrapper"><div class="code-header">${langLabel}<button class="copy-btn" data-code="${escapedText}" title="Copy code">${COPY_SVG}</button></div>${highlighted}</div>`;
 		html = html.replace(placeholder, wrapper);
 	}

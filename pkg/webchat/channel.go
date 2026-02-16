@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"localagent/pkg/activity"
 	"localagent/pkg/bus"
@@ -14,10 +15,11 @@ import (
 )
 
 type OutgoingEvent struct {
-	Type    string        `json:"type"`
-	Role    string        `json:"role,omitempty"`
-	Content string        `json:"content,omitempty"`
-	Event   *ActivityData `json:"event,omitempty"`
+	Type       string        `json:"type"`
+	Role       string        `json:"role,omitempty"`
+	Content    string        `json:"content,omitempty"`
+	Event      *ActivityData `json:"event,omitempty"`
+	Processing *bool         `json:"processing,omitempty"`
 }
 
 type ActivityData struct {
@@ -34,20 +36,23 @@ type sseClient struct {
 
 type WebChatChannel struct {
 	*channels.BaseChannel
-	config    *config.WebChatConfig
-	server    *Server
-	sessions  *session.SessionManager
-	workspace string
-	clients   map[string]*sseClient
-	mu        sync.RWMutex
+	config     *config.WebChatConfig
+	server     *Server
+	sessions   *session.SessionManager
+	workspace  string
+	whisper    config.WhisperConfig
+	clients    map[string]*sseClient
+	mu         sync.RWMutex
+	processing atomic.Bool
 }
 
-func NewWebChatChannel(cfg *config.WebChatConfig, msgBus *bus.MessageBus, workspace string) *WebChatChannel {
+func NewWebChatChannel(cfg *config.WebChatConfig, msgBus *bus.MessageBus, workspace string, whisper config.WhisperConfig) *WebChatChannel {
 	base := channels.NewBaseChannel("web", cfg, msgBus, nil)
 	ch := &WebChatChannel{
 		BaseChannel: base,
 		config:      cfg,
 		workspace:   workspace,
+		whisper:     whisper,
 		clients:     make(map[string]*sseClient),
 	}
 	return ch
@@ -95,6 +100,12 @@ func (ch *WebChatChannel) Send(ctx context.Context, msg bus.OutboundMessage) err
 }
 
 func (ch *WebChatChannel) Emit(evt activity.Event) {
+	if evt.Type == activity.ProcessingStart {
+		ch.processing.Store(true)
+	} else if evt.Type == activity.Complete {
+		ch.processing.Store(false)
+	}
+
 	event := OutgoingEvent{
 		Type: "activity",
 		Event: &ActivityData{
