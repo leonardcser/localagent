@@ -34,18 +34,20 @@ type sseClient struct {
 
 type WebChatChannel struct {
 	*channels.BaseChannel
-	config   *config.WebChatConfig
-	server   *Server
-	sessions *session.SessionManager
-	clients  map[string]*sseClient
-	mu       sync.RWMutex
+	config    *config.WebChatConfig
+	server    *Server
+	sessions  *session.SessionManager
+	workspace string
+	clients   map[string]*sseClient
+	mu        sync.RWMutex
 }
 
-func NewWebChatChannel(cfg *config.WebChatConfig, msgBus *bus.MessageBus) *WebChatChannel {
+func NewWebChatChannel(cfg *config.WebChatConfig, msgBus *bus.MessageBus, workspace string) *WebChatChannel {
 	base := channels.NewBaseChannel("web", cfg, msgBus, nil)
 	ch := &WebChatChannel{
 		BaseChannel: base,
 		config:      cfg,
+		workspace:   workspace,
 		clients:     make(map[string]*sseClient),
 	}
 	return ch

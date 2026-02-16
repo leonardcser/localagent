@@ -53,6 +53,7 @@ function createChat() {
 								role: item.role!,
 								content: item.content,
 								timestamp: item.timestamp,
+								media: item.media,
 								id: ++nextId,
 							};
 						}

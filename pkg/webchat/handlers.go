@@ -34,6 +34,7 @@ type timelineItem struct {
 	Type      string         `json:"type"`
 	Role      string         `json:"role,omitempty"`
 	Content   string         `json:"content,omitempty"`
+	Media     []string       `json:"media,omitempty"`
 	EventType string         `json:"event_type,omitempty"`
 	Message   string         `json:"message,omitempty"`
 	Detail    map[string]any `json:"detail,omitempty"`
@@ -82,7 +83,7 @@ func (s *Server) handleUpload(c *echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "no file provided"})
 	}
 
-	mediaDir := filepath.Join(os.TempDir(), "localagent_media")
+	mediaDir := filepath.Join(s.channel.workspace, "media")
 	if err := os.MkdirAll(mediaDir, 0700); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create media directory"})
 	}
@@ -142,6 +143,7 @@ func (s *Server) handleHistory(c *echo.Context) error {
 				Type:      "message",
 				Role:      msg.Role,
 				Content:   msg.Content,
+				Media:     entry.Media,
 				Timestamp: entry.Timestamp.Format("15:04:05"),
 			})
 		} else if entry.Activity != nil {

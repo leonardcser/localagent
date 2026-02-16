@@ -7,6 +7,7 @@ export interface HistoryItem {
 	type: "message" | "activity";
 	role?: string;
 	content?: string;
+	media?: string[];
 	event_type?: string;
 	message?: string;
 	detail?: Record<string, unknown>;

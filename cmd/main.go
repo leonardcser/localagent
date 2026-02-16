@@ -211,6 +211,8 @@ func gatewayCmd() {
 	skillsInfo := startupInfo["skills"].(map[string]any)
 	fmt.Printf("Agent: tools=%d skills=%d/%d\n", toolsInfo["count"], skillsInfo["available"], skillsInfo["total"])
 
+	sweepOrphanMedia(cfg.WorkspacePath(), agentLoop)
+
 	cronService := setupCronTool(agentLoop, msgBus, cfg.WorkspacePath())
 
 	heartbeatService := heartbeat.NewHeartbeatService(
@@ -239,7 +241,7 @@ func gatewayCmd() {
 		os.Exit(1)
 	}
 
-	webCh := webchat.NewWebChatChannel(&cfg.WebChat, msgBus)
+	webCh := webchat.NewWebChatChannel(&cfg.WebChat, msgBus, cfg.WorkspacePath())
 	webCh.SetSessionManager(agentLoop.GetSessionManager())
 	channelManager.RegisterChannel("web", webCh)
 	agentLoop.SetActivityEmitter(webCh)
@@ -322,6 +324,30 @@ func statusCmd() {
 		fmt.Println("API Key: configured")
 	} else {
 		fmt.Println("API Key: not set")
+	}
+}
+
+func sweepOrphanMedia(workspace string, agentLoop *agent.AgentLoop) {
+	mediaDir := filepath.Join(workspace, "media")
+	entries, err := os.ReadDir(mediaDir)
+	if err != nil {
+		return
+	}
+
+	refs := agentLoop.GetSessionManager().AllReferencedMedia()
+	removed := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		path := filepath.Join(mediaDir, entry.Name())
+		if !refs[path] {
+			os.Remove(path)
+			removed++
+		}
+	}
+	if removed > 0 {
+		logger.Info("swept %d orphan media file(s)", removed)
 	}
 }
 

@@ -94,6 +94,7 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 func NewAgentLoop(cfg *config.Config, msgBus *bus.MessageBus, provider providers.LLMProvider) *AgentLoop {
 	workspace := cfg.WorkspacePath()
 	os.MkdirAll(workspace, 0755)
+	os.MkdirAll(filepath.Join(workspace, "media"), 0755)
 
 	// Create tool registry for main agent
 	toolsRegistry := createToolRegistry(workspace, cfg, msgBus)
@@ -359,7 +360,7 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 	)
 
 	// 3. Save user message to session
-	al.sessions.AddMessage(opts.SessionKey, "user", opts.UserMessage)
+	al.sessions.AddMessageWithMedia(opts.SessionKey, "user", opts.UserMessage, opts.Media)
 
 	// 4. Run LLM iteration loop
 	finalContent, iteration, tokenCount, err := al.runLLMIteration(ctx, messages, opts)
