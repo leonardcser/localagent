@@ -1,26 +1,85 @@
 @import "tailwindcss";
 
 @theme {
+	/* Backgrounds */
 	--color-bg: #000;
 	--color-bg-secondary: #111;
 	--color-bg-tertiary: #1a1a1a;
 	--color-surface: #2a2a2a;
 	--color-surface-hover: #333;
+	--color-chrome: rgba(0, 0, 0, 0.8);
+
+	/* Overlays (transparency scale) */
+	--color-overlay-subtle: rgba(255, 255, 255, 0.04);
+	--color-overlay-light: rgba(255, 255, 255, 0.06);
+	--color-overlay-medium: rgba(255, 255, 255, 0.12);
+	--color-overlay-strong: rgba(255, 255, 255, 0.4);
+
+	/* Borders */
 	--color-border: rgba(255, 255, 255, 0.08);
 	--color-border-light: rgba(255, 255, 255, 0.12);
+
+	/* Text */
 	--color-text-primary: #ececec;
 	--color-text-secondary: #999;
 	--color-text-muted: #666;
+
+	/* Semantic */
 	--color-accent: #6ea2f5;
 	--color-accent-dim: rgba(110, 162, 245, 0.12);
 	--color-danger: #f06;
+	--color-error: #ef4444;
+	--color-warning: #f59e0b;
+	--color-success: #22c55e;
+
+	/* Shadows */
+	--shadow-elevated: 0 2px 8px rgba(0, 0, 0, 0.3);
+
+	/* Component-specific */
 	--color-user-bubble: #2563eb;
 	--color-user-bubble-text: #f0f4ff;
+
+	/* Fonts */
 	--font-sans:
 		-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui,
 		sans-serif;
 	--font-mono:
 		"SF Mono", ui-monospace, "Cascadia Code", "Fira Code", Menlo, monospace;
+}
+
+@media (prefers-color-scheme: light) {
+	:root {
+		--color-bg: #ffffff;
+		--color-bg-secondary: #f5f5f5;
+		--color-bg-tertiary: #ebebeb;
+		--color-surface: #e0e0e0;
+		--color-surface-hover: #d5d5d5;
+		--color-chrome: rgba(255, 255, 255, 0.85);
+
+		--color-overlay-subtle: rgba(0, 0, 0, 0.03);
+		--color-overlay-light: rgba(0, 0, 0, 0.05);
+		--color-overlay-medium: rgba(0, 0, 0, 0.1);
+		--color-overlay-strong: rgba(0, 0, 0, 0.3);
+
+		--color-border: rgba(0, 0, 0, 0.08);
+		--color-border-light: rgba(0, 0, 0, 0.12);
+
+		--color-text-primary: #1a1a1a;
+		--color-text-secondary: #555;
+		--color-text-muted: #888;
+
+		--color-accent: #2563eb;
+		--color-accent-dim: rgba(37, 99, 235, 0.1);
+		--color-danger: #e60060;
+		--color-error: #dc2626;
+		--color-warning: #d97706;
+		--color-success: #16a34a;
+
+		--color-user-bubble: #2563eb;
+		--color-user-bubble-text: #ffffff;
+
+		--shadow-elevated: 0 2px 8px rgba(0, 0, 0, 0.1);
+	}
 }
 
 html {
@@ -52,10 +111,10 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-	background: rgba(255, 255, 255, 0.1);
+	background: var(--color-overlay-medium);
 	border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	background: rgba(255, 255, 255, 0.18);
+	background: var(--color-overlay-strong);
 }

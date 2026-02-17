@@ -2,7 +2,7 @@
 FROM docker.io/oven/bun:1-alpine AS web-builder
 
 WORKDIR /src/web
-COPY web/package.json web/bun.lock web/svelte.config.js ./
+COPY web/package.json web/bun.lock ./
 RUN bun install --frozen-lockfile
 
 COPY web/ .

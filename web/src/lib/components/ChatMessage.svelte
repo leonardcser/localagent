@@ -1,4 +1,5 @@
 <script lang="ts">
+import { cn } from "$lib/cn";
 import { renderMarkdown, COPY_SVG, CHECK_SVG } from "$lib/markdown";
 import { filename, isAudio, mediaUrl } from "$lib/utils";
 import { Icon } from "svelte-icons-pack";
@@ -37,7 +38,7 @@ function handleClick(e: MouseEvent) {
 	<div class="flex flex-col items-end self-end min-w-0 max-w-[85%] sm:max-w-[75%]">
 		<div class="user-msg max-w-full overflow-hidden rounded-2xl rounded-br-md bg-user-bubble px-3.5 py-2.5 text-[14px] leading-relaxed text-user-bubble-text">
 			{#if media && media.length > 0}
-				<div class="flex flex-col gap-1.5 {content ? 'mb-1.5' : ''}">
+				<div class={cn("flex flex-col gap-1.5", content && "mb-1.5")}>
 					{#each media as path (path)}
 						{#if isAudio(path)}
 							<audio class="audio-player" controls preload="metadata" src={mediaUrl(path)}>
@@ -104,7 +105,7 @@ function handleClick(e: MouseEvent) {
 		align-items: center;
 		justify-content: space-between;
 		padding: 0.1rem 0.5rem;
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--color-overlay-subtle);
 		border-bottom: 1px solid var(--color-border-light);
 		font-size: 0.75rem;
 	}
@@ -133,7 +134,7 @@ function handleClick(e: MouseEvent) {
 
 	.msg-content :global(.copy-btn:hover) {
 		color: var(--color-text-primary);
-		background: rgba(255, 255, 255, 0.06);
+		background: var(--color-overlay-light);
 	}
 
 	.msg-content :global(pre) {
@@ -158,14 +159,14 @@ function handleClick(e: MouseEvent) {
 	}
 
 	.msg-content :global(code:not(pre code)) {
-		background: rgba(255, 255, 255, 0.08);
+		background: var(--color-border);
 		padding: 0.15rem 0.35rem;
 		border-radius: 0.25rem;
 		font-size: 0.85em;
 	}
 
 	.user-msg .msg-content :global(code:not(pre code)) {
-		background: rgba(255, 255, 255, 0.18);
+		background: var(--color-overlay-medium);
 	}
 
 	.msg-content :global(a) {
@@ -180,7 +181,7 @@ function handleClick(e: MouseEvent) {
 	.user-msg .msg-content :global(a) {
 		color: inherit;
 		text-decoration: underline;
-		text-decoration-color: rgba(255, 255, 255, 0.4);
+		text-decoration-color: var(--color-overlay-strong);
 	}
 
 	.msg-content :global(ul) {

@@ -120,6 +120,7 @@ container:
 	@echo "Building container image $(CONTAINER_IMAGE):$(CONTAINER_TAG)..."
 	@$(CONTAINER_ENGINE) build -t $(CONTAINER_IMAGE):$(CONTAINER_TAG) -f Containerfile .
 	@$(CONTAINER_ENGINE) tag $(CONTAINER_IMAGE):$(CONTAINER_TAG) $(CONTAINER_IMAGE):latest
+	@$(CONTAINER_ENGINE) image prune -f --filter "until=1h" >/dev/null 2>&1 || true
 	@echo "Container image built: $(CONTAINER_IMAGE):$(CONTAINER_TAG)"
 
 ## container-gateway: Run gateway (local network only, no web tools)

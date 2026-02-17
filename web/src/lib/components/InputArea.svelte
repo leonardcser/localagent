@@ -1,4 +1,5 @@
 <script lang="ts">
+import { cn } from "$lib/cn";
 import { chat } from "$lib/stores/chat.svelte";
 import MediaPreview from "./MediaPreview.svelte";
 import { Icon } from "svelte-icons-pack";
@@ -79,20 +80,36 @@ $effect(() => {
 		/>
 		<button
 			type="button"
-			class="flex size-10.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-muted transition-[color,background] duration-150 hover:bg-border hover:text-text-primary {chat.recording ? 'recording' : ''} {chat.loading ? 'transcribing' : ''}"
+			class={cn(
+				"flex size-10.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-muted transition-[color,background] duration-150 hover:bg-border hover:text-text-primary disabled:bg-surface disabled:text-text-muted disabled:cursor-not-allowed disabled:hover:bg-surface",
+				chat.recording && "recording",
+				chat.transcribing && "transcribing",
+			)}
 			onclick={() => chat.toggleRecording()}
-			disabled={chat.loading}
-			title="Voice"
+			disabled={chat.loading || chat.transcribing}
+			title={chat.transcribing ? "Transcribing..." : "Voice"}
 		>
-			{#if chat.recording}
+			{#if chat.transcribing}
+				<Icon src={FiMic} size="18" />
+			{:else if chat.recording}
 				<span class="block size-3.5 rounded-xs bg-current"></span>
 			{:else}
 				<Icon src={FiMic} size="18" />
 			{/if}
 		</button>
 		<button
-			type="submit"
-			class="send-btn flex size-10.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-muted opacity-40 pointer-events-none transition-[color,background,opacity] duration-150 {chat.input.trim().length > 0 || chat.pendingMedia.length > 0 ? 'has-input' : ''}"
+			type="button"
+			class={cn(
+				"send-btn flex size-10.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-muted opacity-40 pointer-events-none transition-[color,background,opacity] duration-150",
+				(chat.input.trim().length > 0 || chat.pendingMedia.length > 0 || chat.recording) && "has-input",
+			)}
+			onclick={() => {
+				if (chat.recording) {
+					chat.recordAndSend();
+				} else {
+					chat.send();
+				}
+			}}
 			title="Send"
 		>
 			<Icon src={FiArrowUp} size="18" />
@@ -102,7 +119,7 @@ $effect(() => {
 
 <style>
 	.input-chrome {
-		background: rgba(0, 0, 0, 0.8);
+		background: var(--color-chrome);
 		backdrop-filter: blur(20px);
 		-webkit-backdrop-filter: blur(20px);
 		border-top: 1px solid var(--color-border);
@@ -115,9 +132,19 @@ $effect(() => {
 	}
 
 	.transcribing {
-		background: rgba(255, 255, 255, 0.15) !important;
-		color: rgba(255, 255, 255, 0.5) !important;
-		cursor: not-allowed;
+		background: var(--color-surface) !important;
+		color: var(--color-text-secondary) !important;
+		cursor: wait;
+		animation: transcribe-pulse 1.5s ease-in-out infinite;
+	}
+
+	@keyframes transcribe-pulse {
+		0%, 100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.5;
+		}
 	}
 
 	.send-btn.has-input {
@@ -133,13 +160,13 @@ $effect(() => {
 
 	@keyframes pulse-ring {
 		0% {
-			box-shadow: 0 0 0 0 rgba(255, 0, 102, 0.4);
+			box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-danger) 40%, transparent);
 		}
 		70% {
-			box-shadow: 0 0 0 8px rgba(255, 0, 102, 0);
+			box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-danger) 0%, transparent);
 		}
 		100% {
-			box-shadow: 0 0 0 0 rgba(255, 0, 102, 0);
+			box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-danger) 0%, transparent);
 		}
 	}
 </style>

@@ -124,12 +124,18 @@ function createChat() {
 	}
 
 	let transcribing = $state(false);
+	let sendAfterTranscribe = false;
+
+	function stopRecording() {
+		mediaRecorder?.stop();
+		mediaRecorder = null;
+		recording = false;
+	}
 
 	async function toggleRecording() {
 		if (recording) {
-			mediaRecorder?.stop();
-			mediaRecorder = null;
-			recording = false;
+			sendAfterTranscribe = false;
+			stopRecording();
 			return;
 		}
 		try {
@@ -144,10 +150,15 @@ function createChat() {
 				const blob = new Blob(chunks, { type: "audio/webm" });
 				const file = new File([blob], "voice.webm", { type: "audio/webm" });
 				transcribing = true;
+				const shouldSend = sendAfterTranscribe;
+				sendAfterTranscribe = false;
 				const text = await transcribeAudio(file);
 				transcribing = false;
 				if (text) {
 					input = input ? input + " " + text : text;
+				}
+				if (shouldSend) {
+					await send();
 				}
 			};
 			mediaRecorder.start();
@@ -155,6 +166,12 @@ function createChat() {
 		} catch {
 			// mic access denied
 		}
+	}
+
+	function recordAndSend() {
+		if (!recording) return;
+		sendAfterTranscribe = true;
+		stopRecording();
 	}
 
 	async function attachFiles(files: FileList) {
@@ -208,6 +225,7 @@ function createChat() {
 		init,
 		send,
 		toggleRecording,
+		recordAndSend,
 		attachFiles,
 		handleDrop,
 		removeMedia,

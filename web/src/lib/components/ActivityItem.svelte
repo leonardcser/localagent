@@ -1,4 +1,6 @@
 <script lang="ts">
+import { cn } from "$lib/cn";
+
 let {
 	event_type,
 	timestamp,
@@ -20,10 +22,10 @@ function isToolError(): boolean {
 }
 
 function labelColor(t: string): string {
-	if (t === "llm_error" || isToolError()) return "text-[#ef4444]";
+	if (t === "llm_error" || isToolError()) return "text-error";
 	if (t.startsWith("llm_")) return "text-accent";
-	if (t.startsWith("tool_")) return "text-[#f59e0b]";
-	if (t === "complete") return "text-[#22c55e]";
+	if (t.startsWith("tool_")) return "text-warning";
+	if (t === "complete") return "text-success";
 	return "text-text-muted";
 }
 
@@ -46,8 +48,8 @@ function label(t: string): string {
 	class="flex w-full items-baseline py-px text-left cursor-pointer bg-transparent border-none font-[inherit]"
 	onclick={() => { if (onclick) { onclick(); } else if (detail) { expanded = !expanded; } }}
 >
-	<span class="text-[10px] font-bold font-mono tracking-wide shrink-0 w-12 {labelColor(event_type)}">{label(event_type)}</span>
-	<span class="text-[11px] leading-4.5 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap {isToolError() ? 'text-[#ef4444]/80' : 'text-text-muted'}" title={message}>
+	<span class={cn("text-[10px] font-bold font-mono tracking-wide shrink-0 w-12", labelColor(event_type))}>{label(event_type)}</span>
+	<span class={cn("text-[11px] leading-4.5 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap", isToolError() ? "text-error/80" : "text-text-muted")} title={message}>
 		{message}
 	</span>
 	<span class="ml-auto pl-2 text-[10px] text-text-muted/50 font-mono shrink-0">{timestamp}</span>
