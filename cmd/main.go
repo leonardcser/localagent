@@ -211,8 +211,6 @@ func gatewayCmd() {
 	skillsInfo := startupInfo["skills"].(map[string]any)
 	fmt.Printf("Agent: tools=%d skills=%d/%d\n", toolsInfo["count"], skillsInfo["available"], skillsInfo["total"])
 
-	sweepOrphanMedia(cfg.WorkspacePath(), agentLoop)
-
 	cronService := setupCronTool(agentLoop, msgBus, cfg.WorkspacePath())
 
 	heartbeatService := heartbeat.NewHeartbeatService(
@@ -341,29 +339,6 @@ func statusCmd() {
 	}
 }
 
-func sweepOrphanMedia(workspace string, agentLoop *agent.AgentLoop) {
-	mediaDir := filepath.Join(workspace, "media")
-	entries, err := os.ReadDir(mediaDir)
-	if err != nil {
-		return
-	}
-
-	refs := agentLoop.GetSessionManager().AllReferencedMedia()
-	removed := 0
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		path := filepath.Join(mediaDir, entry.Name())
-		if !refs[path] {
-			os.Remove(path)
-			removed++
-		}
-	}
-	if removed > 0 {
-		logger.Info("swept %d orphan media file(s)", removed)
-	}
-}
 
 func setupCronTool(agentLoop *agent.AgentLoop, msgBus *bus.MessageBus, workspace string) *cron.CronService {
 	cronStorePath := filepath.Join(workspace, "cron", "jobs.json")

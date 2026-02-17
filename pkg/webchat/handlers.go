@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"localagent/pkg/logger"
 	"localagent/pkg/tools"
@@ -88,6 +89,8 @@ func (s *Server) handleUpload(c *echo.Context) error {
 	if err := os.MkdirAll(mediaDir, 0700); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create media directory"})
 	}
+
+	utils.CleanOldMedia(mediaDir, 10*time.Minute)
 
 	safeName := utils.SanitizeFilename(file.Filename)
 	localPath := filepath.Join(mediaDir, safeName)

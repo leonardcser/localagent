@@ -248,52 +248,22 @@ func (sm *SessionManager) SetSummary(key string, summary string) {
 }
 
 func (sm *SessionManager) TruncateHistory(key string, keepLast int) {
-	var droppedMedia []string
-
 	sm.mu.Lock()
+	defer sm.mu.Unlock()
 
 	s, ok := sm.sessions[key]
 	if !ok {
-		sm.mu.Unlock()
 		return
 	}
 
 	if keepLast <= 0 {
-		for _, m := range s.messages {
-			droppedMedia = append(droppedMedia, m.Media...)
-		}
 		s.messages = nil
 		s.Activity = nil
 	} else if len(s.messages) > keepLast {
-		dropped := s.messages[:len(s.messages)-keepLast]
 		kept := make([]storedMessage, keepLast)
 		copy(kept, s.messages[len(s.messages)-keepLast:])
-
-		// Collect media from dropped messages
-		for _, m := range dropped {
-			droppedMedia = append(droppedMedia, m.Media...)
-		}
-
-		// Build set of media still referenced by kept messages
-		keptMedia := make(map[string]bool)
-		for _, m := range kept {
-			for _, p := range m.Media {
-				keptMedia[p] = true
-			}
-		}
-
-		// Only delete media not referenced by kept messages
-		toDelete := make([]string, 0, len(droppedMedia))
-		for _, p := range droppedMedia {
-			if !keptMedia[p] {
-				toDelete = append(toDelete, p)
-			}
-		}
-		droppedMedia = toDelete
-
 		s.messages = kept
 
-		// Keep activity events newer than the oldest kept message
 		cutoff := kept[0].Ts
 		filtered := make([]activity.Event, 0)
 		for _, a := range s.Activity {
@@ -305,14 +275,6 @@ func (sm *SessionManager) TruncateHistory(key string, keepLast int) {
 	}
 
 	sm.rewriteFile(key, s)
-	sm.mu.Unlock()
-
-	// Delete orphan media files outside the lock
-	for _, p := range droppedMedia {
-		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
-			logger.Warn("session: failed to remove media file %s: %v", p, err)
-		}
-	}
 }
 
 // Save is a no-op; writes are now immediate via append.
@@ -492,22 +454,6 @@ func (sm *SessionManager) loadJSONL(path string) {
 	}
 
 	sm.sessions[key] = s
-}
-
-// AllReferencedMedia returns a set of all media paths referenced across all sessions.
-func (sm *SessionManager) AllReferencedMedia() map[string]bool {
-	sm.mu.RLock()
-	defer sm.mu.RUnlock()
-
-	refs := make(map[string]bool)
-	for _, s := range sm.sessions {
-		for _, m := range s.messages {
-			for _, p := range m.Media {
-				refs[p] = true
-			}
-		}
-	}
-	return refs
 }
 
 // Migration from old JSON format

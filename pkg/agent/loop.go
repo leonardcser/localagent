@@ -39,6 +39,7 @@ type AgentLoop struct {
 	activity       activity.Emitter
 	running        atomic.Bool
 	summarizing    sync.Map // Tracks which sessions are currently being summarized
+	stopCleanup    chan struct{}
 }
 
 // processOptions configures how a message is processed
@@ -132,12 +133,28 @@ func NewAgentLoop(cfg *config.Config, msgBus *bus.MessageBus, provider providers
 		contextBuilder.SetWhisperService(cfg.Tools.Whisper.URL, cfg.Tools.Whisper.ResolveAPIKey())
 	}
 
+	stopCleanup := make(chan struct{})
+	mediaDir := filepath.Join(workspace, "media")
+
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stopCleanup:
+				return
+			case <-ticker.C:
+				utils.CleanOldMedia(mediaDir, 10*time.Minute)
+			}
+		}
+	}()
+
 	return &AgentLoop{
 		bus:            msgBus,
 		provider:       provider,
 		workspace:      workspace,
 		model:          cfg.Agents.Defaults.Model,
-		contextWindow:  cfg.Agents.Defaults.MaxTokens, // Restore context window for summarization
+		contextWindow:  cfg.Agents.Defaults.MaxTokens,
 		maxIterations:  cfg.Agents.Defaults.MaxToolIterations,
 		sessions:       sessionsManager,
 		state:          stateManager,
@@ -145,6 +162,7 @@ func NewAgentLoop(cfg *config.Config, msgBus *bus.MessageBus, provider providers
 		tools:          toolsRegistry,
 		activity:       activity.NopEmitter{},
 		summarizing:    sync.Map{},
+		stopCleanup:    stopCleanup,
 	}
 }
 
@@ -204,6 +222,11 @@ func (al *AgentLoop) Run(ctx context.Context) error {
 
 func (al *AgentLoop) Stop() {
 	al.running.Store(false)
+	select {
+	case <-al.stopCleanup:
+	default:
+		close(al.stopCleanup)
+	}
 }
 
 func (al *AgentLoop) GetSessionManager() *session.SessionManager {
