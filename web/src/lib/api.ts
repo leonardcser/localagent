@@ -1,6 +1,7 @@
 export interface HistoryMessage {
 	role: string;
 	content: string;
+	media?: string[];
 }
 
 export interface HistoryItem {
@@ -327,7 +328,7 @@ function mockSSE(
 		});
 	}, 5000);
 
-	return {} as EventSource;
+	return { close() {} } as unknown as EventSource;
 }
 
 // --- Real API ---
@@ -383,6 +384,169 @@ export async function getHistory(): Promise<HistoryResponse> {
 	const res = await fetch("/api/history");
 	if (!res.ok) return { items: [] };
 	return res.json();
+}
+
+// --- Image API ---
+
+export interface ImageJob {
+	id: string;
+	model: string;
+	prompt: string;
+	negative_prompt?: string;
+	width: number;
+	height: number;
+	seed?: number;
+	count: number;
+	source_images?: number;
+	status: "pending" | "generating" | "done" | "error";
+	image_count: number;
+	error?: string;
+	created_at: string;
+}
+
+export interface ImageGenerateParams {
+	model: string;
+	prompt: string;
+	negative_prompt?: string;
+	width?: number;
+	height?: number;
+	seed?: number;
+	count?: number;
+}
+
+const mockModels = ["flux-schnell", "stable-diffusion-xl", "sdxl-turbo"];
+
+const mockJobs: ImageJob[] = [
+	{
+		id: "mock-1",
+		model: "flux-schnell",
+		prompt: "A serene mountain lake at sunset with purple clouds",
+		width: 1024,
+		height: 1024,
+		count: 2,
+		status: "done",
+		image_count: 2,
+		created_at: new Date(Date.now() - 300000).toISOString(),
+	},
+	{
+		id: "mock-2",
+		model: "stable-diffusion-xl",
+		prompt: "Cyberpunk cityscape with neon lights and rain",
+		negative_prompt: "blurry, low quality",
+		width: 1024,
+		height: 768,
+		count: 1,
+		status: "done",
+		image_count: 1,
+		created_at: new Date(Date.now() - 120000).toISOString(),
+	},
+];
+
+export async function getImageModels(): Promise<string[]> {
+	if (DEV) return mockModels;
+	try {
+		const res = await fetch("/api/image/models");
+		if (!res.ok) return [];
+		const data = await res.json();
+		return data.models || [];
+	} catch {
+		return [];
+	}
+}
+
+export async function submitImageJob(
+	params: ImageGenerateParams,
+): Promise<string | null> {
+	if (DEV) return `mock-${Date.now()}`;
+	try {
+		const res = await fetch("/api/image/generate", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(params),
+		});
+		if (!res.ok) return null;
+		const data = await res.json();
+		return data.id || null;
+	} catch {
+		return null;
+	}
+}
+
+export async function submitImageEditJob(
+	form: FormData,
+): Promise<string | null> {
+	if (DEV) return `mock-${Date.now()}`;
+	try {
+		const res = await fetch("/api/image/edit", {
+			method: "POST",
+			body: form,
+		});
+		if (!res.ok) return null;
+		const data = await res.json();
+		return data.id || null;
+	} catch {
+		return null;
+	}
+}
+
+export function imageSourceUrl(id: string, index: number): string {
+	if (DEV) return `https://picsum.photos/seed/${id}-src-${index}/512/512`;
+	return `/api/image/source/${id}/${index}`;
+}
+
+export async function getImageJobs(): Promise<ImageJob[]> {
+	if (DEV) return mockJobs;
+	try {
+		const res = await fetch("/api/image/jobs");
+		if (!res.ok) return [];
+		const data = await res.json();
+		return data.jobs || [];
+	} catch {
+		return [];
+	}
+}
+
+export async function getImageJob(id: string): Promise<ImageJob | null> {
+	if (DEV) return mockJobs.find((j) => j.id === id) || null;
+	try {
+		const res = await fetch(`/api/image/jobs/${id}`);
+		if (!res.ok) return null;
+		return res.json();
+	} catch {
+		return null;
+	}
+}
+
+export function imageResultUrl(id: string, index: number): string {
+	if (DEV) return `https://picsum.photos/seed/${id}-${index}/512/512`;
+	return `/api/image/result/${id}/${index}`;
+}
+
+export async function deleteImageResult(
+	id: string,
+	index: number,
+): Promise<number | null> {
+	if (DEV) return 0;
+	try {
+		const res = await fetch(`/api/image/result/${id}/${index}`, {
+			method: "DELETE",
+		});
+		if (!res.ok) return null;
+		const data = await res.json();
+		return data.image_count ?? 0;
+	} catch {
+		return null;
+	}
+}
+
+export async function deleteImageJob(id: string): Promise<boolean> {
+	if (DEV) return true;
+	try {
+		const res = await fetch(`/api/image/jobs/${id}`, { method: "DELETE" });
+		return res.ok;
+	} catch {
+		return false;
+	}
 }
 
 export function connectSSE(

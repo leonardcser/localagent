@@ -35,9 +35,10 @@ function createChat() {
 	let dragging = $state(false);
 	let eventSource: EventSource | null = null;
 	let mediaRecorder: MediaRecorder | null = null;
+	let mediaStream = $state<MediaStream | null>(null);
 
 	function addMessage(msg: HistoryMessage) {
-		if (!msg.content) return;
+		if (!msg.content && (!msg.media || msg.media.length === 0)) return;
 		timeline.push({
 			kind: "message",
 			...msg,
@@ -60,11 +61,11 @@ function createChat() {
 				timeline = history.items
 					.map((item): TimelineItem | null => {
 						if (item.type === "message") {
-							if (!item.content) return null;
+							if (item.role !== "user" && !item.content) return null;
 							return {
 								kind: "message",
 								role: item.role!,
-								content: item.content,
+								content: item.content ?? "",
 								timestamp: item.timestamp,
 								media: item.media,
 								id: ++nextId,
@@ -140,6 +141,7 @@ function createChat() {
 		}
 		try {
 			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+			mediaStream = stream;
 			const chunks: Blob[] = [];
 			mediaRecorder = new MediaRecorder(stream);
 			mediaRecorder.ondataavailable = (e) => {
@@ -147,6 +149,7 @@ function createChat() {
 			};
 			mediaRecorder.onstop = async () => {
 				stream.getTracks().forEach((t) => t.stop());
+				mediaStream = null;
 				const blob = new Blob(chunks, { type: "audio/webm" });
 				const file = new File([blob], "voice.webm", { type: "audio/webm" });
 				transcribing = true;
@@ -175,7 +178,8 @@ function createChat() {
 	}
 
 	async function attachFiles(files: FileList) {
-		for (const file of files) {
+		const snapshot = [...files];
+		for (const file of snapshot) {
 			const path = await uploadFile(file);
 			if (path) pendingMedia.push(path);
 		}
@@ -212,6 +216,9 @@ function createChat() {
 		},
 		get transcribing() {
 			return transcribing;
+		},
+		get mediaStream() {
+			return mediaStream;
 		},
 		get pendingMedia() {
 			return pendingMedia;

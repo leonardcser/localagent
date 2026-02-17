@@ -83,7 +83,13 @@ func (t *ExecTool) Execute(ctx context.Context, args map[string]any) *ToolResult
 		return ErrorResult(guardError)
 	}
 
-	cmdCtx, cancel := context.WithTimeout(ctx, t.timeout)
+	var cmdCtx context.Context
+	var cancel context.CancelFunc
+	if t.timeout > 0 {
+		cmdCtx, cancel = context.WithTimeout(ctx, t.timeout)
+	} else {
+		cmdCtx, cancel = context.WithCancel(ctx)
+	}
 	defer cancel()
 
 	cmd := exec.CommandContext(cmdCtx, "sh", "-c", command)

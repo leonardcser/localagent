@@ -2,11 +2,12 @@
 import { cn } from "$lib/cn";
 import { chat } from "$lib/stores/chat.svelte";
 import MediaPreview from "./MediaPreview.svelte";
+import AudioWaveform from "./AudioWaveform.svelte";
 import { Icon } from "svelte-icons-pack";
 import { FiPaperclip, FiMic, FiArrowUp } from "svelte-icons-pack/fi";
 
-let textarea: HTMLTextAreaElement;
-let fileInput: HTMLInputElement;
+let textarea = $state<HTMLTextAreaElement>();
+let fileInput = $state<HTMLInputElement>();
 
 function handleKeydown(e: KeyboardEvent) {
 	if (e.key === "Enter" && !e.shiftKey) {
@@ -35,8 +36,9 @@ function handleFileChange(e: Event) {
 
 $effect(() => {
 	chat.input;
-	if (textarea && chat.input === "") {
+	if (textarea) {
 		textarea.style.height = "auto";
+		textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
 	}
 });
 </script>
@@ -52,25 +54,31 @@ $effect(() => {
 			chat.send();
 		}}
 	>
-		<div class="flex min-h-10.5 flex-1 items-end rounded-2xl bg-bg-tertiary ring-1 ring-border-light transition-all duration-150 focus-within:ring-text-muted">
-			<textarea
-				bind:this={textarea}
-				bind:value={chat.input}
-				oninput={autoGrow}
-				onkeydown={handleKeydown}
-				placeholder="Message..."
-				rows="1"
-				class="max-h-50 min-h-10.5 flex-1 resize-none overflow-y-auto bg-transparent px-4 py-2.5 text-[14px] leading-normal text-text-primary outline-none placeholder:text-text-muted"
-			></textarea>
-			<button
-				type="button"
-				class="mb-1 mr-1 flex size-8.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-muted transition-[color,background] duration-150 hover:bg-border hover:text-text-secondary"
-				onclick={handleAttach}
-				title="Attach file"
-			>
-				<Icon src={FiPaperclip} size="18" />
-			</button>
-		</div>
+		{#if chat.recording || chat.transcribing}
+			<div class="flex h-10.5 flex-1 items-center rounded-2xl bg-bg-tertiary ring-1 ring-border-light overflow-hidden px-3">
+				<AudioWaveform mode={chat.recording ? "recording" : "transcribing"} stream={chat.mediaStream} />
+			</div>
+		{:else}
+			<div class="flex min-h-10.5 flex-1 items-end rounded-2xl bg-bg-tertiary ring-1 ring-border-light transition-all duration-150 focus-within:ring-text-muted">
+				<textarea
+					bind:this={textarea}
+					bind:value={chat.input}
+					oninput={autoGrow}
+					onkeydown={handleKeydown}
+					placeholder="Message..."
+					rows="1"
+					class="max-h-50 min-h-10.5 flex-1 resize-none overflow-y-auto bg-transparent px-4 py-2.5 text-[14px] leading-normal text-text-primary outline-none placeholder:text-text-muted"
+				></textarea>
+				<button
+					type="button"
+					class="mb-1 mr-1 flex size-8.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-muted transition-[color,background] duration-150 hover:bg-border hover:text-text-secondary"
+					onclick={handleAttach}
+					title="Attach file"
+				>
+					<Icon src={FiPaperclip} size="18" />
+				</button>
+			</div>
+		{/if}
 		<input
 			bind:this={fileInput}
 			type="file"
@@ -81,9 +89,9 @@ $effect(() => {
 		<button
 			type="button"
 			class={cn(
-				"flex size-10.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-muted transition-[color,background] duration-150 hover:bg-border hover:text-text-primary disabled:bg-surface disabled:text-text-muted disabled:cursor-not-allowed disabled:hover:bg-surface",
-				chat.recording && "recording",
-				chat.transcribing && "transcribing",
+				"flex size-10.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-muted transition-[color,background] duration-150 hover:bg-border hover:text-text-primary disabled:cursor-not-allowed",
+				chat.transcribing && "animate-pulse bg-surface! text-text-secondary! cursor-wait",
+				!chat.transcribing && chat.recording && "recording",
 			)}
 			onclick={() => chat.toggleRecording()}
 			disabled={chat.loading || chat.transcribing}
@@ -101,7 +109,7 @@ $effect(() => {
 			type="button"
 			class={cn(
 				"send-btn flex size-10.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-muted opacity-40 pointer-events-none transition-[color,background,opacity] duration-150",
-				(chat.input.trim().length > 0 || chat.pendingMedia.length > 0 || chat.recording) && "has-input",
+				(chat.input.trim().length > 0 || chat.pendingMedia.length > 0 || chat.recording) && !chat.transcribing && "has-input",
 			)}
 			onclick={() => {
 				if (chat.recording) {
@@ -129,22 +137,6 @@ $effect(() => {
 		background: var(--color-danger) !important;
 		color: white !important;
 		animation: pulse-ring 1.5s infinite;
-	}
-
-	.transcribing {
-		background: var(--color-surface) !important;
-		color: var(--color-text-secondary) !important;
-		cursor: wait;
-		animation: transcribe-pulse 1.5s ease-in-out infinite;
-	}
-
-	@keyframes transcribe-pulse {
-		0%, 100% {
-			opacity: 1;
-		}
-		50% {
-			opacity: 0.5;
-		}
 	}
 
 	.send-btn.has-input {

@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"localagent/pkg/agent"
 	"localagent/pkg/bus"
@@ -211,7 +212,7 @@ func gatewayCmd() {
 	skillsInfo := startupInfo["skills"].(map[string]any)
 	fmt.Printf("Agent: tools=%d skills=%d/%d\n", toolsInfo["count"], skillsInfo["available"], skillsInfo["total"])
 
-	cronService := setupCronTool(agentLoop, msgBus, cfg.WorkspacePath())
+	cronService := setupCronTool(agentLoop, msgBus, cfg.WorkspacePath(), cfg.Tools.Cron)
 
 	heartbeatService := heartbeat.NewHeartbeatService(
 		cfg.WorkspacePath(),
@@ -239,7 +240,7 @@ func gatewayCmd() {
 		os.Exit(1)
 	}
 
-	webCh := webchat.NewWebChatChannel(&cfg.WebChat, msgBus, cfg.WorkspacePath(), cfg.Tools.Whisper)
+	webCh := webchat.NewWebChatChannel(&cfg.WebChat, msgBus, cfg.WorkspacePath(), cfg.Tools.STT, cfg.Tools.Image)
 	webCh.SetSessionManager(agentLoop.GetSessionManager())
 	channelManager.RegisterChannel("web", webCh)
 	agentLoop.SetActivityEmitter(webCh)
@@ -340,12 +341,17 @@ func statusCmd() {
 }
 
 
-func setupCronTool(agentLoop *agent.AgentLoop, msgBus *bus.MessageBus, workspace string) *cron.CronService {
+func setupCronTool(agentLoop *agent.AgentLoop, msgBus *bus.MessageBus, workspace string, cronCfg config.CronToolsConfig) *cron.CronService {
 	cronStorePath := filepath.Join(workspace, "cron", "jobs.json")
 
 	cronService := cron.NewCronService(cronStorePath, nil)
 
-	cronTool := tools.NewCronTool(cronService, agentLoop, msgBus, workspace)
+	var execTimeout time.Duration
+	if cronCfg.ExecTimeoutMinutes > 0 {
+		execTimeout = time.Duration(cronCfg.ExecTimeoutMinutes) * time.Minute
+	}
+
+	cronTool := tools.NewCronTool(cronService, agentLoop, msgBus, workspace, execTimeout)
 	agentLoop.RegisterTool(cronTool)
 
 	cronService.SetOnJob(func(job *cron.CronJob) (string, error) {

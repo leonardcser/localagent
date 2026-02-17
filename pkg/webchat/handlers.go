@@ -143,9 +143,9 @@ func (s *Server) handleTranscribe(c *echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "no file provided"})
 	}
 
-	whisper := s.channel.whisper
-	if whisper.URL == "" {
-		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "whisper not configured"})
+	stt := s.channel.stt
+	if stt.URL == "" {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "stt not configured"})
 	}
 
 	tmpDir := filepath.Join(s.channel.workspace, "media")
@@ -174,7 +174,7 @@ func (s *Server) handleTranscribe(c *echo.Context) error {
 	src.Close()
 	tmpFile.Close()
 
-	text, err := tools.TranscribeAudio(c.Request().Context(), tmpPath, whisper.URL, whisper.ResolveAPIKey())
+	text, err := tools.TranscribeAudio(c.Request().Context(), tmpPath, stt.URL, stt.ResolveAPIKey())
 	if err != nil {
 		logger.Error("transcription failed: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "transcription failed"})

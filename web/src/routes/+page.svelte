@@ -146,7 +146,7 @@ onDestroy(() => {
 });
 </script>
 
-<div class="relative mx-auto flex h-dvh w-full max-w-3xl flex-col pt-[env(safe-area-inset-top,0px)]">
+<div class="relative mx-auto flex h-full w-full max-w-3xl flex-col">
 	<div
 		bind:this={messagesEl}
 		onscroll={handleScroll}

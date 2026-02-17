@@ -31,6 +31,14 @@
     "pdf": {
       "url": "",
       "api_key_env": ""
+    },
+    "stt": {
+      "url": "",
+      "api_key_env": ""
+    },
+    "image": {
+      "url": "",
+      "api_key_env": ""
     }
   },
   "heartbeat": {

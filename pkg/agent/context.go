@@ -24,7 +24,7 @@ type PDFService struct {
 	APIKey string
 }
 
-type WhisperService struct {
+type STTService struct {
 	URL    string
 	APIKey string
 }
@@ -35,7 +35,7 @@ type ContextBuilder struct {
 	memory       *MemoryStore
 	tools        *tools.ToolRegistry // Direct reference to tool registry
 	pdf          *PDFService
-	whisper      *WhisperService
+	stt          *STTService
 }
 
 func getGlobalConfigDir() string {
@@ -75,9 +75,8 @@ func (cb *ContextBuilder) SetPDFService(url, apiKey string) {
 	cb.pdf = &PDFService{URL: url, APIKey: apiKey}
 }
 
-// SetWhisperService configures the Whisper service for auto-transcribing uploaded audio.
-func (cb *ContextBuilder) SetWhisperService(url, apiKey string) {
-	cb.whisper = &WhisperService{URL: url, APIKey: apiKey}
+func (cb *ContextBuilder) SetSTTService(url, apiKey string) {
+	cb.stt = &STTService{URL: url, APIKey: apiKey}
 }
 
 func (cb *ContextBuilder) getIdentity() string {
@@ -240,10 +239,10 @@ func (cb *ContextBuilder) buildUserMessage(text string, media []string) provider
 					Text: fmt.Sprintf("\n--- PDF: %s ---\n%s\n--- End of %s ---", filename, pdfText, filename),
 				})
 			}
-		} else if utils.IsAudioFile(mediaPath) && cb.whisper != nil {
+		} else if utils.IsAudioFile(mediaPath) && cb.stt != nil {
 			filename := filepath.Base(mediaPath)
 			ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-			audioText, err := tools.TranscribeAudio(ctx, mediaPath, cb.whisper.URL, cb.whisper.APIKey)
+			audioText, err := tools.TranscribeAudio(ctx, mediaPath, cb.stt.URL, cb.stt.APIKey)
 			cancel()
 			if err != nil {
 				logger.Warn("audio transcription failed for %s: %v", filename, err)

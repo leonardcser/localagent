@@ -89,8 +89,8 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 		registry.Register(tools.NewPDFToTextTool(workspace, cfg.Tools.PDF.URL, cfg.Tools.PDF.ResolveAPIKey()))
 	}
 
-	if cfg.Tools.Whisper.URL != "" {
-		registry.Register(tools.NewTranscribeAudioTool(workspace, cfg.Tools.Whisper.URL, cfg.Tools.Whisper.ResolveAPIKey()))
+	if cfg.Tools.STT.URL != "" {
+		registry.Register(tools.NewTranscribeAudioTool(workspace, cfg.Tools.STT.URL, cfg.Tools.STT.ResolveAPIKey()))
 	}
 
 	return registry
@@ -129,8 +129,8 @@ func NewAgentLoop(cfg *config.Config, msgBus *bus.MessageBus, provider providers
 	if cfg.Tools.PDF.URL != "" {
 		contextBuilder.SetPDFService(cfg.Tools.PDF.URL, cfg.Tools.PDF.ResolveAPIKey())
 	}
-	if cfg.Tools.Whisper.URL != "" {
-		contextBuilder.SetWhisperService(cfg.Tools.Whisper.URL, cfg.Tools.Whisper.ResolveAPIKey())
+	if cfg.Tools.STT.URL != "" {
+		contextBuilder.SetSTTService(cfg.Tools.STT.URL, cfg.Tools.STT.ResolveAPIKey())
 	}
 
 	stopCleanup := make(chan struct{})

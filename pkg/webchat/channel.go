@@ -40,19 +40,21 @@ type WebChatChannel struct {
 	server     *Server
 	sessions   *session.SessionManager
 	workspace  string
-	whisper    config.WhisperConfig
+	stt        config.STTConfig
+	image      config.ImageConfig
 	clients    map[string]*sseClient
 	mu         sync.RWMutex
 	processing atomic.Bool
 }
 
-func NewWebChatChannel(cfg *config.WebChatConfig, msgBus *bus.MessageBus, workspace string, whisper config.WhisperConfig) *WebChatChannel {
+func NewWebChatChannel(cfg *config.WebChatConfig, msgBus *bus.MessageBus, workspace string, stt config.STTConfig, image config.ImageConfig) *WebChatChannel {
 	base := channels.NewBaseChannel("web", cfg, msgBus, nil)
 	ch := &WebChatChannel{
 		BaseChannel: base,
 		config:      cfg,
 		workspace:   workspace,
-		whisper:     whisper,
+		stt:         stt,
+		image:       image,
 		clients:     make(map[string]*sseClient),
 	}
 	return ch

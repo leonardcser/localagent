@@ -94,22 +94,40 @@ func (p PDFConfig) ResolveAPIKey() string {
 	return os.Getenv(p.APIKeyEnv)
 }
 
-type WhisperConfig struct {
+type STTConfig struct {
 	URL       string `json:"url"`
 	APIKeyEnv string `json:"api_key_env"`
 }
 
-func (w WhisperConfig) ResolveAPIKey() string {
-	if w.APIKeyEnv == "" {
+func (s STTConfig) ResolveAPIKey() string {
+	if s.APIKeyEnv == "" {
 		return ""
 	}
-	return os.Getenv(w.APIKeyEnv)
+	return os.Getenv(s.APIKeyEnv)
+}
+
+type ImageConfig struct {
+	URL       string `json:"url"`
+	APIKeyEnv string `json:"api_key_env"`
+}
+
+func (i ImageConfig) ResolveAPIKey() string {
+	if i.APIKeyEnv == "" {
+		return ""
+	}
+	return os.Getenv(i.APIKeyEnv)
+}
+
+type CronToolsConfig struct {
+	ExecTimeoutMinutes int `json:"exec_timeout_minutes"`
 }
 
 type ToolsConfig struct {
-	Web     WebToolsConfig `json:"web"`
-	PDF     PDFConfig      `json:"pdf"`
-	Whisper WhisperConfig  `json:"whisper"`
+	Web   WebToolsConfig `json:"web"`
+	PDF   PDFConfig      `json:"pdf"`
+	STT   STTConfig      `json:"stt"`
+	Image ImageConfig    `json:"image"`
+	Cron  CronToolsConfig `json:"cron"`
 }
 
 func DefaultConfig() *Config {
@@ -118,9 +136,9 @@ func DefaultConfig() *Config {
 			Defaults: AgentDefaults{
 				Workspace:         "~/.localagent/workspace",
 				Model:             "llama3.2:latest",
-				MaxTokens:           8192,
-				Temperature:         0.7,
-				MaxToolIterations:   20,
+				MaxTokens:         8192,
+				Temperature:       0.7,
+				MaxToolIterations: 20,
 			},
 		},
 		Provider: ProviderConfig{

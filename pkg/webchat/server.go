@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/labstack/echo/v5"
@@ -18,6 +19,7 @@ type Server struct {
 	httpServer *http.Server
 	addr       string
 	channel    *WebChatChannel
+	imageJobs  *ImageJobStore
 }
 
 func NewServer(addr string, channel *WebChatChannel) *Server {
@@ -32,9 +34,10 @@ func NewServer(addr string, channel *WebChatChannel) *Server {
 	}))
 
 	s := &Server{
-		echo:    e,
-		addr:    addr,
-		channel: channel,
+		echo:      e,
+		addr:      addr,
+		channel:   channel,
+		imageJobs: NewImageJobStore(filepath.Join(channel.workspace, "images")),
 	}
 
 	s.setupRoutes()
@@ -49,6 +52,16 @@ func (s *Server) setupRoutes() {
 	s.echo.GET("/api/media/:filename", s.handleMedia)
 	s.echo.POST("/api/transcribe", s.handleTranscribe)
 
+	s.echo.GET("/api/image/models", s.handleImageModels)
+	s.echo.POST("/api/image/generate", s.handleImageGenerate)
+	s.echo.POST("/api/image/edit", s.handleImageEdit)
+	s.echo.GET("/api/image/jobs", s.handleImageJobs)
+	s.echo.GET("/api/image/jobs/:id", s.handleImageJob)
+	s.echo.DELETE("/api/image/jobs/:id", s.handleImageDelete)
+	s.echo.GET("/api/image/result/:id/:index", s.handleImageResult)
+	s.echo.DELETE("/api/image/result/:id/:index", s.handleImageResultDelete)
+	s.echo.GET("/api/image/source/:id/:index", s.handleImageSource)
+
 	s.echo.GET("/*", s.handleSPA)
 }
 
@@ -61,6 +74,7 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Stop(ctx context.Context) error {
+	s.imageJobs.Stop()
 	if s.httpServer != nil {
 		return s.httpServer.Shutdown(ctx)
 	}
