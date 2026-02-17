@@ -45,6 +45,8 @@ type CronJob struct {
 	Schedule       CronSchedule `json:"schedule"`
 	Payload        CronPayload  `json:"payload"`
 	State          CronJobState `json:"state"`
+	SessionTarget  string       `json:"sessionTarget,omitempty"`
+	WakeMode       string       `json:"wakeMode,omitempty"`
 	CreatedAtMS    int64        `json:"createdAtMs"`
 	UpdatedAtMS    int64        `json:"updatedAtMs"`
 	DeleteAfterRun bool         `json:"deleteAfterRun"`
@@ -324,7 +326,7 @@ func (cs *CronService) saveStoreUnsafe() error {
 	return os.WriteFile(cs.storePath, data, 0644)
 }
 
-func (cs *CronService) AddJob(name string, schedule CronSchedule, message string, deliver bool, channel, to string) (*CronJob, error) {
+func (cs *CronService) AddJob(name string, schedule CronSchedule, message string, deliver bool, channel, to, sessionTarget, wakeMode string) (*CronJob, error) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
@@ -346,6 +348,8 @@ func (cs *CronService) AddJob(name string, schedule CronSchedule, message string
 		State: CronJobState{
 			NextRunAtMS: cs.computeNextRun(&schedule, now),
 		},
+		SessionTarget:  sessionTarget,
+		WakeMode:       wakeMode,
 		CreatedAtMS:    now,
 		UpdatedAtMS:    now,
 		DeleteAfterRun: deleteAfterRun,

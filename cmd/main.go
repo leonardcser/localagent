@@ -212,7 +212,8 @@ func gatewayCmd() {
 	skillsInfo := startupInfo["skills"].(map[string]any)
 	fmt.Printf("Agent: tools=%d skills=%d/%d\n", toolsInfo["count"], skillsInfo["available"], skillsInfo["total"])
 
-	cronService := setupCronTool(agentLoop, msgBus, cfg.WorkspacePath(), cfg.Tools.Cron)
+	eventQueue := heartbeat.NewEventQueue()
+	cronService := setupCronTool(agentLoop, msgBus, cfg.WorkspacePath(), cfg.Tools.Cron, eventQueue)
 
 	heartbeatService := heartbeat.NewHeartbeatService(
 		cfg.WorkspacePath(),
@@ -220,6 +221,7 @@ func gatewayCmd() {
 		cfg.Heartbeat.Enabled,
 	)
 	heartbeatService.SetBus(msgBus)
+	heartbeatService.SetEventQueue(eventQueue)
 	heartbeatService.SetHandler(func(prompt, channel, chatID string) *tools.ToolResult {
 		if channel == "" || chatID == "" {
 			channel, chatID = "cli", "direct"
@@ -231,7 +233,7 @@ func gatewayCmd() {
 		if response == "HEARTBEAT_OK" {
 			return tools.SilentResult("Heartbeat OK")
 		}
-		return tools.SilentResult(response)
+		return tools.NewToolResult(response)
 	})
 
 	channelManager, err := channels.NewManager(cfg, msgBus)
@@ -341,7 +343,7 @@ func statusCmd() {
 }
 
 
-func setupCronTool(agentLoop *agent.AgentLoop, msgBus *bus.MessageBus, workspace string, cronCfg config.CronToolsConfig) *cron.CronService {
+func setupCronTool(agentLoop *agent.AgentLoop, msgBus *bus.MessageBus, workspace string, cronCfg config.CronToolsConfig, eventQueue *heartbeat.EventQueue) *cron.CronService {
 	cronStorePath := filepath.Join(workspace, "cron", "jobs.json")
 
 	cronService := cron.NewCronService(cronStorePath, nil)
@@ -352,6 +354,19 @@ func setupCronTool(agentLoop *agent.AgentLoop, msgBus *bus.MessageBus, workspace
 	}
 
 	cronTool := tools.NewCronTool(cronService, agentLoop, msgBus, workspace, execTimeout)
+	cronTool.SetEventEnqueuer(func(source, message, channel, chatID string, wake bool) {
+		e := heartbeat.Event{
+			Source:  source,
+			Message: message,
+			Channel: channel,
+			ChatID:  chatID,
+		}
+		if wake {
+			eventQueue.EnqueueAndWake(e)
+		} else {
+			eventQueue.Enqueue(e)
+		}
+	})
 	agentLoop.RegisterTool(cronTool)
 
 	cronService.SetOnJob(func(job *cron.CronJob) (string, error) {

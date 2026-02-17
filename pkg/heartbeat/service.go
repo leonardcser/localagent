@@ -28,14 +28,15 @@ type HeartbeatHandler func(prompt, channel, chatID string) *tools.ToolResult
 
 // HeartbeatService manages periodic heartbeat checks
 type HeartbeatService struct {
-	workspace string
-	bus       *bus.MessageBus
-	state     *state.Manager
-	handler   HeartbeatHandler
-	interval  time.Duration
-	enabled   bool
-	mu        sync.RWMutex
-	stopChan  chan struct{}
+	workspace  string
+	bus        *bus.MessageBus
+	state      *state.Manager
+	handler    HeartbeatHandler
+	eventQueue *EventQueue
+	interval   time.Duration
+	enabled    bool
+	mu         sync.RWMutex
+	stopChan   chan struct{}
 }
 
 // NewHeartbeatService creates a new heartbeat service
@@ -69,6 +70,13 @@ func (hs *HeartbeatService) SetHandler(handler HeartbeatHandler) {
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
 	hs.handler = handler
+}
+
+// SetEventQueue sets the event queue for receiving cron events.
+func (hs *HeartbeatService) SetEventQueue(eq *EventQueue) {
+	hs.mu.Lock()
+	defer hs.mu.Unlock()
+	hs.eventQueue = eq
 }
 
 // Start begins the heartbeat service
@@ -113,6 +121,13 @@ func (hs *HeartbeatService) runLoop(stopChan chan struct{}) {
 	ticker := time.NewTicker(hs.interval)
 	defer ticker.Stop()
 
+	var wakeChan <-chan struct{}
+	hs.mu.RLock()
+	if hs.eventQueue != nil {
+		wakeChan = hs.eventQueue.WakeChan()
+	}
+	hs.mu.RUnlock()
+
 	// Run first heartbeat after initial delay
 	time.AfterFunc(time.Second, func() {
 		hs.executeHeartbeat()
@@ -123,6 +138,8 @@ func (hs *HeartbeatService) runLoop(stopChan chan struct{}) {
 		case <-stopChan:
 			return
 		case <-ticker.C:
+			hs.executeHeartbeat()
+		case <-wakeChan:
 			hs.executeHeartbeat()
 		}
 	}
@@ -198,27 +215,52 @@ func (hs *HeartbeatService) executeHeartbeat() {
 	hs.logInfo("Heartbeat completed: %s", result.ForLLM)
 }
 
-// buildPrompt builds the heartbeat prompt from HEARTBEAT.md
+// buildPrompt builds the heartbeat prompt from HEARTBEAT.md and pending events.
 func (hs *HeartbeatService) buildPrompt() string {
 	heartbeatPath := filepath.Join(hs.workspace, "HEARTBEAT.md")
 
+	var staticContent string
 	data, err := os.ReadFile(heartbeatPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			hs.createDefaultHeartbeatTemplate()
-			return ""
+		} else {
+			hs.logError("Error reading HEARTBEAT.md: %v", err)
 		}
-		hs.logError("Error reading HEARTBEAT.md: %v", err)
+	} else {
+		staticContent = strings.TrimSpace(string(data))
+	}
+
+	hs.mu.RLock()
+	eq := hs.eventQueue
+	hs.mu.RUnlock()
+
+	var events []Event
+	if eq != nil {
+		events = eq.Drain()
+	}
+
+	if staticContent == "" && len(events) == 0 {
 		return ""
 	}
 
-	content := string(data)
-	if len(content) == 0 {
-		return ""
+	var content strings.Builder
+	if staticContent != "" {
+		content.WriteString(staticContent)
+	}
+
+	if len(events) > 0 {
+		if content.Len() > 0 {
+			content.WriteString("\n\n")
+		}
+		content.WriteString("## Pending Events\n\n")
+		for _, e := range events {
+			fmt.Fprintf(&content, "- [%s] (%s) %s\n", e.Source, e.EnqueuedAt.Format("15:04:05"), e.Message)
+		}
 	}
 
 	now := time.Now().Format("2006-01-02 15:04:05")
-	return fmt.Sprintf(prompts.Heartbeat, now, content)
+	return fmt.Sprintf(prompts.Heartbeat, now, content.String())
 }
 
 // createDefaultHeartbeatTemplate creates the default HEARTBEAT.md file
