@@ -1,5 +1,6 @@
 <script lang="ts">
 import "../app.css";
+import { onMount } from "svelte";
 import { page } from "$app/state";
 import { Icon } from "svelte-icons-pack";
 import {
@@ -15,6 +16,25 @@ let { children } = $props();
 
 let collapsed = $state(true);
 
+onMount(() => {
+	function preventZoom(e: TouchEvent) {
+		if (e.touches.length > 1) e.preventDefault();
+	}
+	function preventGesture(e: Event) {
+		e.preventDefault();
+	}
+	document.addEventListener("touchmove", preventZoom, { passive: false });
+	document.addEventListener("gesturestart", preventGesture, { passive: false });
+	document.addEventListener("gesturechange", preventGesture, {
+		passive: false,
+	});
+	return () => {
+		document.removeEventListener("touchmove", preventZoom);
+		document.removeEventListener("gesturestart", preventGesture);
+		document.removeEventListener("gesturechange", preventGesture);
+	};
+});
+
 const navItems = [
 	{ href: "/", icon: FiMessageCircle, label: "Chat" },
 	{ href: "/images", icon: FiImage, label: "Images" },
@@ -26,7 +46,7 @@ function isActive(href: string): boolean {
 }
 </script>
 
-<div class="flex h-dvh w-full">
+<div class="fixed inset-0 flex">
 	<nav
 		class="flex flex-col border-r border-border bg-bg-secondary transition-[width] duration-150"
 		style:width={collapsed ? "48px" : "160px"}

@@ -89,11 +89,14 @@ html {
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 	-webkit-tap-highlight-color: transparent;
+	-webkit-text-size-adjust: 100%;
+	touch-action: manipulation;
 	overscroll-behavior: none;
 }
 
 body {
 	margin: 0;
+	overscroll-behavior: none;
 }
 
 ::selection {

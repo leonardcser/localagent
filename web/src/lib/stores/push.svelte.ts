@@ -40,7 +40,8 @@ function createPush() {
 
 			const sub = await reg.pushManager.subscribe({
 				userVisibleOnly: true,
-				applicationServerKey: urlBase64ToUint8Array(keyRes).buffer as ArrayBuffer,
+				applicationServerKey: urlBase64ToUint8Array(keyRes)
+					.buffer as ArrayBuffer,
 			});
 
 			await subscribePush(sub);
