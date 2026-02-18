@@ -22,7 +22,7 @@ func NewNewsTool(maxItems int) *NewsTool {
 }
 
 func (t *NewsTool) Name() string {
-	return "news"
+	return "tech_news"
 }
 
 func (t *NewsTool) Description() string {
