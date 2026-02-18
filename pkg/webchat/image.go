@@ -24,12 +24,15 @@ import (
 
 type ImageJob struct {
 	ID             string    `json:"id"`
+	Type           string    `json:"type"`
 	Model          string    `json:"model"`
 	Prompt         string    `json:"prompt"`
 	NegativePrompt string    `json:"negative_prompt,omitempty"`
 	Width          int       `json:"width"`
 	Height         int       `json:"height"`
 	Seed           *int      `json:"seed,omitempty"`
+	Steps          *int      `json:"steps,omitempty"`
+	GuidanceScale  *float64  `json:"guidance_scale,omitempty"`
 	Count          int       `json:"count"`
 	SourceImages   int       `json:"source_images,omitempty"`
 	Status         string    `json:"status"`
@@ -88,15 +91,26 @@ func (s *ImageJobStore) processJob(job *ImageJob, cfg config.ImageConfig) {
 	job.Status = "generating"
 	s.Update(job)
 
-	url := fmt.Sprintf("%s/%s", cfg.URL, job.Model)
+	var endpoint string
+	switch job.Type {
+	case "edit":
+		endpoint = cfg.URL + "/edit"
+	case "upscale":
+		endpoint = cfg.URL + "/upscale"
+	default:
+		endpoint = cfg.URL + "/generate"
+	}
 
 	var resp *http.Response
 	var err error
 
-	if job.SourceImages > 0 {
-		resp, err = s.doEditRequest(job, cfg, url)
-	} else {
-		resp, err = s.doGenerateRequest(job, cfg, url)
+	switch job.Type {
+	case "edit":
+		resp, err = s.doEditRequest(job, cfg, endpoint)
+	case "upscale":
+		resp, err = s.doUpscaleRequest(job, cfg, endpoint)
+	default:
+		resp, err = s.doGenerateRequest(job, cfg, endpoint)
 	}
 
 	if err != nil {
@@ -135,17 +149,24 @@ func (s *ImageJobStore) processJob(job *ImageJob, cfg config.ImageConfig) {
 	}
 
 	job.ImageCount = imageCount
+	if genResp.Width > 0 && genResp.Height > 0 {
+		job.Width = genResp.Width
+		job.Height = genResp.Height
+	}
 	job.Status = "done"
 	s.Update(job)
 }
 
 func (s *ImageJobStore) doGenerateRequest(job *ImageJob, cfg config.ImageConfig, url string) (*http.Response, error) {
 	remoteReq := remoteGenerateRequest{
+		Model:          job.Model,
 		Prompt:         job.Prompt,
 		NegativePrompt: job.NegativePrompt,
 		Width:          job.Width,
 		Height:         job.Height,
 		Seed:           job.Seed,
+		Steps:          job.Steps,
+		GuidanceScale:  job.GuidanceScale,
 		Count:          job.Count,
 	}
 	body, err := json.Marshal(remoteReq)
@@ -177,6 +198,7 @@ func (s *ImageJobStore) doEditRequest(job *ImageJob, cfg config.ImageConfig, url
 		f.Close()
 	}
 
+	w.WriteField("model", job.Model)
 	w.WriteField("prompt", job.Prompt)
 	if job.NegativePrompt != "" {
 		w.WriteField("negative_prompt", job.NegativePrompt)
@@ -184,9 +206,43 @@ func (s *ImageJobStore) doEditRequest(job *ImageJob, cfg config.ImageConfig, url
 	if job.Seed != nil {
 		w.WriteField("seed", strconv.Itoa(*job.Seed))
 	}
+	if job.Steps != nil {
+		w.WriteField("steps", strconv.Itoa(*job.Steps))
+	}
+	if job.GuidanceScale != nil {
+		w.WriteField("guidance_scale", strconv.FormatFloat(*job.GuidanceScale, 'f', -1, 64))
+	}
 	if job.Count > 0 {
 		w.WriteField("count", strconv.Itoa(job.Count))
 	}
+	w.Close()
+
+	return imageHTTPRequest("POST", url, cfg, w.FormDataContentType(), &buf)
+}
+
+func (s *ImageJobStore) doUpscaleRequest(job *ImageJob, cfg config.ImageConfig, url string) (*http.Response, error) {
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+
+	for i := 0; i < job.SourceImages; i++ {
+		srcPath := s.sourcePath(job.ID, i)
+		f, err := os.Open(srcPath)
+		if err != nil {
+			return nil, fmt.Errorf("open source image %d: %w", i, err)
+		}
+		part, err := w.CreateFormFile("images", fmt.Sprintf("source_%d.png", i))
+		if err != nil {
+			f.Close()
+			return nil, fmt.Errorf("create form file: %w", err)
+		}
+		if _, err := io.Copy(part, f); err != nil {
+			f.Close()
+			return nil, fmt.Errorf("copy source image: %w", err)
+		}
+		f.Close()
+	}
+
+	w.WriteField("model", job.Model)
 	w.Close()
 
 	return imageHTTPRequest("POST", url, cfg, w.FormDataContentType(), &buf)
@@ -328,31 +384,40 @@ func (s *ImageJobStore) All() []*ImageJob {
 }
 
 type generateRequest struct {
-	Model          string `json:"model"`
-	Prompt         string `json:"prompt"`
-	NegativePrompt string `json:"negative_prompt"`
-	Width          int    `json:"width"`
-	Height         int    `json:"height"`
-	Seed           *int   `json:"seed"`
-	Count          int    `json:"count"`
+	Model          string   `json:"model"`
+	Prompt         string   `json:"prompt"`
+	NegativePrompt string   `json:"negative_prompt"`
+	Width          int      `json:"width"`
+	Height         int      `json:"height"`
+	Seed           *int     `json:"seed"`
+	Steps          *int     `json:"steps"`
+	GuidanceScale  *float64 `json:"guidance_scale"`
+	Count          int      `json:"count"`
 }
 
 type remoteGenerateRequest struct {
-	Prompt         string `json:"prompt"`
-	NegativePrompt string `json:"negative_prompt,omitempty"`
-	Width          int    `json:"width,omitempty"`
-	Height         int    `json:"height,omitempty"`
-	Seed           *int   `json:"seed,omitempty"`
-	Count          int    `json:"count,omitempty"`
+	Model          string   `json:"model"`
+	Prompt         string   `json:"prompt"`
+	NegativePrompt string   `json:"negative_prompt,omitempty"`
+	Width          int      `json:"width,omitempty"`
+	Height         int      `json:"height,omitempty"`
+	Seed           *int     `json:"seed,omitempty"`
+	Steps          *int     `json:"steps,omitempty"`
+	GuidanceScale  *float64 `json:"guidance_scale,omitempty"`
+	Count          int      `json:"count,omitempty"`
 }
 
 type remoteHealthResponse struct {
-	Status string   `json:"status"`
-	Models []string `json:"models"`
+	Status         string   `json:"status"`
+	GenerateModels []string `json:"generate_models"`
+	EditModels     []string `json:"edit_models"`
+	UpscaleModels  []string `json:"upscale_models"`
 }
 
 type remoteGenerateResponse struct {
 	Images []string `json:"images"`
+	Width  int      `json:"width"`
+	Height int      `json:"height"`
 }
 
 func imageHTTPRequest(method, url string, cfg config.ImageConfig, contentType string, body io.Reader) (*http.Response, error) {
@@ -386,7 +451,11 @@ func (s *Server) handleImageModels(c *echo.Context) error {
 		return c.JSON(http.StatusBadGateway, map[string]string{"error": "invalid response from image service"})
 	}
 
-	return c.JSON(http.StatusOK, map[string]any{"models": health.Models})
+	return c.JSON(http.StatusOK, map[string]any{
+		"generate": health.GenerateModels,
+		"edit":     health.EditModels,
+		"upscale":  health.UpscaleModels,
+	})
 }
 
 func (s *Server) handleImageGenerate(c *echo.Context) error {
@@ -415,12 +484,15 @@ func (s *Server) handleImageGenerate(c *echo.Context) error {
 
 	job := &ImageJob{
 		ID:             utils.RandHex(8),
+		Type:           "generate",
 		Model:          req.Model,
 		Prompt:         req.Prompt,
 		NegativePrompt: req.NegativePrompt,
 		Width:          req.Width,
 		Height:         req.Height,
 		Seed:           req.Seed,
+		Steps:          req.Steps,
+		GuidanceScale:  req.GuidanceScale,
 		Count:          req.Count,
 		Status:         "pending",
 		CreatedAt:      time.Now(),
@@ -544,12 +616,29 @@ func (s *Server) handleImageEdit(c *echo.Context) error {
 		}
 	}
 
+	var stepsVal *int
+	if v := c.FormValue("steps"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			stepsVal = &n
+		}
+	}
+
+	var guidanceVal *float64
+	if v := c.FormValue("guidance_scale"); v != "" {
+		if n, err := strconv.ParseFloat(v, 64); err == nil && n > 0 {
+			guidanceVal = &n
+		}
+	}
+
 	job := &ImageJob{
 		ID:             utils.RandHex(8),
+		Type:           "edit",
 		Model:          model,
 		Prompt:         prompt,
 		NegativePrompt: c.FormValue("negative_prompt"),
 		Seed:           seedVal,
+		Steps:          stepsVal,
+		GuidanceScale:  guidanceVal,
 		Count:          countVal,
 		SourceImages:   len(files),
 		Status:         "pending",
@@ -593,4 +682,55 @@ func (s *Server) handleImageSource(c *echo.Context) error {
 
 	path := s.imageJobs.sourcePath(id, index)
 	return c.File(path)
+}
+
+func (s *Server) handleImageUpscale(c *echo.Context) error {
+	imageConfig := s.channel.image
+	if imageConfig.URL == "" {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "image service not configured"})
+	}
+
+	model := c.FormValue("model")
+	if model == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "model is required"})
+	}
+
+	if err := c.Request().ParseMultipartForm(32 << 20); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "multipart form required"})
+	}
+
+	files := c.Request().MultipartForm.File["images[]"]
+	if len(files) == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "at least one source image is required"})
+	}
+
+	job := &ImageJob{
+		ID:           utils.RandHex(8),
+		Type:         "upscale",
+		Model:        model,
+		Count:        len(files),
+		SourceImages: len(files),
+		Status:       "pending",
+		CreatedAt:    time.Now(),
+	}
+
+	s.imageJobs.Create(job)
+
+	for i, fh := range files {
+		src, err := fh.Open()
+		if err != nil {
+			s.imageJobs.Delete(job.ID)
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "failed to read uploaded file"})
+		}
+		data, err := io.ReadAll(src)
+		src.Close()
+		if err != nil {
+			s.imageJobs.Delete(job.ID)
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "failed to read uploaded file"})
+		}
+		s.imageJobs.saveSource(job.ID, i, data)
+	}
+
+	s.imageJobs.Enqueue(job, imageConfig)
+	return c.JSON(http.StatusOK, map[string]string{"id": job.ID})
 }

@@ -55,6 +55,7 @@ func (s *Server) setupRoutes() {
 	s.echo.GET("/api/image/models", s.handleImageModels)
 	s.echo.POST("/api/image/generate", s.handleImageGenerate)
 	s.echo.POST("/api/image/edit", s.handleImageEdit)
+	s.echo.POST("/api/image/upscale", s.handleImageUpscale)
 	s.echo.GET("/api/image/jobs", s.handleImageJobs)
 	s.echo.GET("/api/image/jobs/:id", s.handleImageJob)
 	s.echo.DELETE("/api/image/jobs/:id", s.handleImageDelete)

@@ -390,12 +390,14 @@ export async function getHistory(): Promise<HistoryResponse> {
 
 export interface ImageJob {
 	id: string;
+	type: "generate" | "edit" | "upscale";
 	model: string;
 	prompt: string;
 	negative_prompt?: string;
 	width: number;
 	height: number;
 	seed?: number;
+	steps?: number;
 	count: number;
 	source_images?: number;
 	status: "pending" | "generating" | "done" | "error";
@@ -411,14 +413,27 @@ export interface ImageGenerateParams {
 	width?: number;
 	height?: number;
 	seed?: number;
+	steps?: number;
+	guidance_scale?: number;
 	count?: number;
 }
 
-const mockModels = ["flux-schnell", "stable-diffusion-xl", "sdxl-turbo"];
+export interface ImageModelsResponse {
+	generate: string[];
+	edit: string[];
+	upscale: string[];
+}
+
+const mockModels: ImageModelsResponse = {
+	generate: ["flux-schnell", "stable-diffusion-xl"],
+	edit: ["sdxl-edit"],
+	upscale: ["real-esrgan-x4"],
+};
 
 const mockJobs: ImageJob[] = [
 	{
 		id: "mock-1",
+		type: "generate",
 		model: "flux-schnell",
 		prompt: "A serene mountain lake at sunset with purple clouds",
 		width: 1024,
@@ -430,6 +445,7 @@ const mockJobs: ImageJob[] = [
 	},
 	{
 		id: "mock-2",
+		type: "generate",
 		model: "stable-diffusion-xl",
 		prompt: "Cyberpunk cityscape with neon lights and rain",
 		negative_prompt: "blurry, low quality",
@@ -442,15 +458,19 @@ const mockJobs: ImageJob[] = [
 	},
 ];
 
-export async function getImageModels(): Promise<string[]> {
+export async function getImageModels(): Promise<ImageModelsResponse> {
 	if (DEV) return mockModels;
 	try {
 		const res = await fetch("/api/image/models");
-		if (!res.ok) return [];
+		if (!res.ok) return { generate: [], edit: [], upscale: [] };
 		const data = await res.json();
-		return data.models || [];
+		return {
+			generate: data.generate || [],
+			edit: data.edit || [],
+			upscale: data.upscale || [],
+		};
 	} catch {
-		return [];
+		return { generate: [], edit: [], upscale: [] };
 	}
 }
 
@@ -478,6 +498,23 @@ export async function submitImageEditJob(
 	if (DEV) return `mock-${Date.now()}`;
 	try {
 		const res = await fetch("/api/image/edit", {
+			method: "POST",
+			body: form,
+		});
+		if (!res.ok) return null;
+		const data = await res.json();
+		return data.id || null;
+	} catch {
+		return null;
+	}
+}
+
+export async function submitImageUpscaleJob(
+	form: FormData,
+): Promise<string | null> {
+	if (DEV) return `mock-${Date.now()}`;
+	try {
+		const res = await fetch("/api/image/upscale", {
 			method: "POST",
 			body: form,
 		});

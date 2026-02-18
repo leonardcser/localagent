@@ -12,9 +12,11 @@ import {
 	FiX,
 	FiEdit2,
 	FiUpload,
+	FiArrowUp,
 } from "svelte-icons-pack/fi";
 
 let lightboxJob = $state<{ jobId: string; index: number } | null>(null);
+let upscaleMenu = $state<{ jobId: string; index: number } | null>(null);
 let lightboxUrl = $derived(
 	lightboxJob ? imageResultUrl(lightboxJob.jobId, lightboxJob.index) : null,
 );
@@ -30,7 +32,10 @@ function closeLightbox() {
 }
 
 function handleKeydown(e: KeyboardEvent) {
-	if (e.key === "Escape") closeLightbox();
+	if (e.key === "Escape") {
+		closeLightbox();
+		upscaleMenu = null;
+	}
 	if (!lightboxJob) return;
 	const job = imageStore.jobs.find((j) => j.id === lightboxJob!.jobId);
 	if (!job) return;
@@ -231,6 +236,28 @@ let reversedJobs = $derived([...imageStore.jobs].reverse());
 				</label>
 			</div>
 
+			<!-- Steps + Guidance Scale -->
+			<div class="flex gap-2">
+				<label class="flex min-w-0 flex-1 flex-col gap-1">
+					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Steps</span>
+					<input
+						type="text"
+						bind:value={imageStore.steps}
+						placeholder="Default"
+						class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
+					/>
+				</label>
+				<label class="flex min-w-0 flex-1 flex-col gap-1">
+					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Guidance</span>
+					<input
+						type="text"
+						bind:value={imageStore.guidanceScale}
+						placeholder="Default"
+						class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
+					/>
+				</label>
+			</div>
+
 			<div class="mt-auto pt-2">
 				<button
 					type="submit"
@@ -267,17 +294,28 @@ let reversedJobs = $derived([...imageStore.jobs].reverse());
 								<Icon src={FiAlertCircle} size="13" className="text-error" />
 							{/if}
 							<span class="text-[12px] font-medium text-text-secondary">{job.model}</span>
-							{#if !job.source_images}
+							{#if job.type === "generate"}
 								<span class="text-[11px] text-text-muted">&middot;</span>
 								<span class="text-[12px] text-text-muted">{job.width}&times;{job.height}</span>
 							{/if}
-							{#if job.source_images}
+							{#if job.type === "edit"}
 								<span class="text-[11px] text-text-muted">&middot;</span>
 								<span class="text-[11px] text-text-muted">edit</span>
 							{/if}
+							{#if job.type === "upscale"}
+								<span class="text-[11px] text-text-muted">&middot;</span>
+								<span class="text-[11px] text-text-muted">upscale</span>
+								{#if job.width && job.height}
+									<span class="text-[11px] text-text-muted">&middot;</span>
+									<span class="text-[12px] text-text-muted">{job.width}&times;{job.height}</span>
+								{/if}
+							{/if}
 						</div>
 						<div class="flex items-start gap-2">
-							<p class="flex-1 text-[12px] leading-relaxed text-text-secondary line-clamp-2">{job.prompt}</p>
+							{#if job.prompt}
+								<p class="flex-1 text-[12px] leading-relaxed text-text-secondary line-clamp-2">{job.prompt}</p>
+							{/if}
+							<div class="ml-auto shrink-0">
 							{#if job.status === "pending"}
 								<button
 									onclick={() => imageStore.removeJob(job.id)}
@@ -296,6 +334,7 @@ let reversedJobs = $derived([...imageStore.jobs].reverse());
 									<Icon src={FiTrash2} size="12" />
 								</button>
 							{/if}
+							</div>
 						</div>
 						{#if job.status === "error" && job.error}
 							<p class="text-[12px] text-error">{job.error}</p>
@@ -343,6 +382,29 @@ let reversedJobs = $derived([...imageStore.jobs].reverse());
 											>
 												<Icon src={FiEdit2} size="13" />
 											</button>
+											{#if imageStore.upscaleModels.length > 0}
+												<div class="relative">
+													<button
+														onclick={(e) => { e.stopPropagation(); upscaleMenu = upscaleMenu?.jobId === job.id && upscaleMenu?.index === i ? null : { jobId: job.id, index: i }; }}
+														class="flex h-7 w-7 items-center justify-center rounded-md bg-black/60 text-white backdrop-blur-sm transition-colors duration-100 hover:bg-black/80"
+														title="Upscale"
+													>
+														<Icon src={FiArrowUp} size="13" />
+													</button>
+													{#if upscaleMenu?.jobId === job.id && upscaleMenu?.index === i}
+														<div class="absolute right-0 top-8 z-10 min-w-35 rounded-md border border-border bg-bg-secondary py-1 shadow-elevated">
+															{#each imageStore.upscaleModels as uModel}
+																<button
+																	onclick={(e) => { e.stopPropagation(); imageStore.upscale(job.id, i, uModel); upscaleMenu = null; }}
+																	class="block w-full px-3 py-1.5 text-left text-[12px] text-text-secondary hover:bg-overlay-light"
+																>
+																	{uModel}
+																</button>
+															{/each}
+														</div>
+													{/if}
+												</div>
+											{/if}
 											<a
 												href={imageResultUrl(job.id, i)}
 												download="{job.id}_{i}.png"

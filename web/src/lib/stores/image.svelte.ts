@@ -3,15 +3,21 @@ import {
 	getImageJobs,
 	submitImageJob,
 	submitImageEditJob,
+	submitImageUpscaleJob,
 	deleteImageJob,
 	deleteImageResult,
 	imageResultUrl,
 	type ImageJob,
 	type ImageGenerateParams,
+	type ImageModelsResponse,
 } from "$lib/api";
 
 function createImageStore() {
-	let models = $state<string[]>([]);
+	let modelData = $state<ImageModelsResponse>({
+		generate: [],
+		edit: [],
+		upscale: [],
+	});
 	let jobs = $state<ImageJob[]>([]);
 	let selectedModel = $state("");
 	let prompt = $state("");
@@ -19,17 +25,22 @@ function createImageStore() {
 	let width = $state(1024);
 	let height = $state(1024);
 	let seed = $state("");
+	let steps = $state("");
+	let guidanceScale = $state("");
 	let count = $state(1);
 	let generating = $state(false);
 	let sourceImages = $state<File[]>([]);
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-	let isEditModel = $derived(selectedModel.includes("edit"));
+	let models = $derived([...modelData.generate, ...modelData.edit]);
+	let upscaleModels = $derived(modelData.upscale);
+	let isEditModel = $derived(modelData.edit.includes(selectedModel));
 
 	async function fetchModels() {
-		models = await getImageModels();
-		if (models.length > 0 && !selectedModel) {
-			selectedModel = models[0];
+		modelData = await getImageModels();
+		const allModels = [...modelData.generate, ...modelData.edit];
+		if (allModels.length > 0 && !selectedModel) {
+			selectedModel = allModels[0];
 		}
 	}
 
@@ -53,6 +64,12 @@ function createImageStore() {
 			if (seed.trim()) {
 				form.append("seed", seed.trim());
 			}
+			if (steps.trim()) {
+				form.append("steps", steps.trim());
+			}
+			if (guidanceScale.trim()) {
+				form.append("guidance_scale", guidanceScale.trim());
+			}
 			form.append("count", String(count));
 			for (const file of sourceImages) {
 				form.append("images[]", file);
@@ -72,6 +89,14 @@ function createImageStore() {
 			if (seed.trim()) {
 				const s = parseInt(seed.trim(), 10);
 				if (!isNaN(s)) params.seed = s;
+			}
+			if (steps.trim()) {
+				const s = parseInt(steps.trim(), 10);
+				if (!isNaN(s)) params.steps = s;
+			}
+			if (guidanceScale.trim()) {
+				const s = parseFloat(guidanceScale.trim());
+				if (!isNaN(s)) params.guidance_scale = s;
 			}
 			id = await submitImageJob(params);
 		}
@@ -135,11 +160,34 @@ function createImageStore() {
 				type: "image/png",
 			});
 
-			const editModel = models.find((m) => m.includes("edit"));
-			if (editModel) {
-				selectedModel = editModel;
+			if (modelData.edit.length > 0) {
+				selectedModel = modelData.edit[0];
 			}
 			sourceImages = [file];
+		} catch {
+			// ignore fetch errors
+		}
+	}
+
+	async function upscale(jobId: string, index: number, model: string) {
+		const url = imageResultUrl(jobId, index);
+		try {
+			const res = await fetch(url);
+			if (!res.ok) return;
+			const blob = await res.blob();
+			const file = new File([blob], `source_${jobId}_${index}.png`, {
+				type: "image/png",
+			});
+
+			const form = new FormData();
+			form.append("model", model);
+			form.append("images[]", file);
+
+			const id = await submitImageUpscaleJob(form);
+			if (id) {
+				startPolling();
+				await loadJobs();
+			}
 		} catch {
 			// ignore fetch errors
 		}
@@ -173,7 +221,7 @@ function createImageStore() {
 		},
 		set selectedModel(v: string) {
 			if (v !== selectedModel) {
-				if (!v.includes("edit")) {
+				if (!modelData.edit.includes(v)) {
 					sourceImages = [];
 				}
 			}
@@ -209,6 +257,18 @@ function createImageStore() {
 		set seed(v: string) {
 			seed = v;
 		},
+		get steps() {
+			return steps;
+		},
+		set steps(v: string) {
+			steps = v;
+		},
+		get guidanceScale() {
+			return guidanceScale;
+		},
+		set guidanceScale(v: string) {
+			guidanceScale = v;
+		},
 		get count() {
 			return count;
 		},
@@ -224,11 +284,15 @@ function createImageStore() {
 		get isEditModel() {
 			return isEditModel;
 		},
+		get upscaleModels() {
+			return upscaleModels;
+		},
 		init,
 		generate,
 		removeJob,
 		removeImage,
 		useAsSource,
+		upscale,
 		addSourceImages,
 		removeSourceImage,
 		clearSourceImages,
