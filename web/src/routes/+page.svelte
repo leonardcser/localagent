@@ -179,7 +179,7 @@ onDestroy(() => {
 
 	{#if !isAtBottom}
 		<button
-			class="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 flex items-center justify-center w-9 h-9 rounded-full border border-border-light bg-bg-secondary text-text-secondary cursor-pointer shadow-elevated transition-[background,color] duration-150 hover:bg-surface hover:text-text-primary"
+			class="absolute bottom-20 inset-x-0 mx-auto z-10 flex items-center justify-center w-9 h-9 rounded-full border border-border-light bg-bg-secondary text-text-secondary cursor-pointer shadow-elevated transition-[background,color] duration-150 hover:bg-surface hover:text-text-primary"
 			onclick={scrollToBottom}
 			title="Scroll to bottom"
 		>

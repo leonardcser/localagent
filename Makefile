@@ -116,7 +116,7 @@ run: build
 	@$(BUILD_DIR)/$(BINARY_NAME) $(ARGS)
 
 ## container: Build the container image
-container: web-build
+container:
 	@echo "Building container image $(CONTAINER_IMAGE):$(CONTAINER_TAG)..."
 	@$(CONTAINER_ENGINE) build -t $(CONTAINER_IMAGE):$(CONTAINER_TAG) -f Containerfile .
 	@$(CONTAINER_ENGINE) tag $(CONTAINER_IMAGE):$(CONTAINER_TAG) $(CONTAINER_IMAGE):latest

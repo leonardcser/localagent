@@ -450,6 +450,7 @@ export interface ImageModelsResponse {
 	generate: string[];
 	edit: string[];
 	upscale: string[];
+	loaded_model?: string | null;
 }
 
 const mockModels: ImageModelsResponse = {
@@ -496,6 +497,7 @@ export async function getImageModels(): Promise<ImageModelsResponse> {
 			generate: data.generate || [],
 			edit: data.edit || [],
 			upscale: data.upscale || [],
+			loaded_model: data.loaded_model ?? null,
 		};
 	} catch {
 		return { generate: [], edit: [], upscale: [] };
@@ -602,6 +604,11 @@ export async function deleteImageResult(
 	} catch {
 		return null;
 	}
+}
+
+export async function unloadImageModel(): Promise<void> {
+	if (DEV) return;
+	await fetch("/api/image/unload", { method: "POST" });
 }
 
 export async function deleteImageJob(id: string): Promise<boolean> {

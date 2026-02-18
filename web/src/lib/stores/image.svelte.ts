@@ -6,6 +6,7 @@ import {
 	submitImageUpscaleJob,
 	deleteImageJob,
 	deleteImageResult,
+	unloadImageModel,
 	imageResultUrl,
 	type ImageJob,
 	type ImageGenerateParams,
@@ -30,6 +31,7 @@ function createImageStore() {
 	let scale = $state("");
 	let count = $state(1);
 	let generating = $state(false);
+	let unloading = $state(false);
 	let sourceImages = $state<File[]>([]);
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -41,6 +43,7 @@ function createImageStore() {
 	let upscaleModels = $derived(modelData.upscale);
 	let isEditModel = $derived(modelData.edit.includes(selectedModel));
 	let isUpscaleModel = $derived(modelData.upscale.includes(selectedModel));
+	let loadedModel = $derived(modelData.loaded_model ?? null);
 
 	async function fetchModels() {
 		modelData = await getImageModels();
@@ -250,6 +253,13 @@ function createImageStore() {
 		sourceImages = [];
 	}
 
+	async function unload() {
+		unloading = true;
+		await unloadImageModel();
+		await fetchModels();
+		unloading = false;
+	}
+
 	function destroy() {
 		stopPolling();
 	}
@@ -344,7 +354,14 @@ function createImageStore() {
 		get upscaleModels() {
 			return upscaleModels;
 		},
+		get loadedModel() {
+			return loadedModel;
+		},
+		get unloading() {
+			return unloading;
+		},
 		init,
+		unload,
 		generate,
 		removeJob,
 		removeImage,

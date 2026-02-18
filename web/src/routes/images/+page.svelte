@@ -13,6 +13,7 @@ import {
 	FiEdit2,
 	FiUpload,
 	FiArrowUp,
+	FiPower,
 } from "svelte-icons-pack/fi";
 
 let lightboxJob = $state<{ jobId: string; index: number } | null>(null);
@@ -98,8 +99,25 @@ let reversedJobs = $derived([...imageStore.jobs].reverse());
 <div class="flex h-full">
 	<!-- Controls Panel -->
 	<div class="flex w-72 shrink-0 flex-col border-r border-border bg-bg-secondary">
-		<div class="p-4">
+		<div class="flex items-center justify-between p-4">
 			<h2 class="text-[13px] font-medium text-text-primary">{imageStore.isUpscaleModel ? "Upscale" : imageStore.isEditModel ? "Edit" : "Generate"}</h2>
+			{#if imageStore.loadedModel}
+				<div class="flex items-center gap-1.5">
+					<span class="text-[11px] text-text-muted truncate max-w-24" title={imageStore.loadedModel}>{imageStore.loadedModel}</span>
+					<button
+						onclick={() => imageStore.unload()}
+						disabled={imageStore.unloading}
+						class="flex h-5 w-5 items-center justify-center rounded text-text-muted transition-colors duration-100 hover:bg-overlay-light hover:text-danger disabled:opacity-40"
+						title="Unload model"
+					>
+						{#if imageStore.unloading}
+							<Icon src={FiLoader} size="12" className="animate-spin" />
+						{:else}
+							<Icon src={FiPower} size="12" />
+						{/if}
+					</button>
+				</div>
+			{/if}
 		</div>
 
 		<form onsubmit={handleSubmit} class="flex flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4">
@@ -345,11 +363,6 @@ let reversedJobs = $derived([...imageStore.jobs].reverse());
 									<span class="text-[12px] text-text-muted">{job.width}&times;{job.height}</span>
 								{/if}
 							{/if}
-						</div>
-						<div class="flex items-start gap-2">
-							{#if job.prompt}
-								<p class="flex-1 text-[12px] leading-relaxed text-text-secondary line-clamp-2">{job.prompt}</p>
-							{/if}
 							<div class="ml-auto shrink-0">
 							{#if job.status === "pending"}
 								<button
@@ -371,6 +384,9 @@ let reversedJobs = $derived([...imageStore.jobs].reverse());
 							{/if}
 							</div>
 						</div>
+						{#if job.prompt}
+							<p class="text-[12px] leading-relaxed text-text-secondary line-clamp-2">{job.prompt}</p>
+						{/if}
 						{#if job.status === "error" && job.error}
 							<p class="text-[12px] text-error">{job.error}</p>
 						{/if}

@@ -413,6 +413,7 @@ type remoteGenerateRequest struct {
 
 type remoteHealthResponse struct {
 	Status         string   `json:"status"`
+	LoadedModel    *string  `json:"loaded_model"`
 	GenerateModels []string `json:"generate_models"`
 	EditModels     []string `json:"edit_models"`
 	UpscaleModels  []string `json:"upscale_models"`
@@ -456,10 +457,31 @@ func (s *Server) handleImageModels(c *echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, map[string]any{
-		"generate": health.GenerateModels,
-		"edit":     health.EditModels,
-		"upscale":  health.UpscaleModels,
+		"generate":     health.GenerateModels,
+		"edit":         health.EditModels,
+		"upscale":      health.UpscaleModels,
+		"loaded_model": health.LoadedModel,
 	})
+}
+
+func (s *Server) handleImageUnload(c *echo.Context) error {
+	cfg := s.channel.image
+	if cfg.URL == "" {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "image service not configured"})
+	}
+
+	resp, err := imageHTTPRequest("POST", cfg.URL+"/unload", cfg, "", nil)
+	if err != nil {
+		return c.JSON(http.StatusBadGateway, map[string]string{"error": "image service unreachable"})
+	}
+	defer resp.Body.Close()
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return c.JSON(http.StatusBadGateway, map[string]string{"error": "invalid response from image service"})
+	}
+
+	return c.JSON(http.StatusOK, result)
 }
 
 func (s *Server) handleImageGenerate(c *echo.Context) error {
