@@ -168,6 +168,63 @@ func TestShellTool_StderrCapture(t *testing.T) {
 	}
 }
 
+// TestShellTool_DenyNetworkCommands verifies network commands are blocked when enabled
+func TestShellTool_DenyNetworkCommands(t *testing.T) {
+	tool := NewExecTool("")
+	tool.DenyNetworkCommands()
+
+	ctx := context.Background()
+
+	blocked := []string{
+		"curl https://example.com",
+		"wget https://example.com",
+		"curl -s https://example.com | jq .",
+		"wget -O - https://example.com",
+		"nc localhost 8080",
+		"ncat -l 9090",
+		"netcat 10.0.0.1 80",
+		"ssh user@host",
+		"scp file.txt user@host:/tmp",
+		"sftp user@host",
+		"ftp ftp.example.com",
+		"telnet example.com 80",
+		"rsync -avz dir/ user@host:/tmp",
+		"aria2c https://example.com/file.zip",
+		"lynx https://example.com",
+		"socat TCP:localhost:8080 -",
+	}
+
+	for _, cmd := range blocked {
+		result := tool.Execute(ctx, map[string]any{"command": cmd})
+		if !result.IsError {
+			t.Errorf("Expected network command to be blocked: %s", cmd)
+		}
+		if !strings.Contains(result.ForLLM, "blocked") {
+			t.Errorf("Expected 'blocked' message for %q, got: %s", cmd, result.ForLLM)
+		}
+	}
+}
+
+// TestShellTool_NetworkCommandsAllowedByDefault verifies network commands work without DenyNetworkCommands
+func TestShellTool_NetworkCommandsAllowedByDefault(t *testing.T) {
+	tool := NewExecTool("")
+
+	ctx := context.Background()
+
+	// These should NOT be blocked by default (they will fail to execute but won't be "blocked")
+	cmds := []string{
+		"curl --version",
+		"wget --version",
+	}
+
+	for _, cmd := range cmds {
+		result := tool.Execute(ctx, map[string]any{"command": cmd})
+		if result.IsError && strings.Contains(result.ForLLM, "blocked") {
+			t.Errorf("Network command should not be blocked by default: %s", cmd)
+		}
+	}
+}
+
 // TestShellTool_OutputTruncation verifies long output is truncated
 func TestShellTool_OutputTruncation(t *testing.T) {
 	tool := NewExecTool("")

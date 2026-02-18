@@ -68,7 +68,11 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 	registry.Register(tools.NewAppendFileTool(workspace))
 
 	// Shell execution
-	registry.Register(tools.NewExecTool(workspace))
+	execTool := tools.NewExecTool(workspace)
+	if !cfg.WebEnabled {
+		execTool.DenyNetworkCommands()
+	}
+	registry.Register(execTool)
 
 	if cfg.WebEnabled {
 		if searchTool := tools.NewWebSearchTool(tools.WebSearchToolOptions{
