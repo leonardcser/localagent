@@ -39,7 +39,7 @@ type WebChatChannel struct {
 	config     *config.WebChatConfig
 	server     *Server
 	sessions   *session.SessionManager
-	workspace  string
+	dataDir    string
 	stt        config.STTConfig
 	image      config.ImageConfig
 	clients    map[string]*sseClient
@@ -47,12 +47,12 @@ type WebChatChannel struct {
 	processing atomic.Bool
 }
 
-func NewWebChatChannel(cfg *config.WebChatConfig, msgBus *bus.MessageBus, workspace string, stt config.STTConfig, image config.ImageConfig) *WebChatChannel {
+func NewWebChatChannel(cfg *config.WebChatConfig, msgBus *bus.MessageBus, dataDir string, stt config.STTConfig, image config.ImageConfig) *WebChatChannel {
 	base := channels.NewBaseChannel("web", cfg, msgBus, nil)
 	ch := &WebChatChannel{
 		BaseChannel: base,
 		config:      cfg,
-		workspace:   workspace,
+		dataDir:     dataDir,
 		stt:         stt,
 		image:       image,
 		clients:     make(map[string]*sseClient),

@@ -210,6 +210,11 @@ func (c *Config) WorkspacePath() string {
 	return expandHome(c.Agents.Defaults.Workspace)
 }
 
+func (c *Config) DataDir() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".localagent")
+}
+
 func expandHome(path string) string {
 	if path == "" {
 		return path

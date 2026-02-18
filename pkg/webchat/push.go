@@ -25,8 +25,8 @@ type PushManager struct {
 	mu            sync.RWMutex
 }
 
-func NewPushManager(workspace string) (*PushManager, error) {
-	dir := filepath.Join(workspace, "push")
+func NewPushManager(webchatDir string) (*PushManager, error) {
+	dir := filepath.Join(webchatDir, "push")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, fmt.Errorf("create push dir: %w", err)
 	}

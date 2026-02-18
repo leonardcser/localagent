@@ -242,7 +242,7 @@ func gatewayCmd() {
 		os.Exit(1)
 	}
 
-	webCh := webchat.NewWebChatChannel(&cfg.WebChat, msgBus, cfg.WorkspacePath(), cfg.Tools.STT, cfg.Tools.Image)
+	webCh := webchat.NewWebChatChannel(&cfg.WebChat, msgBus, cfg.DataDir(), cfg.Tools.STT, cfg.Tools.Image)
 	webCh.SetSessionManager(agentLoop.GetSessionManager())
 	channelManager.RegisterChannel("web", webCh)
 	agentLoop.SetActivityEmitter(webCh)

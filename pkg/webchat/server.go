@@ -21,6 +21,7 @@ type Server struct {
 	httpServer  *http.Server
 	addr        string
 	channel     *WebChatChannel
+	mediaDir    string
 	imageJobs   *ImageJobStore
 	pushManager *PushManager
 }
@@ -36,7 +37,9 @@ func NewServer(addr string, channel *WebChatChannel) *Server {
 		},
 	}))
 
-	pm, err := NewPushManager(channel.workspace)
+	webchatDir := filepath.Join(channel.dataDir, "webchat")
+
+	pm, err := NewPushManager(webchatDir)
 	if err != nil {
 		logger.Warn("push notifications disabled: %v", err)
 	}
@@ -45,7 +48,8 @@ func NewServer(addr string, channel *WebChatChannel) *Server {
 		echo:        e,
 		addr:        addr,
 		channel:     channel,
-		imageJobs:   NewImageJobStore(filepath.Join(channel.workspace, "images")),
+		mediaDir:    filepath.Join(webchatDir, "media"),
+		imageJobs:   NewImageJobStore(filepath.Join(webchatDir, "images")),
 		pushManager: pm,
 	}
 

@@ -11,8 +11,7 @@ Network=pasta
 PublishPort=18790:18790
 PublishPort=18791:18791
 Environment=LOCALAGENT_WEB_ENABLED=true
-Volume=%h/.localagent/config.json:/home/localagent/.localagent/config.json:ro,Z
-Volume=%h/.localagent/workspace:/home/localagent/.localagent/workspace:Z
+Volume=%h/.localagent:/home/localagent/.localagent:Z
 AutoUpdate=local
 
 [Service]

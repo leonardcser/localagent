@@ -86,7 +86,7 @@ func (s *Server) handleUpload(c *echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "no file provided"})
 	}
 
-	mediaDir := filepath.Join(s.channel.workspace, "media")
+	mediaDir := s.mediaDir
 	if err := os.MkdirAll(mediaDir, 0700); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create media directory"})
 	}
@@ -134,7 +134,7 @@ func (s *Server) handleMedia(c *echo.Context) error {
 	if name == "" || strings.Contains(name, "/") || strings.Contains(name, "..") {
 		return echo.ErrNotFound
 	}
-	filePath := filepath.Join(s.channel.workspace, "media", name)
+	filePath := filepath.Join(s.mediaDir, name)
 	return c.File(filePath)
 }
 
@@ -149,7 +149,7 @@ func (s *Server) handleTranscribe(c *echo.Context) error {
 		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "stt not configured"})
 	}
 
-	tmpDir := filepath.Join(s.channel.workspace, "media")
+	tmpDir := s.mediaDir
 	if err := os.MkdirAll(tmpDir, 0700); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create temp directory"})
 	}
