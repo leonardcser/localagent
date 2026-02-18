@@ -386,6 +386,34 @@ export async function getHistory(): Promise<HistoryResponse> {
 	return res.json();
 }
 
+// --- Push API ---
+
+export async function getVAPIDPublicKey(): Promise<string | null> {
+	if (DEV) return null;
+	try {
+		const res = await fetch("/api/push/vapid-public-key");
+		if (!res.ok) return null;
+		const data = await res.json();
+		return data.key || null;
+	} catch {
+		return null;
+	}
+}
+
+export async function subscribePush(sub: PushSubscription): Promise<boolean> {
+	if (DEV) return false;
+	try {
+		const res = await fetch("/api/push/subscribe", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(sub.toJSON()),
+		});
+		return res.ok;
+	} catch {
+		return false;
+	}
+}
+
 // --- Image API ---
 
 export interface ImageJob {

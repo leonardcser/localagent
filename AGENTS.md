@@ -30,11 +30,11 @@ cd web && bun run build
 # Frontend type check
 cd web && bun run check
 
-# Frontend format
-cd web && bunx biome format --write .
+# Frontend lint (type check + biome)
+cd web && bun run lint
 
-# Frontend lint
-cd web && bunx biome check .
+# Frontend format
+cd web && bun run format
 ```
 
 ## Architecture

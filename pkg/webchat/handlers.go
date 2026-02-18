@@ -15,6 +15,7 @@ import (
 	"localagent/pkg/tools"
 	"localagent/pkg/utils"
 
+	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/labstack/echo/v5"
 )
 
@@ -262,5 +263,33 @@ func (s *Server) handleSSE(c *echo.Context) error {
 			rc.Flush()
 		}
 	}
+}
+
+func (s *Server) handleVAPIDPublicKey(c *echo.Context) error {
+	if s.pushManager == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "push not available"})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"key": s.pushManager.VAPIDPublicKey()})
+}
+
+func (s *Server) handlePushSubscribe(c *echo.Context) error {
+	if s.pushManager == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "push not available"})
+	}
+
+	var sub webpush.Subscription
+	if err := c.Bind(&sub); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid subscription"})
+	}
+	if sub.Endpoint == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "missing endpoint"})
+	}
+
+	if err := s.pushManager.AddSubscription(sub); err != nil {
+		logger.Error("push: subscribe failed: %v", err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to save subscription"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]bool{"ok": true})
 }
 

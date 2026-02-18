@@ -98,6 +98,15 @@ func (ch *WebChatChannel) Send(ctx context.Context, msg bus.OutboundMessage) err
 		Content: msg.Content,
 	}
 	ch.broadcast(event)
+
+	if ch.server != nil && ch.server.pushManager != nil {
+		body := msg.Content
+		if len(body) > 200 {
+			body = body[:200] + "..."
+		}
+		go ch.server.pushManager.SendPush("localagent", body, "/")
+	}
+
 	return nil
 }
 

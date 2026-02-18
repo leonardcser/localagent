@@ -2,7 +2,14 @@
 import "../app.css";
 import { page } from "$app/state";
 import { Icon } from "svelte-icons-pack";
-import { FiMessageCircle, FiImage, FiSidebar } from "svelte-icons-pack/fi";
+import {
+	FiMessageCircle,
+	FiImage,
+	FiSidebar,
+	FiBell,
+	FiBellOff,
+} from "svelte-icons-pack/fi";
+import { push } from "$lib/stores/push.svelte";
 
 let { children } = $props();
 
@@ -42,7 +49,33 @@ function isActive(href: string): boolean {
 				</a>
 			{/each}
 		</div>
-		<div class="mt-auto p-1.5 pb-[max(env(safe-area-inset-bottom,0px),6px)]">
+		<div class="mt-auto flex flex-col gap-1 p-1.5 pb-[max(env(safe-area-inset-bottom,0px),6px)]">
+			{#if push.supported}
+				<button
+					onclick={() => push.subscribe()}
+					class="flex w-full items-center rounded-md py-2 text-text-muted transition-colors duration-100 hover:bg-overlay-light hover:text-text-secondary {collapsed
+						? 'justify-center'
+						: 'gap-2.5 px-2.5'}"
+					title={collapsed
+						? push.permission === "granted"
+							? "Notifications enabled"
+							: "Enable notifications"
+						: undefined}
+				>
+					<Icon
+						src={push.permission === "granted" ? FiBell : FiBellOff}
+						size="16"
+						className="shrink-0 {push.permission === 'granted' ? 'text-green-400' : ''}"
+					/>
+					{#if !collapsed}
+						<span class="truncate text-[12px]">
+							{push.permission === "granted"
+								? "Notifications on"
+								: "Enable notifications"}
+						</span>
+					{/if}
+				</button>
+			{/if}
 			<button
 				onclick={() => (collapsed = !collapsed)}
 				class="flex w-full items-center rounded-md py-2 text-text-muted transition-colors duration-100 hover:bg-overlay-light hover:text-text-secondary {collapsed

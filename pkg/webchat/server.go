@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"localagent/pkg/logger"
+
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
 )
@@ -15,11 +17,12 @@ import (
 var staticFiles embed.FS
 
 type Server struct {
-	echo       *echo.Echo
-	httpServer *http.Server
-	addr       string
-	channel    *WebChatChannel
-	imageJobs  *ImageJobStore
+	echo        *echo.Echo
+	httpServer  *http.Server
+	addr        string
+	channel     *WebChatChannel
+	imageJobs   *ImageJobStore
+	pushManager *PushManager
 }
 
 func NewServer(addr string, channel *WebChatChannel) *Server {
@@ -33,11 +36,17 @@ func NewServer(addr string, channel *WebChatChannel) *Server {
 		},
 	}))
 
+	pm, err := NewPushManager(channel.workspace)
+	if err != nil {
+		logger.Warn("push notifications disabled: %v", err)
+	}
+
 	s := &Server{
-		echo:      e,
-		addr:      addr,
-		channel:   channel,
-		imageJobs: NewImageJobStore(filepath.Join(channel.workspace, "images")),
+		echo:        e,
+		addr:        addr,
+		channel:     channel,
+		imageJobs:   NewImageJobStore(filepath.Join(channel.workspace, "images")),
+		pushManager: pm,
 	}
 
 	s.setupRoutes()
@@ -62,6 +71,9 @@ func (s *Server) setupRoutes() {
 	s.echo.GET("/api/image/result/:id/:index", s.handleImageResult)
 	s.echo.DELETE("/api/image/result/:id/:index", s.handleImageResultDelete)
 	s.echo.GET("/api/image/source/:id/:index", s.handleImageSource)
+
+	s.echo.GET("/api/push/vapid-public-key", s.handleVAPIDPublicKey)
+	s.echo.POST("/api/push/subscribe", s.handlePushSubscribe)
 
 	s.echo.GET("/*", s.handleSPA)
 }
