@@ -144,10 +144,16 @@ function createImageStore() {
 	function startPolling() {
 		if (pollTimer) return;
 		pollTimer = setInterval(async () => {
+			const before = new Set(
+				jobs
+					.filter((j) => j.status === "pending" || j.status === "generating")
+					.map((j) => j.id),
+			);
 			await loadJobs();
 			const hasPending = jobs.some(
 				(j) => j.status === "pending" || j.status === "generating",
 			);
+			if (before.size > 0 && !hasPending) fetchModels();
 			if (!hasPending) stopPolling();
 		}, 2000);
 	}
