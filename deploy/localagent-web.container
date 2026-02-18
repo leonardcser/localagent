@@ -7,6 +7,7 @@ Image=localhost/localagent:latest
 ContainerName=localagent-gateway-web
 Exec=gateway
 PodmanArgs=--runtime=krun
+UserNS=keep-id
 Network=pasta
 PublishPort=18790:18790
 PublishPort=18791:18791
