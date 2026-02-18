@@ -20,6 +20,7 @@ import (
 	"localagent/pkg/heartbeat"
 	"localagent/pkg/logger"
 	"localagent/pkg/providers"
+	"localagent/pkg/proxy"
 	"localagent/pkg/tools"
 	"localagent/pkg/webchat"
 )
@@ -128,6 +129,9 @@ func agentCmd() {
 		os.Exit(1)
 	}
 
+	p := startProxy(cfg)
+	defer p.Stop(context.Background())
+
 	provider := providers.NewHTTPProvider(
 		cfg.Provider.ResolveAPIKey(),
 		cfg.Provider.APIBase,
@@ -136,6 +140,9 @@ func agentCmd() {
 
 	msgBus := bus.NewMessageBus()
 	agentLoop := agent.NewAgentLoop(cfg, msgBus, provider)
+
+	// Add tool-declared domains to proxy whitelist
+	p.Whitelist().Add(agentLoop.GetToolDomains()...)
 
 	startupInfo := agentLoop.GetStartupInfo()
 	logger.Info("agent initialized: tools=%d", startupInfo["tools"].(map[string]any)["count"])
@@ -198,6 +205,8 @@ func gatewayCmd() {
 		os.Exit(1)
 	}
 
+	p := startProxy(cfg)
+
 	provider := providers.NewHTTPProvider(
 		cfg.Provider.ResolveAPIKey(),
 		cfg.Provider.APIBase,
@@ -206,6 +215,9 @@ func gatewayCmd() {
 
 	msgBus := bus.NewMessageBus()
 	agentLoop := agent.NewAgentLoop(cfg, msgBus, provider)
+
+	// Add tool-declared domains to proxy whitelist
+	p.Whitelist().Add(agentLoop.GetToolDomains()...)
 
 	startupInfo := agentLoop.GetStartupInfo()
 	toolsInfo := startupInfo["tools"].(map[string]any)
@@ -304,6 +316,7 @@ func gatewayCmd() {
 	cronService.Stop()
 	agentLoop.Stop()
 	channelManager.StopAll(ctx)
+	p.Stop(context.Background())
 	fmt.Println("Gateway stopped")
 }
 
@@ -342,6 +355,23 @@ func statusCmd() {
 	}
 }
 
+
+func startProxy(cfg *config.Config) *proxy.Proxy {
+	wl := proxy.NewWhitelist()
+	wl.Add(cfg.ServiceDomains()...)
+	wl.Add(cfg.AllowedDomains...)
+	p := proxy.New(wl)
+	if err := p.Start(); err != nil {
+		fmt.Printf("Error starting proxy: %v\n", err)
+		os.Exit(1)
+	}
+	addr := p.Addr()
+	os.Setenv("HTTP_PROXY", addr)
+	os.Setenv("HTTPS_PROXY", addr)
+	os.Setenv("http_proxy", addr)
+	os.Setenv("https_proxy", addr)
+	return p
+}
 
 func setupCronTool(agentLoop *agent.AgentLoop, msgBus *bus.MessageBus, workspace string, cronCfg config.CronToolsConfig, eventQueue *heartbeat.EventQueue) *cron.CronService {
 	cronStorePath := filepath.Join(workspace, "cron", "jobs.json")

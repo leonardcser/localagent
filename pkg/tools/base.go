@@ -69,6 +69,12 @@ type AsyncTool interface {
 	SetCallback(cb AsyncCallback)
 }
 
+// DomainDeclarer is an optional interface that tools can implement
+// to declare the external domains they need access to.
+type DomainDeclarer interface {
+	DeclaredDomains() []string
+}
+
 func ToolToSchema(tool Tool) map[string]any {
 	return map[string]any{
 		"type": "function",

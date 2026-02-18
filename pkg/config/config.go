@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -14,14 +15,14 @@ type WebChatConfig struct {
 }
 
 type Config struct {
-	Agents     AgentsConfig    `json:"agents"`
-	Provider   ProviderConfig  `json:"provider"`
-	Gateway    GatewayConfig   `json:"gateway"`
-	Tools      ToolsConfig     `json:"tools"`
-	Heartbeat  HeartbeatConfig `json:"heartbeat"`
-	WebChat    WebChatConfig   `json:"webchat"`
-	WebEnabled bool            `json:"web_enabled"`
-	mu         sync.RWMutex
+	Agents         AgentsConfig    `json:"agents"`
+	Provider       ProviderConfig  `json:"provider"`
+	Gateway        GatewayConfig   `json:"gateway"`
+	Tools          ToolsConfig     `json:"tools"`
+	Heartbeat      HeartbeatConfig `json:"heartbeat"`
+	WebChat        WebChatConfig   `json:"webchat"`
+	AllowedDomains []string        `json:"allowed_domains"`
+	mu             sync.RWMutex
 }
 
 type AgentsConfig struct {
@@ -57,29 +58,6 @@ type HeartbeatConfig struct {
 type GatewayConfig struct {
 	Host string `json:"host"`
 	Port int    `json:"port"`
-}
-
-type BraveConfig struct {
-	Enabled    bool   `json:"enabled"`
-	APIKeyEnv  string `json:"api_key_env"`
-	MaxResults int    `json:"max_results"`
-}
-
-func (b BraveConfig) ResolveAPIKey() string {
-	if b.APIKeyEnv == "" {
-		return ""
-	}
-	return os.Getenv(b.APIKeyEnv)
-}
-
-type DuckDuckGoConfig struct {
-	Enabled    bool `json:"enabled"`
-	MaxResults int  `json:"max_results"`
-}
-
-type WebToolsConfig struct {
-	Brave      BraveConfig      `json:"brave"`
-	DuckDuckGo DuckDuckGoConfig `json:"duckduckgo"`
 }
 
 type PDFConfig struct {
@@ -123,10 +101,9 @@ type CronToolsConfig struct {
 }
 
 type ToolsConfig struct {
-	Web   WebToolsConfig `json:"web"`
-	PDF   PDFConfig      `json:"pdf"`
-	STT   STTConfig      `json:"stt"`
-	Image ImageConfig    `json:"image"`
+	PDF   PDFConfig       `json:"pdf"`
+	STT   STTConfig       `json:"stt"`
+	Image ImageConfig     `json:"image"`
 	Cron  CronToolsConfig `json:"cron"`
 }
 
@@ -147,18 +124,6 @@ func DefaultConfig() *Config {
 		Gateway: GatewayConfig{
 			Host: "0.0.0.0",
 			Port: 18790,
-		},
-		Tools: ToolsConfig{
-			Web: WebToolsConfig{
-				Brave: BraveConfig{
-					Enabled:    false,
-					MaxResults: 5,
-				},
-				DuckDuckGo: DuckDuckGoConfig{
-					Enabled:    false,
-					MaxResults: 5,
-				},
-			},
 		},
 		Heartbeat: HeartbeatConfig{
 			Enabled:  true,
@@ -215,6 +180,28 @@ func (c *Config) DataDir() string {
 	return filepath.Join(home, ".localagent")
 }
 
+// ServiceDomains extracts host from configured service URLs
+// (provider API base, PDF, STT, Image).
+func (c *Config) ServiceDomains() []string {
+	var domains []string
+	for _, rawURL := range []string{
+		c.Provider.APIBase,
+		c.Tools.PDF.URL,
+		c.Tools.STT.URL,
+		c.Tools.Image.URL,
+	} {
+		if rawURL == "" {
+			continue
+		}
+		u, err := url.Parse(rawURL)
+		if err != nil || u.Host == "" {
+			continue
+		}
+		domains = append(domains, u.Host)
+	}
+	return domains
+}
+
 func expandHome(path string) string {
 	if path == "" {
 		return path
@@ -247,8 +234,5 @@ func applyEnvOverrides(cfg *Config) {
 		if _, err := fmt.Sscanf(v, "%d", &port); err == nil {
 			cfg.Gateway.Port = port
 		}
-	}
-	if v := os.Getenv("LOCALAGENT_WEB_ENABLED"); v == "true" || v == "1" {
-		cfg.WebEnabled = true
 	}
 }

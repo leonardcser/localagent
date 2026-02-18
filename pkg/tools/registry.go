@@ -107,6 +107,19 @@ func (r *ToolRegistry) List() []string {
 	return names
 }
 
+func (r *ToolRegistry) DeclaredDomains() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var domains []string
+	for _, tool := range r.tools {
+		if dd, ok := tool.(DomainDeclarer); ok {
+			domains = append(domains, dd.DeclaredDomains()...)
+		}
+	}
+	return domains
+}
+
 func (r *ToolRegistry) GetSummaries() []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

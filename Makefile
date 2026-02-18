@@ -1,5 +1,5 @@
 .PHONY: all web-build build build-all clean test lint fmt deps run help \
-        container container-gateway container-gateway-web container-stop container-logs
+        container container-gateway container-stop container-logs
 
 # Build variables
 BINARY_NAME=localagent
@@ -123,10 +123,10 @@ container:
 	@$(CONTAINER_ENGINE) image prune -f --filter "until=24h" >/dev/null 2>&1 || true
 	@echo "Container image built: $(CONTAINER_IMAGE):$(CONTAINER_TAG)"
 
-## container-gateway: Run gateway (local network only, no web tools)
+## container-gateway: Run gateway
 container-gateway:
 	@mkdir -p $(WORKSPACE_DIR)
-	@echo "Starting localagent gateway (local network only)..."
+	@echo "Starting localagent gateway..."
 	@$(CONTAINER_ENGINE) run -d \
 		--name $(CONTAINER_NAME) \
 		$(CONTAINER_RUNTIME_FLAG) \
@@ -141,26 +141,6 @@ container-gateway:
 		-p 18791:18791 \
 		$(CONTAINER_IMAGE):latest gateway
 	@echo "Gateway started: $(CONTAINER_NAME)"
-
-## container-gateway-web: Run gateway with web tools enabled
-container-gateway-web:
-	@mkdir -p $(WORKSPACE_DIR)
-	@echo "Starting localagent gateway (web tools enabled)..."
-	@$(CONTAINER_ENGINE) run -d \
-		--name $(CONTAINER_NAME) \
-		$(CONTAINER_RUNTIME_FLAG) \
-		--network=pasta \
-		--restart=unless-stopped \
-		-e TZ=$(TZ) \
-		-e LOCALAGENT_WEB_ENABLED=true \
-		$(foreach v,$(ENV_PASS),-e $(v)) \
-		$(if $(CA_CERT),-v $(CA_CERT):/usr/local/share/ca-certificates/custom-ca.crt:ro$(comma)Z) \
-		-v $(CONFIG_FILE):/home/localagent/.localagent/config.json:ro,Z \
-		-v $(WORKSPACE_DIR):/home/localagent/.localagent/workspace:Z \
-		-p 18790:18790 \
-		-p 18791:18791 \
-		$(CONTAINER_IMAGE):latest gateway
-	@echo "Gateway started with web tools: $(CONTAINER_NAME)"
 
 ## container-stop: Stop and remove the container
 container-stop:

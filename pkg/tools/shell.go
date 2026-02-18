@@ -12,10 +12,9 @@ import (
 )
 
 type ExecTool struct {
-	workingDir    string
-	timeout       time.Duration
-	denyPatterns  []*regexp.Regexp
-	allowPatterns []*regexp.Regexp
+	workingDir   string
+	timeout      time.Duration
+	denyPatterns []*regexp.Regexp
 }
 
 func NewExecTool(workingDir string) *ExecTool {
@@ -29,10 +28,9 @@ func NewExecTool(workingDir string) *ExecTool {
 	}
 
 	return &ExecTool{
-		workingDir:    workingDir,
-		timeout:       60 * time.Second,
-		denyPatterns:  denyPatterns,
-		allowPatterns: nil,
+		workingDir:   workingDir,
+		timeout:      60 * time.Second,
+		denyPatterns: denyPatterns,
 	}
 }
 
@@ -152,34 +150,9 @@ func (t *ExecTool) guardCommand(command string) string {
 		}
 	}
 
-	if len(t.allowPatterns) > 0 {
-		allowed := false
-		for _, pattern := range t.allowPatterns {
-			if pattern.MatchString(lower) {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			return "Command blocked by safety guard (not in allowlist)"
-		}
-	}
-
 	return ""
 }
 
 func (t *ExecTool) SetTimeout(timeout time.Duration) {
 	t.timeout = timeout
-}
-
-func (t *ExecTool) SetAllowPatterns(patterns []string) error {
-	t.allowPatterns = make([]*regexp.Regexp, 0, len(patterns))
-	for _, p := range patterns {
-		re, err := regexp.Compile(p)
-		if err != nil {
-			return fmt.Errorf("invalid allow pattern %q: %w", p, err)
-		}
-		t.allowPatterns = append(t.allowPatterns, re)
-	}
-	return nil
 }

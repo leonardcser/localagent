@@ -70,19 +70,8 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 	// Shell execution
 	registry.Register(tools.NewExecTool(workspace))
 
-	if cfg.WebEnabled {
-		if searchTool := tools.NewWebSearchTool(tools.WebSearchToolOptions{
-			BraveAPIKey:          cfg.Tools.Web.Brave.ResolveAPIKey(),
-			BraveMaxResults:      cfg.Tools.Web.Brave.MaxResults,
-			BraveEnabled:         cfg.Tools.Web.Brave.Enabled,
-			DuckDuckGoMaxResults: cfg.Tools.Web.DuckDuckGo.MaxResults,
-			DuckDuckGoEnabled:    cfg.Tools.Web.DuckDuckGo.Enabled,
-		}); searchTool != nil {
-			registry.Register(searchTool)
-		}
-		registry.Register(tools.NewWebFetchTool(50000))
-		registry.Register(tools.NewNewsTool(15))
-	}
+	// News tool
+	registry.Register(tools.NewNewsTool(15))
 
 	registry.Register(tools.NewMessageTool(msgBus))
 
@@ -236,6 +225,11 @@ func (al *AgentLoop) GetSessionManager() *session.SessionManager {
 
 func (al *AgentLoop) RegisterTool(tool tools.Tool) {
 	al.tools.Register(tool)
+}
+
+// GetToolDomains returns all domains declared by registered tools.
+func (al *AgentLoop) GetToolDomains() []string {
+	return al.tools.DeclaredDomains()
 }
 
 // RecordLastChannel records the last active channel for this workspace.

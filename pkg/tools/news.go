@@ -49,6 +49,10 @@ func (t *NewsTool) Parameters() map[string]any {
 	}
 }
 
+func (t *NewsTool) DeclaredDomains() []string {
+	return []string{"hn.algolia.com", "lobste.rs"}
+}
+
 func (t *NewsTool) Execute(ctx context.Context, args map[string]any) *ToolResult {
 	source := "all"
 	if s, ok := args["source"].(string); ok && s != "" {

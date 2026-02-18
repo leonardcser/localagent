@@ -1,5 +1,5 @@
 [Unit]
-Description=localagent gateway (local network only)
+Description=localagent gateway
 After=network-online.target
 
 [Container]
