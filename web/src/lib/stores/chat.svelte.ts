@@ -194,6 +194,37 @@ function createChat() {
 		pendingMedia.splice(index, 1);
 	}
 
+	async function sync() {
+		try {
+			const history = await getHistory();
+			timeline = history.items
+				.map((item): TimelineItem | null => {
+					if (item.type === "message") {
+						if (item.role !== "user" && !item.content) return null;
+						return {
+							kind: "message",
+							role: item.role!,
+							content: item.content ?? "",
+							timestamp: item.timestamp,
+							media: item.media,
+							id: ++nextId,
+						};
+					}
+					return {
+						kind: "activity",
+						event_type: item.event_type!,
+						timestamp: item.timestamp,
+						message: item.message!,
+						detail: item.detail,
+						id: ++nextId,
+					};
+				})
+				.filter((item): item is TimelineItem => item !== null);
+		} catch {
+			// ignore
+		}
+	}
+
 	function destroy() {
 		eventSource?.close();
 	}
@@ -230,6 +261,7 @@ function createChat() {
 			dragging = v;
 		},
 		init,
+		sync,
 		send,
 		toggleRecording,
 		recordAndSend,
