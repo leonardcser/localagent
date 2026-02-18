@@ -85,6 +85,7 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 			registry.Register(searchTool)
 		}
 		registry.Register(tools.NewWebFetchTool(50000))
+		registry.Register(tools.NewNewsTool(15))
 	}
 
 	registry.Register(tools.NewMessageTool(msgBus))
