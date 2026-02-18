@@ -19,9 +19,13 @@ sw.addEventListener("push", (event: PushEvent) => {
 	event.waitUntil(
 		sw.clients
 			.matchAll({ type: "window", includeUncontrolled: true })
-			.then((clients) => {
-				const focused = clients.some((c) => c.focused);
-				if (focused) return;
+			.then((windowClients) => {
+				const chatActive = windowClients.some((c) => {
+					const wc = c as WindowClient;
+					const onChat = new URL(wc.url).pathname === "/";
+					return onChat && (wc.focused || wc.visibilityState === "visible");
+				});
+				if (chatActive) return;
 				return sw.registration.showNotification(title, {
 					body,
 					tag: "localagent-message",
