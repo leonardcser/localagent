@@ -172,19 +172,6 @@ func (t *ExecTool) SetTimeout(timeout time.Duration) {
 	t.timeout = timeout
 }
 
-func (t *ExecTool) DenyNetworkCommands() {
-	networkPatterns := []*regexp.Regexp{
-		regexp.MustCompile(`\b(curl|wget)\b`),
-		regexp.MustCompile(`\b(nc|ncat|netcat)\b`),
-		regexp.MustCompile(`\bhttpie\b`),
-		regexp.MustCompile(`\baria2c?\b`),
-		regexp.MustCompile(`\b(lynx|links|w3m|elinks)\b`),
-		regexp.MustCompile(`\b(ssh|scp|sftp|ftp|telnet|rsync)\b`),
-		regexp.MustCompile(`\bsocat\b`),
-	}
-	t.denyPatterns = append(t.denyPatterns, networkPatterns...)
-}
-
 func (t *ExecTool) SetAllowPatterns(patterns []string) error {
 	t.allowPatterns = make([]*regexp.Regexp, 0, len(patterns))
 	for _, p := range patterns {
