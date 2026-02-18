@@ -27,9 +27,6 @@ cd web && bun run dev
 # Frontend build
 cd web && bun run build
 
-# Frontend type check
-cd web && bun run check
-
 # Frontend lint (type check + biome)
 cd web && bun run lint
 

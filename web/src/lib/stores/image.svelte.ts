@@ -27,20 +27,30 @@ function createImageStore() {
 	let seed = $state("");
 	let steps = $state("");
 	let guidanceScale = $state("");
+	let scale = $state("");
 	let count = $state(1);
 	let generating = $state(false);
 	let sourceImages = $state<File[]>([]);
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-	let models = $derived([...modelData.generate, ...modelData.edit]);
+	let models = $derived([
+		...modelData.generate,
+		...modelData.edit,
+		...modelData.upscale,
+	]);
 	let upscaleModels = $derived(modelData.upscale);
 	let isEditModel = $derived(modelData.edit.includes(selectedModel));
+	let isUpscaleModel = $derived(modelData.upscale.includes(selectedModel));
 
 	async function fetchModels() {
 		modelData = await getImageModels();
-		const allModels = [...modelData.generate, ...modelData.edit];
-		if (allModels.length > 0 && !selectedModel) {
-			selectedModel = allModels[0];
+		const all = [
+			...modelData.generate,
+			...modelData.edit,
+			...modelData.upscale,
+		];
+		if (all.length > 0 && !selectedModel) {
+			selectedModel = all[0];
 		}
 	}
 
@@ -49,12 +59,31 @@ function createImageStore() {
 	}
 
 	async function generate() {
-		if (!prompt.trim() || !selectedModel) return;
+		if (!selectedModel) return;
+
+		const isUpscale = modelData.upscale.includes(selectedModel);
+		if (!isUpscale && !prompt.trim()) return;
+		if (
+			(isUpscale || modelData.edit.includes(selectedModel)) &&
+			sourceImages.length === 0
+		)
+			return;
+
 		generating = true;
 
 		let id: string | null;
 
-		if (sourceImages.length > 0) {
+		if (isUpscale) {
+			const form = new FormData();
+			form.append("model", selectedModel);
+			for (const file of sourceImages) {
+				form.append("images[]", file);
+			}
+			if (scale.trim()) {
+				form.append("scale", scale.trim());
+			}
+			id = await submitImageUpscaleJob(form);
+		} else if (sourceImages.length > 0) {
 			const form = new FormData();
 			form.append("model", selectedModel);
 			form.append("prompt", prompt.trim());
@@ -169,6 +198,22 @@ function createImageStore() {
 		}
 	}
 
+	async function useForUpscale(jobId: string, index: number, model: string) {
+		const url = imageResultUrl(jobId, index);
+		try {
+			const res = await fetch(url);
+			if (!res.ok) return;
+			const blob = await res.blob();
+			const file = new File([blob], `source_${jobId}_${index}.png`, {
+				type: "image/png",
+			});
+			selectedModel = model;
+			sourceImages = [file];
+		} catch {
+			// ignore fetch errors
+		}
+	}
+
 	async function upscale(jobId: string, index: number, model: string) {
 		const url = imageResultUrl(jobId, index);
 		try {
@@ -221,7 +266,7 @@ function createImageStore() {
 		},
 		set selectedModel(v: string) {
 			if (v !== selectedModel) {
-				if (!modelData.edit.includes(v)) {
+				if (!modelData.edit.includes(v) && !modelData.upscale.includes(v)) {
 					sourceImages = [];
 				}
 			}
@@ -284,6 +329,18 @@ function createImageStore() {
 		get isEditModel() {
 			return isEditModel;
 		},
+		get isUpscaleModel() {
+			return isUpscaleModel;
+		},
+		get scale() {
+			return scale;
+		},
+		set scale(v: string) {
+			scale = v;
+		},
+		get modelGroups() {
+			return modelData;
+		},
 		get upscaleModels() {
 			return upscaleModels;
 		},
@@ -292,6 +349,7 @@ function createImageStore() {
 		removeJob,
 		removeImage,
 		useAsSource,
+		useForUpscale,
 		upscale,
 		addSourceImages,
 		removeSourceImage,

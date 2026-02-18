@@ -33,6 +33,7 @@ type ImageJob struct {
 	Seed           *int      `json:"seed,omitempty"`
 	Steps          *int      `json:"steps,omitempty"`
 	GuidanceScale  *float64  `json:"guidance_scale,omitempty"`
+	Scale          *int      `json:"scale,omitempty"`
 	Count          int       `json:"count"`
 	SourceImages   int       `json:"source_images,omitempty"`
 	Status         string    `json:"status"`
@@ -243,6 +244,9 @@ func (s *ImageJobStore) doUpscaleRequest(job *ImageJob, cfg config.ImageConfig, 
 	}
 
 	w.WriteField("model", job.Model)
+	if job.Scale != nil {
+		w.WriteField("scale", strconv.Itoa(*job.Scale))
+	}
 	w.Close()
 
 	return imageHTTPRequest("POST", url, cfg, w.FormDataContentType(), &buf)
@@ -704,10 +708,18 @@ func (s *Server) handleImageUpscale(c *echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "at least one source image is required"})
 	}
 
+	var scaleVal *int
+	if v := c.FormValue("scale"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			scaleVal = &n
+		}
+	}
+
 	job := &ImageJob{
 		ID:           utils.RandHex(8),
 		Type:         "upscale",
 		Model:        model,
+		Scale:        scaleVal,
 		Count:        len(files),
 		SourceImages: len(files),
 		Status:       "pending",

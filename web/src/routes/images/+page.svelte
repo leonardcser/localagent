@@ -99,7 +99,7 @@ let reversedJobs = $derived([...imageStore.jobs].reverse());
 	<!-- Controls Panel -->
 	<div class="flex w-72 shrink-0 flex-col border-r border-border bg-bg-secondary">
 		<div class="p-4">
-			<h2 class="text-[13px] font-medium text-text-primary">Generate</h2>
+			<h2 class="text-[13px] font-medium text-text-primary">{imageStore.isUpscaleModel ? "Upscale" : imageStore.isEditModel ? "Edit" : "Generate"}</h2>
 		</div>
 
 		<form onsubmit={handleSubmit} class="flex flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4">
@@ -110,38 +110,58 @@ let reversedJobs = $derived([...imageStore.jobs].reverse());
 					bind:value={imageStore.selectedModel}
 					class="rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary outline-none focus:border-accent"
 				>
-					{#each imageStore.models as model}
-						<option value={model}>{model}</option>
-					{/each}
+					{#if imageStore.modelGroups.generate.length > 0}
+						<optgroup label="Generate">
+							{#each imageStore.modelGroups.generate as model}
+								<option value={model}>{model}</option>
+							{/each}
+						</optgroup>
+					{/if}
+					{#if imageStore.modelGroups.edit.length > 0}
+						<optgroup label="Edit">
+							{#each imageStore.modelGroups.edit as model}
+								<option value={model}>{model}</option>
+							{/each}
+						</optgroup>
+					{/if}
+					{#if imageStore.modelGroups.upscale.length > 0}
+						<optgroup label="Upscale">
+							{#each imageStore.modelGroups.upscale as model}
+								<option value={model}>{model}</option>
+							{/each}
+						</optgroup>
+					{/if}
 					{#if imageStore.models.length === 0}
 						<option value="" disabled>No models available</option>
 					{/if}
 				</select>
 			</label>
 
-			<!-- Prompt -->
-			<label class="flex flex-col gap-1">
-				<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Prompt</span>
-				<textarea
-					bind:value={imageStore.prompt}
-					rows="3"
-					placeholder={imageStore.isEditModel ? "Describe the edit you want to make..." : "Describe the image you want to create..."}
-					class="resize-none rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
-				></textarea>
-			</label>
+			{#if !imageStore.isUpscaleModel}
+				<!-- Prompt -->
+				<label class="flex flex-col gap-1">
+					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Prompt</span>
+					<textarea
+						bind:value={imageStore.prompt}
+						rows="3"
+						placeholder={imageStore.isEditModel ? "Describe the edit you want to make..." : "Describe the image you want to create..."}
+						class="resize-none rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
+					></textarea>
+				</label>
 
-			<!-- Negative Prompt -->
-			<label class="flex flex-col gap-1">
-				<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Negative Prompt</span>
-				<textarea
-					bind:value={imageStore.negativePrompt}
-					rows="2"
-					placeholder="What to avoid..."
-					class="resize-none rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
-				></textarea>
-			</label>
+				<!-- Negative Prompt -->
+				<label class="flex flex-col gap-1">
+					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Negative Prompt</span>
+					<textarea
+						bind:value={imageStore.negativePrompt}
+						rows="2"
+						placeholder="What to avoid..."
+						class="resize-none rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
+					></textarea>
+				</label>
+			{/if}
 
-			{#if imageStore.isEditModel}
+			{#if imageStore.isEditModel || imageStore.isUpscaleModel}
 				<!-- Source Images Drop Zone -->
 				<div class="flex flex-col gap-1">
 					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Source Images</span>
@@ -213,60 +233,75 @@ let reversedJobs = $derived([...imageStore.jobs].reverse());
 				</div>
 			{/if}
 
-			<!-- Seed + Count -->
-			<div class="flex gap-2">
-				<label class="flex min-w-0 flex-1 flex-col gap-1">
-					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Seed</span>
+			{#if imageStore.selectedModel === "seedvr2"}
+				<label class="flex flex-col gap-1">
+					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Scale</span>
 					<input
 						type="text"
-						bind:value={imageStore.seed}
-						placeholder="Random"
+						bind:value={imageStore.scale}
+						placeholder="2"
 						class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
 					/>
 				</label>
-				<label class="flex w-16 shrink-0 flex-col gap-1">
-					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Count</span>
-					<input
-						type="number"
-						bind:value={imageStore.count}
-						min="1"
-						max="4"
-						class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary outline-none focus:border-accent"
-					/>
-				</label>
-			</div>
+			{:else if !imageStore.isUpscaleModel}
+				<!-- Seed + Count -->
+				<div class="flex gap-2">
+					<label class="flex min-w-0 flex-1 flex-col gap-1">
+						<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Seed</span>
+						<input
+							type="text"
+							bind:value={imageStore.seed}
+							placeholder="Random"
+							class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
+						/>
+					</label>
+					<label class="flex w-16 shrink-0 flex-col gap-1">
+						<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Count</span>
+						<input
+							type="number"
+							bind:value={imageStore.count}
+							min="1"
+							max="4"
+							class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary outline-none focus:border-accent"
+						/>
+					</label>
+				</div>
 
-			<!-- Steps + Guidance Scale -->
-			<div class="flex gap-2">
-				<label class="flex min-w-0 flex-1 flex-col gap-1">
-					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Steps</span>
-					<input
-						type="text"
-						bind:value={imageStore.steps}
-						placeholder="Default"
-						class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
-					/>
-				</label>
-				<label class="flex min-w-0 flex-1 flex-col gap-1">
-					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Guidance</span>
-					<input
-						type="text"
-						bind:value={imageStore.guidanceScale}
-						placeholder="Default"
-						class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
-					/>
-				</label>
-			</div>
+				<!-- Steps + Guidance Scale -->
+				<div class="flex gap-2">
+					<label class="flex min-w-0 flex-1 flex-col gap-1">
+						<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Steps</span>
+						<input
+							type="text"
+							bind:value={imageStore.steps}
+							placeholder="Default"
+							class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
+						/>
+					</label>
+					<label class="flex min-w-0 flex-1 flex-col gap-1">
+						<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Guidance</span>
+						<input
+							type="text"
+							bind:value={imageStore.guidanceScale}
+							placeholder="Default"
+							class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
+						/>
+					</label>
+				</div>
+			{/if}
 
 			<div class="mt-auto pt-2">
 				<button
 					type="submit"
-					disabled={!imageStore.prompt.trim() || !imageStore.selectedModel || (imageStore.isEditModel && imageStore.sourceImages.length === 0)}
+					disabled={!imageStore.selectedModel || imageStore.generating || (imageStore.isUpscaleModel ? imageStore.sourceImages.length === 0 : !imageStore.prompt.trim() || (imageStore.isEditModel && imageStore.sourceImages.length === 0))}
 					class="flex w-full items-center justify-center gap-2 rounded-full bg-text-primary px-3 py-2 text-[13px] font-medium text-bg transition-opacity duration-100 not-disabled:hover:bg-text-secondary disabled:opacity-40"
 				>
 					{#if imageStore.generating}
 						<Icon src={FiLoader} size="14" className="animate-spin" />
-						Generating...
+						Processing...
+					{:else if imageStore.isUpscaleModel}
+						<Icon src={FiArrowUp} size="14" />
+						Upscale
 					{:else if imageStore.isEditModel}
 						<Icon src={FiEdit2} size="14" />
 						Edit
@@ -395,7 +430,7 @@ let reversedJobs = $derived([...imageStore.jobs].reverse());
 														<div class="absolute right-0 top-8 z-10 min-w-35 rounded-md border border-border bg-bg-secondary py-1 shadow-elevated">
 															{#each imageStore.upscaleModels as uModel}
 																<button
-																	onclick={(e) => { e.stopPropagation(); imageStore.upscale(job.id, i, uModel); upscaleMenu = null; }}
+																	onclick={(e) => { e.stopPropagation(); if (uModel === "seedvr2") { imageStore.useForUpscale(job.id, i, uModel); } else { imageStore.upscale(job.id, i, uModel); } upscaleMenu = null; }}
 																	class="block w-full px-3 py-1.5 text-left text-[12px] text-text-secondary hover:bg-overlay-light"
 																>
 																	{uModel}
