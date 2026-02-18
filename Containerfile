@@ -1,4 +1,13 @@
-# Stage 1: Build Go binary
+# Stage 1: Build web frontend
+FROM docker.io/oven/bun:latest AS web-builder
+
+WORKDIR /src/web
+COPY web/package.json web/bun.lock ./
+RUN bun install --frozen-lockfile
+COPY web/ ./
+RUN bun run build
+
+# Stage 2: Build Go binary
 FROM docker.io/library/golang:1.25-alpine AS builder
 
 RUN apk add --no-cache git
@@ -9,9 +18,10 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+COPY --from=web-builder /src/pkg/webchat/static/ ./pkg/webchat/static/
 RUN CGO_ENABLED=0 go build -v -ldflags "-X main.version=container" -o /src/build/localagent ./cmd
 
-# Stage 2: Runtime
+# Stage 3: Runtime
 FROM docker.io/library/alpine:3.21
 
 RUN apk add --no-cache ca-certificates tzdata \
