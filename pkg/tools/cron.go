@@ -10,6 +10,7 @@ import (
 
 	"localagent/pkg/bus"
 	"localagent/pkg/cron"
+	"localagent/pkg/session"
 )
 
 const defaultJobTimeout = 10 * time.Minute
@@ -24,6 +25,7 @@ type CronTool struct {
 	cronService  *cron.CronService
 	executor     JobExecutor
 	msgBus       *bus.MessageBus
+	sessions     *session.SessionManager
 	enqueueEvent EventEnqueuer
 	channel      string
 	chatID       string
@@ -42,6 +44,12 @@ func (t *CronTool) SetEventEnqueuer(fn EventEnqueuer) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.enqueueEvent = fn
+}
+
+func (t *CronTool) SetSessionManager(sm *session.SessionManager) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.sessions = sm
 }
 
 func (t *CronTool) Name() string {
@@ -415,9 +423,20 @@ func (t *CronTool) announceResult(channel, chatID string, job *cron.CronJob, res
 		content.WriteString(response)
 	}
 
+	msg := content.String()
+
+	t.mu.RLock()
+	sm := t.sessions
+	t.mu.RUnlock()
+
+	if sm != nil {
+		sessionKey := fmt.Sprintf("%s:%s", channel, chatID)
+		sm.AddMessage(sessionKey, "assistant", msg)
+	}
+
 	t.msgBus.PublishOutbound(bus.OutboundMessage{
 		Channel: channel,
 		ChatID:  chatID,
-		Content: content.String(),
+		Content: msg,
 	})
 }

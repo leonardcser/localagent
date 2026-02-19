@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -143,6 +144,10 @@ func (t *AppendFileTool) Execute(ctx context.Context, args map[string]any) *Tool
 	resolvedPath, err := validatePath(path, t.workspace)
 	if err != nil {
 		return ErrorResult(err.Error())
+	}
+
+	if err := os.MkdirAll(filepath.Dir(resolvedPath), 0755); err != nil {
+		return ErrorResult(fmt.Sprintf("failed to create directory: %v", err))
 	}
 
 	f, err := os.OpenFile(resolvedPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)

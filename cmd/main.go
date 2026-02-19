@@ -381,6 +381,7 @@ func setupCronTool(agentLoop *agent.AgentLoop, msgBus *bus.MessageBus, workspace
 	cronService := cron.NewCronService(cronStorePath, nil)
 
 	cronTool := tools.NewCronTool(cronService, agentLoop, msgBus)
+	cronTool.SetSessionManager(agentLoop.GetSessionManager())
 	cronTool.SetEventEnqueuer(func(source, message, channel, chatID string, wake bool) {
 		e := heartbeat.Event{
 			Source:  source,
