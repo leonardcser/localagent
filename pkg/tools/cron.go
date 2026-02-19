@@ -64,7 +64,7 @@ func (t *CronTool) Parameters() map[string]any {
 			},
 			"message": map[string]any{
 				"type":        "string",
-				"description": "Required for 'add' action. Must be a non-empty string. With deliver=true, sent as-is to user (no shell expansion). With deliver=false, sent to agent for processing.",
+				"description": "Required for 'add' unless 'command' is provided. Must be non-empty. With deliver=true, sent as-is to user. With deliver=false, sent to agent for processing.",
 			},
 			"command": map[string]any{
 				"type":        "string",
@@ -150,9 +150,15 @@ func (t *CronTool) addJob(args map[string]any) *ToolResult {
 		return ErrorResult("no session context (channel/chat_id not set)")
 	}
 
-	message, ok := args["message"].(string)
-	if !ok || message == "" {
-		return ErrorResult("'message' parameter is required and must be a non-empty string when action is 'add'")
+	message, _ := args["message"].(string)
+	command, _ := args["command"].(string)
+
+	if command != "" {
+		if message == "" {
+			message = command
+		}
+	} else if message == "" {
+		return ErrorResult("'message' parameter is required and must be a non-empty string when action is 'add' (unless 'command' is provided)")
 	}
 
 	var schedule cron.CronSchedule
@@ -178,7 +184,6 @@ func (t *CronTool) addJob(args map[string]any) *ToolResult {
 		deliver = d
 	}
 
-	command, _ := args["command"].(string)
 	if command != "" {
 		deliver = false
 	}
