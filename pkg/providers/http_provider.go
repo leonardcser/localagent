@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"localagent/pkg/logger"
 )
 
 type HTTPProvider struct {
@@ -65,6 +67,20 @@ func (p *HTTPProvider) Chat(ctx context.Context, messages []Message, tools []Too
 	jsonData, err := json.Marshal(requestBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// Log the last 3 serialized messages to verify tool results reach the LLM
+	var debugPayload struct {
+		Messages []json.RawMessage `json:"messages"`
+	}
+	if err := json.Unmarshal(jsonData, &debugPayload); err == nil {
+		start := len(debugPayload.Messages) - 3
+		if start < 0 {
+			start = 0
+		}
+		for i := start; i < len(debugPayload.Messages); i++ {
+			logger.Info("LLM request msg[%d/%d]: %s", i, len(debugPayload.Messages), string(debugPayload.Messages[i]))
+		}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", p.apiBase+"/chat/completions", bytes.NewReader(jsonData))
