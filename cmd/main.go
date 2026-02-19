@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"localagent/pkg/agent"
 	"localagent/pkg/bus"
@@ -225,7 +224,7 @@ func gatewayCmd() {
 	fmt.Printf("Agent: tools=%d skills=%d/%d\n", toolsInfo["count"], skillsInfo["available"], skillsInfo["total"])
 
 	eventQueue := heartbeat.NewEventQueue()
-	cronService := setupCronTool(agentLoop, msgBus, cfg.WorkspacePath(), cfg.Tools.Cron, eventQueue)
+	cronService := setupCronTool(agentLoop, msgBus, cfg.WorkspacePath(), eventQueue)
 
 	heartbeatService := heartbeat.NewHeartbeatService(
 		cfg.WorkspacePath(),
@@ -242,10 +241,11 @@ func gatewayCmd() {
 		if err != nil {
 			return tools.ErrorResult(fmt.Sprintf("Heartbeat error: %v", err))
 		}
-		if response == "HEARTBEAT_OK" {
+		text, skip := heartbeat.StripHeartbeatToken(response)
+		if skip {
 			return tools.SilentResult("Heartbeat OK")
 		}
-		return tools.NewToolResult(response)
+		return tools.NewToolResult(text)
 	})
 
 	channelManager, err := channels.NewManager(cfg, msgBus)
@@ -372,17 +372,12 @@ func startProxy(cfg *config.Config) *proxy.Proxy {
 	return p
 }
 
-func setupCronTool(agentLoop *agent.AgentLoop, msgBus *bus.MessageBus, workspace string, cronCfg config.CronToolsConfig, eventQueue *heartbeat.EventQueue) *cron.CronService {
+func setupCronTool(agentLoop *agent.AgentLoop, msgBus *bus.MessageBus, workspace string, eventQueue *heartbeat.EventQueue) *cron.CronService {
 	cronStorePath := filepath.Join(workspace, "cron", "jobs.json")
 
 	cronService := cron.NewCronService(cronStorePath, nil)
 
-	var execTimeout time.Duration
-	if cronCfg.ExecTimeoutMinutes > 0 {
-		execTimeout = time.Duration(cronCfg.ExecTimeoutMinutes) * time.Minute
-	}
-
-	cronTool := tools.NewCronTool(cronService, agentLoop, msgBus, workspace, execTimeout)
+	cronTool := tools.NewCronTool(cronService, agentLoop, msgBus)
 	cronTool.SetEventEnqueuer(func(source, message, channel, chatID string, wake bool) {
 		e := heartbeat.Event{
 			Source:  source,

@@ -215,6 +215,70 @@ func (hs *HeartbeatService) executeHeartbeat() {
 	hs.logInfo("Heartbeat completed: %s", result.ForLLM)
 }
 
+const heartbeatToken = "HEARTBEAT_OK"
+const maxAckChars = 300
+
+// StripHeartbeatToken removes the HEARTBEAT_OK token from a response.
+// Returns shouldSkip=true if the remaining text is short enough to be
+// just an acknowledgement (<=300 chars), meaning nothing to deliver.
+func StripHeartbeatToken(raw string) (text string, shouldSkip bool) {
+	stripped := strings.ReplaceAll(raw, heartbeatToken, "")
+	stripped = strings.TrimSpace(stripped)
+	// Trim trailing punctuation that often follows the token
+	stripped = strings.TrimRight(stripped, ".!,;:")
+	stripped = strings.TrimSpace(stripped)
+
+	if stripped == "" {
+		return "", true
+	}
+	if len([]rune(stripped)) <= maxAckChars {
+		return stripped, true
+	}
+	return stripped, false
+}
+
+// isHeartbeatContentEffectivelyEmpty returns true if the content is only
+// whitespace, markdown headers, or empty list items — meaning there are no
+// real tasks for the heartbeat to process.
+func isHeartbeatContentEffectivelyEmpty(content string) bool {
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		if line == "-" || line == "*" || line == "+" {
+			continue
+		}
+		if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") || strings.HasPrefix(line, "+ ") {
+			rest := strings.TrimSpace(line[2:])
+			if rest == "" {
+				continue
+			}
+		}
+		return false
+	}
+	return true
+}
+
+// RequestWakeNow triggers an immediate heartbeat with the given event text.
+func (hs *HeartbeatService) RequestWakeNow(text string) {
+	hs.mu.RLock()
+	eq := hs.eventQueue
+	hs.mu.RUnlock()
+
+	if eq == nil {
+		return
+	}
+
+	eq.EnqueueAndWake(Event{
+		Source:  "wake",
+		Message: text,
+	})
+}
+
 // buildPrompt builds the heartbeat prompt from HEARTBEAT.md and pending events.
 func (hs *HeartbeatService) buildPrompt() string {
 	heartbeatPath := filepath.Join(hs.workspace, "HEARTBEAT.md")
@@ -240,27 +304,33 @@ func (hs *HeartbeatService) buildPrompt() string {
 		events = eq.Drain()
 	}
 
-	if staticContent == "" && len(events) == 0 {
+	if len(events) > 0 {
+		return hs.buildCronEventPrompt(events)
+	}
+
+	if staticContent == "" || isHeartbeatContentEffectivelyEmpty(staticContent) {
 		return ""
 	}
 
-	var content strings.Builder
-	if staticContent != "" {
-		content.WriteString(staticContent)
-	}
+	now := time.Now()
+	tz, _ := now.Zone()
+	return fmt.Sprintf("%s\n\nCurrent time: %s (%s)", prompts.Heartbeat, now.Format("2006-01-02 15:04:05"), tz)
+}
 
-	if len(events) > 0 {
-		if content.Len() > 0 {
+// buildCronEventPrompt builds a prompt for cron-triggered events.
+func (hs *HeartbeatService) buildCronEventPrompt(events []Event) string {
+	var content strings.Builder
+	for i, e := range events {
+		if i > 0 {
 			content.WriteString("\n\n")
 		}
-		content.WriteString("## Pending Events\n\n")
-		for _, e := range events {
-			fmt.Fprintf(&content, "- [%s] (%s) %s\n", e.Source, e.EnqueuedAt.Format("15:04:05"), e.Message)
-		}
+		content.WriteString(e.Message)
 	}
 
-	now := time.Now().Format("2006-01-02 15:04:05")
-	return fmt.Sprintf(prompts.Heartbeat, now, content.String())
+	now := time.Now()
+	tz, _ := now.Zone()
+	return fmt.Sprintf("A scheduled reminder has been triggered. The reminder content is:\n\n%s\n\nPlease relay this reminder to the user in a helpful and friendly way.\n\nCurrent time: %s (%s)",
+		content.String(), now.Format("2006-01-02 15:04:05"), tz)
 }
 
 // createDefaultHeartbeatTemplate creates the default HEARTBEAT.md file

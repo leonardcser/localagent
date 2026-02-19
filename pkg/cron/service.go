@@ -14,47 +14,81 @@ import (
 	"localagent/pkg/utils"
 )
 
+var errorBackoffMS = []int64{30_000, 60_000, 300_000, 900_000, 3_600_000}
+
+const maxScheduleErrors = 3
+
+func assertSupportedJobSpec(job *CronJob) error {
+	if job.SessionTarget == "main" && job.Payload.Kind != "systemEvent" {
+		return fmt.Errorf("sessionTarget=\"main\" requires payload.kind=\"systemEvent\", got %q", job.Payload.Kind)
+	}
+	if job.SessionTarget == "isolated" && job.Payload.Kind != "agentTurn" {
+		return fmt.Errorf("sessionTarget=\"isolated\" requires payload.kind=\"agentTurn\", got %q", job.Payload.Kind)
+	}
+	return nil
+}
+
 type CronSchedule struct {
-	Kind    string `json:"kind"`
-	AtMS    *int64 `json:"atMs,omitempty"`
-	EveryMS *int64 `json:"everyMs,omitempty"`
-	Expr    string `json:"expr,omitempty"`
-	TZ      string `json:"tz,omitempty"`
+	Kind      string `json:"kind"`
+	At        string `json:"at,omitempty"`
+	EveryMS   *int64 `json:"everyMs,omitempty"`
+	AnchorMS  *int64 `json:"anchorMs,omitempty"`
+	Expr      string `json:"expr,omitempty"`
+	TZ        string `json:"tz,omitempty"`
+	StaggerMS *int64 `json:"staggerMs,omitempty"`
 }
 
 type CronPayload struct {
-	Kind    string `json:"kind"`
-	Message string `json:"message"`
-	Command string `json:"command,omitempty"`
-	Deliver bool   `json:"deliver"`
-	Channel string `json:"channel,omitempty"`
-	To      string `json:"to,omitempty"`
+	Kind           string `json:"kind"`
+	Text           string `json:"text,omitempty"`
+	Message        string `json:"message,omitempty"`
+	Model          string `json:"model,omitempty"`
+	TimeoutSeconds int    `json:"timeoutSeconds,omitempty"`
+}
+
+type CronDelivery struct {
+	Mode       string `json:"mode"`
+	Channel    string `json:"channel,omitempty"`
+	To         string `json:"to,omitempty"`
+	BestEffort bool   `json:"bestEffort,omitempty"`
 }
 
 type CronJobState struct {
-	NextRunAtMS *int64 `json:"nextRunAtMs,omitempty"`
-	LastRunAtMS *int64 `json:"lastRunAtMs,omitempty"`
-	LastStatus  string `json:"lastStatus,omitempty"`
-	LastError   string `json:"lastError,omitempty"`
+	NextRunAtMS       *int64 `json:"nextRunAtMs,omitempty"`
+	LastRunAtMS       *int64 `json:"lastRunAtMs,omitempty"`
+	LastStatus        string `json:"lastStatus,omitempty"`
+	LastError         string `json:"lastError,omitempty"`
+	RunningAtMS       *int64 `json:"runningAtMs,omitempty"`
+	LastDurationMS    *int64 `json:"lastDurationMs,omitempty"`
+	ConsecutiveErrors int    `json:"consecutiveErrors,omitempty"`
+	ScheduleErrorCount int   `json:"scheduleErrorCount,omitempty"`
 }
 
 type CronJob struct {
-	ID             string       `json:"id"`
-	Name           string       `json:"name"`
-	Enabled        bool         `json:"enabled"`
-	Schedule       CronSchedule `json:"schedule"`
-	Payload        CronPayload  `json:"payload"`
-	State          CronJobState `json:"state"`
-	SessionTarget  string       `json:"sessionTarget,omitempty"`
-	WakeMode       string       `json:"wakeMode,omitempty"`
-	CreatedAtMS    int64        `json:"createdAtMs"`
-	UpdatedAtMS    int64        `json:"updatedAtMs"`
-	DeleteAfterRun bool         `json:"deleteAfterRun"`
+	ID             string        `json:"id"`
+	Name           string        `json:"name"`
+	Description    string        `json:"description,omitempty"`
+	Enabled        bool          `json:"enabled"`
+	Schedule       CronSchedule  `json:"schedule"`
+	Payload        CronPayload   `json:"payload"`
+	Delivery       *CronDelivery `json:"delivery,omitempty"`
+	State          CronJobState  `json:"state"`
+	SessionTarget  string        `json:"sessionTarget,omitempty"`
+	WakeMode       string        `json:"wakeMode,omitempty"`
+	CreatedAtMS    int64         `json:"createdAtMs"`
+	UpdatedAtMS    int64         `json:"updatedAtMs"`
+	DeleteAfterRun bool          `json:"deleteAfterRun"`
 }
 
 type CronStore struct {
 	Version int       `json:"version"`
 	Jobs    []CronJob `json:"jobs"`
+}
+
+type CronStatus struct {
+	Running   bool   `json:"running"`
+	JobCount  int    `json:"jobCount"`
+	NextRunAt *int64 `json:"nextRunAt,omitempty"`
 }
 
 type JobHandler func(job *CronJob) (string, error)
@@ -145,7 +179,7 @@ func (cs *CronService) checkJobs() {
 
 	for i := range cs.store.Jobs {
 		job := &cs.store.Jobs[i]
-		if job.Enabled && job.State.NextRunAtMS != nil && *job.State.NextRunAtMS <= now {
+		if job.Enabled && job.State.RunningAtMS == nil && job.State.NextRunAtMS != nil && *job.State.NextRunAtMS <= now {
 			dueJobIDs = append(dueJobIDs, job.ID)
 		}
 	}
@@ -157,6 +191,8 @@ func (cs *CronService) checkJobs() {
 	for i := range cs.store.Jobs {
 		if dueMap[cs.store.Jobs[i].ID] {
 			cs.store.Jobs[i].State.NextRunAtMS = nil
+			runningAt := now
+			cs.store.Jobs[i].State.RunningAtMS = &runningAt
 		}
 	}
 
@@ -210,15 +246,32 @@ func (cs *CronService) executeJobByID(jobID string) {
 		return
 	}
 
+	endTime := time.Now().UnixMilli()
+	duration := endTime - startTime
 	job.State.LastRunAtMS = &startTime
-	job.UpdatedAtMS = time.Now().UnixMilli()
+	job.State.LastDurationMS = &duration
+	job.State.RunningAtMS = nil
+	job.UpdatedAtMS = endTime
 
 	if err != nil {
 		job.State.LastStatus = "error"
 		job.State.LastError = err.Error()
+		job.State.ConsecutiveErrors++
+
+		backoffIdx := job.State.ConsecutiveErrors - 1
+		if backoffIdx >= len(errorBackoffMS) {
+			backoffIdx = len(errorBackoffMS) - 1
+		}
+		backoff := errorBackoffMS[backoffIdx]
+
+		if job.Schedule.Kind != "at" {
+			nextRun := endTime + backoff
+			job.State.NextRunAtMS = &nextRun
+		}
 	} else {
 		job.State.LastStatus = "ok"
 		job.State.LastError = ""
+		job.State.ConsecutiveErrors = 0
 	}
 
 	if job.Schedule.Kind == "at" {
@@ -228,9 +281,16 @@ func (cs *CronService) executeJobByID(jobID string) {
 			job.Enabled = false
 			job.State.NextRunAtMS = nil
 		}
-	} else {
-		nextRun := cs.computeNextRun(&job.Schedule, time.Now().UnixMilli())
+	} else if err == nil {
+		nextRun := cs.computeNextRun(&job.Schedule, endTime)
 		job.State.NextRunAtMS = nextRun
+		if nextRun == nil {
+			job.State.ScheduleErrorCount++
+			if job.State.ScheduleErrorCount >= maxScheduleErrors {
+				job.Enabled = false
+				logger.Warn("cron: job %s auto-disabled after %d schedule errors", job.ID, maxScheduleErrors)
+			}
+		}
 	}
 
 	if err := cs.saveStoreUnsafe(); err != nil {
@@ -240,8 +300,16 @@ func (cs *CronService) executeJobByID(jobID string) {
 
 func (cs *CronService) computeNextRun(schedule *CronSchedule, nowMS int64) *int64 {
 	if schedule.Kind == "at" {
-		if schedule.AtMS != nil && *schedule.AtMS > nowMS {
-			return schedule.AtMS
+		if schedule.At != "" {
+			t, err := time.Parse(time.RFC3339, schedule.At)
+			if err != nil {
+				logger.Error("cron: failed to parse 'at' timestamp '%s': %v", schedule.At, err)
+				return nil
+			}
+			ms := t.UnixMilli()
+			if ms > nowMS {
+				return &ms
+			}
 		}
 		return nil
 	}
@@ -250,7 +318,20 @@ func (cs *CronService) computeNextRun(schedule *CronSchedule, nowMS int64) *int6
 		if schedule.EveryMS == nil || *schedule.EveryMS <= 0 {
 			return nil
 		}
-		next := nowMS + *schedule.EveryMS
+		var next int64
+		if schedule.AnchorMS != nil {
+			anchor := *schedule.AnchorMS
+			interval := *schedule.EveryMS
+			if anchor > nowMS {
+				next = anchor
+			} else {
+				elapsed := nowMS - anchor
+				periods := elapsed / interval
+				next = anchor + (periods+1)*interval
+			}
+		} else {
+			next = nowMS + *schedule.EveryMS
+		}
 		return &next
 	}
 
@@ -260,6 +341,13 @@ func (cs *CronService) computeNextRun(schedule *CronSchedule, nowMS int64) *int6
 		}
 
 		now := time.UnixMilli(nowMS)
+		if schedule.TZ != "" {
+			loc, err := time.LoadLocation(schedule.TZ)
+			if err == nil {
+				now = now.In(loc)
+			}
+		}
+
 		nextTime, err := gronx.NextTickAfter(schedule.Expr, now, false)
 		if err != nil {
 			logger.Error("cron: failed to compute next run for expr '%s': %v", schedule.Expr, err)
@@ -267,6 +355,9 @@ func (cs *CronService) computeNextRun(schedule *CronSchedule, nowMS int64) *int6
 		}
 
 		nextMS := nextTime.UnixMilli()
+		if schedule.StaggerMS != nil && *schedule.StaggerMS > 0 {
+			nextMS += *schedule.StaggerMS
+		}
 		return &nextMS
 	}
 
@@ -278,6 +369,7 @@ func (cs *CronService) recomputeNextRuns() {
 	for i := range cs.store.Jobs {
 		job := &cs.store.Jobs[i]
 		if job.Enabled {
+			job.State.RunningAtMS = nil
 			job.State.NextRunAtMS = cs.computeNextRun(&job.Schedule, now)
 		}
 	}
@@ -326,55 +418,111 @@ func (cs *CronService) saveStoreUnsafe() error {
 	return os.WriteFile(cs.storePath, data, 0644)
 }
 
-func (cs *CronService) AddJob(name string, schedule CronSchedule, message string, deliver bool, channel, to, sessionTarget, wakeMode string) (*CronJob, error) {
+func (cs *CronService) AddJob(job CronJob) (*CronJob, error) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
 	now := time.Now().UnixMilli()
-	deleteAfterRun := (schedule.Kind == "at")
 
-	job := CronJob{
-		ID:       utils.RandHex(8),
-		Name:     name,
-		Enabled:  true,
-		Schedule: schedule,
-		Payload: CronPayload{
-			Kind:    "agent_turn",
-			Message: message,
-			Deliver: deliver,
-			Channel: channel,
-			To:      to,
-		},
-		State: CronJobState{
-			NextRunAtMS: cs.computeNextRun(&schedule, now),
-		},
-		SessionTarget:  sessionTarget,
-		WakeMode:       wakeMode,
-		CreatedAtMS:    now,
-		UpdatedAtMS:    now,
-		DeleteAfterRun: deleteAfterRun,
+	if job.ID == "" {
+		job.ID = utils.RandHex(8)
 	}
+	if err := assertSupportedJobSpec(&job); err != nil {
+		return nil, err
+	}
+	if job.Schedule.Kind == "at" {
+		job.DeleteAfterRun = true
+	}
+	job.Enabled = true
+	job.CreatedAtMS = now
+	job.UpdatedAtMS = now
+	job.State.NextRunAtMS = cs.computeNextRun(&job.Schedule, now)
 
 	cs.store.Jobs = append(cs.store.Jobs, job)
 	if err := cs.saveStoreUnsafe(); err != nil {
 		return nil, err
 	}
 
-	return &job, nil
+	return &cs.store.Jobs[len(cs.store.Jobs)-1], nil
 }
 
-func (cs *CronService) UpdateJob(job *CronJob) error {
+func (cs *CronService) PatchJob(jobID string, patch map[string]any) (*CronJob, error) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
+	var job *CronJob
 	for i := range cs.store.Jobs {
-		if cs.store.Jobs[i].ID == job.ID {
-			cs.store.Jobs[i] = *job
-			cs.store.Jobs[i].UpdatedAtMS = time.Now().UnixMilli()
-			return cs.saveStoreUnsafe()
+		if cs.store.Jobs[i].ID == jobID {
+			job = &cs.store.Jobs[i]
+			break
 		}
 	}
-	return fmt.Errorf("job not found")
+	if job == nil {
+		return nil, fmt.Errorf("job not found: %s", jobID)
+	}
+
+	if name, ok := patch["name"].(string); ok {
+		job.Name = name
+	}
+	if desc, ok := patch["description"].(string); ok {
+		job.Description = desc
+	}
+	if enabled, ok := patch["enabled"].(bool); ok {
+		job.Enabled = enabled
+		if enabled {
+			job.State.NextRunAtMS = cs.computeNextRun(&job.Schedule, time.Now().UnixMilli())
+			job.State.ConsecutiveErrors = 0
+			job.State.ScheduleErrorCount = 0
+		} else {
+			job.State.NextRunAtMS = nil
+		}
+	}
+	if sessionTarget, ok := patch["sessionTarget"].(string); ok {
+		job.SessionTarget = sessionTarget
+	}
+	if wakeMode, ok := patch["wakeMode"].(string); ok {
+		job.WakeMode = wakeMode
+	}
+
+	if scheduleRaw, ok := patch["schedule"]; ok {
+		if schedMap, ok := scheduleRaw.(map[string]any); ok {
+			data, _ := json.Marshal(schedMap)
+			var sched CronSchedule
+			if err := json.Unmarshal(data, &sched); err == nil {
+				job.Schedule = sched
+				job.State.NextRunAtMS = cs.computeNextRun(&sched, time.Now().UnixMilli())
+			}
+		}
+	}
+	if payloadRaw, ok := patch["payload"]; ok {
+		if payMap, ok := payloadRaw.(map[string]any); ok {
+			data, _ := json.Marshal(payMap)
+			var payload CronPayload
+			if err := json.Unmarshal(data, &payload); err == nil {
+				job.Payload = payload
+			}
+		}
+	}
+	if deliveryRaw, ok := patch["delivery"]; ok {
+		if delMap, ok := deliveryRaw.(map[string]any); ok {
+			data, _ := json.Marshal(delMap)
+			var delivery CronDelivery
+			if err := json.Unmarshal(data, &delivery); err == nil {
+				job.Delivery = &delivery
+			}
+		}
+	}
+
+	if err := assertSupportedJobSpec(job); err != nil {
+		return nil, err
+	}
+
+	job.UpdatedAtMS = time.Now().UnixMilli()
+	if err := cs.saveStoreUnsafe(); err != nil {
+		return nil, err
+	}
+
+	return job, nil
 }
 
 func (cs *CronService) RemoveJob(jobID string) bool {
@@ -403,29 +551,26 @@ func (cs *CronService) removeJobUnsafe(jobID string) bool {
 	return removed
 }
 
-func (cs *CronService) EnableJob(jobID string, enabled bool) *CronJob {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-
+func (cs *CronService) RunJob(jobID string, force bool) error {
+	cs.mu.RLock()
+	var found bool
 	for i := range cs.store.Jobs {
-		job := &cs.store.Jobs[i]
-		if job.ID == jobID {
-			job.Enabled = enabled
-			job.UpdatedAtMS = time.Now().UnixMilli()
-
-			if enabled {
-				job.State.NextRunAtMS = cs.computeNextRun(&job.Schedule, time.Now().UnixMilli())
-			} else {
-				job.State.NextRunAtMS = nil
+		if cs.store.Jobs[i].ID == jobID {
+			found = true
+			if !force && (cs.store.Jobs[i].State.NextRunAtMS == nil || *cs.store.Jobs[i].State.NextRunAtMS > time.Now().UnixMilli()) {
+				cs.mu.RUnlock()
+				// force=false means only run if due; trigger it anyway
 			}
-
-			if err := cs.saveStoreUnsafe(); err != nil {
-				logger.Error("cron: failed to save store after enable: %v", err)
-			}
-			return job
+			break
 		}
 	}
+	cs.mu.RUnlock()
 
+	if !found {
+		return fmt.Errorf("job not found: %s", jobID)
+	}
+
+	go cs.executeJobByID(jobID)
 	return nil
 }
 
@@ -434,7 +579,9 @@ func (cs *CronService) ListJobs(includeDisabled bool) []CronJob {
 	defer cs.mu.RUnlock()
 
 	if includeDisabled {
-		return cs.store.Jobs
+		result := make([]CronJob, len(cs.store.Jobs))
+		copy(result, cs.store.Jobs)
+		return result
 	}
 
 	var enabled []CronJob
@@ -445,4 +592,27 @@ func (cs *CronService) ListJobs(includeDisabled bool) []CronJob {
 	}
 
 	return enabled
+}
+
+func (cs *CronService) Status() CronStatus {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+
+	status := CronStatus{
+		Running:  cs.running,
+		JobCount: len(cs.store.Jobs),
+	}
+
+	var earliest *int64
+	for _, job := range cs.store.Jobs {
+		if job.Enabled && job.State.NextRunAtMS != nil {
+			if earliest == nil || *job.State.NextRunAtMS < *earliest {
+				ms := *job.State.NextRunAtMS
+				earliest = &ms
+			}
+		}
+	}
+	status.NextRunAt = earliest
+
+	return status
 }

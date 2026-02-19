@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -11,32 +12,36 @@ import (
 	"localagent/pkg/cron"
 )
 
+const defaultJobTimeout = 10 * time.Minute
+
 type JobExecutor interface {
 	ProcessDirectWithChannel(ctx context.Context, content, sessionKey, channel, chatID string) (string, error)
 }
+
+type EventEnqueuer func(source, message, channel, chatID string, wake bool)
 
 type CronTool struct {
 	cronService  *cron.CronService
 	executor     JobExecutor
 	msgBus       *bus.MessageBus
-	execTool     *ExecTool
-	enqueueEvent func(source, message, channel, chatID string, wake bool)
+	enqueueEvent EventEnqueuer
 	channel      string
 	chatID       string
 	mu           sync.RWMutex
 }
 
-func NewCronTool(cronService *cron.CronService, executor JobExecutor, msgBus *bus.MessageBus, workspace string, execTimeout time.Duration) *CronTool {
-	execTool := NewExecTool(workspace)
-	if execTimeout > 0 {
-		execTool.SetTimeout(execTimeout)
-	}
+func NewCronTool(cronService *cron.CronService, executor JobExecutor, msgBus *bus.MessageBus) *CronTool {
 	return &CronTool{
 		cronService: cronService,
 		executor:    executor,
 		msgBus:      msgBus,
-		execTool:    execTool,
 	}
+}
+
+func (t *CronTool) SetEventEnqueuer(fn EventEnqueuer) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.enqueueEvent = fn
 }
 
 func (t *CronTool) Name() string {
@@ -44,13 +49,53 @@ func (t *CronTool) Name() string {
 }
 
 func (t *CronTool) Description() string {
-	return `Schedule jobs that trigger on a timer. Three modes:
-1. deliver=true (default): sends 'message' as plain text directly to the user. No shell expansion.
-2. deliver=false: sends 'message' to the agent for processing (agent can use tools to fulfill it).
-3. command: runs a shell command and sends its stdout to the user. Use this for dynamic output like random selection, system info, etc.
-Scheduling: use 'at_seconds' for one-shot, 'every_seconds' for intervals, or 'cron_expr' for cron schedules (server timezone).
-Session routing: session_target controls how the job executes. 'main' batches the message into the next heartbeat (efficient, shared context). 'isolated' (default for deliver=false) runs its own LLM call. deliver=true defaults to 'main'.
-wake_mode: 'now' triggers an immediate heartbeat when the job fires. 'next-heartbeat' (default) waits for the next scheduled heartbeat tick.`
+	return `Manage cron jobs (status/list/add/update/remove/run) and send wake events.
+
+ACTIONS:
+- status: Check cron scheduler status
+- list: List jobs (use includeDisabled:true to include disabled)
+- add: Create job (requires job object, see schema below)
+- update: Modify job (requires jobId + patch object)
+- remove: Delete job (requires jobId)
+- run: Trigger job immediately (requires jobId)
+- wake: Send wake event (requires text, optional mode)
+
+JOB SCHEMA (for add action):
+{
+  "name": "string (optional)",
+  "schedule": { ... },
+  "payload": { ... },
+  "delivery": { ... },
+  "sessionTarget": "main" | "isolated",
+  "enabled": true | false
+}
+
+SCHEDULE TYPES (schedule.kind):
+- "at": One-shot at absolute time
+  { "kind": "at", "at": "<ISO-8601 timestamp>" }
+- "every": Recurring interval
+  { "kind": "every", "everyMs": <ms> }
+- "cron": Cron expression
+  { "kind": "cron", "expr": "<expression>", "tz": "<optional-timezone>" }
+
+PAYLOAD TYPES (payload.kind):
+- "systemEvent": Injects text as system event into session
+  { "kind": "systemEvent", "text": "<message>" }
+- "agentTurn": Runs agent with message (isolated sessions only)
+  { "kind": "agentTurn", "message": "<prompt>" }
+
+DELIVERY (top-level):
+  { "mode": "none|announce", "channel": "<optional>", "to": "<optional>" }
+  Default for isolated agentTurn jobs: "announce"
+
+CRITICAL CONSTRAINTS:
+- sessionTarget="main" REQUIRES payload.kind="systemEvent"
+- sessionTarget="isolated" REQUIRES payload.kind="agentTurn"
+Default: prefer isolated agentTurn jobs unless the user explicitly wants a main-session system event.
+
+WAKE MODES (for wake action):
+- "next-heartbeat" (default): Wake on next heartbeat
+- "now": Wake immediately`
 }
 
 func (t *CronTool) Parameters() map[string]any {
@@ -59,50 +104,69 @@ func (t *CronTool) Parameters() map[string]any {
 		"properties": map[string]any{
 			"action": map[string]any{
 				"type":        "string",
-				"enum":        []string{"add", "list", "remove", "enable", "disable"},
+				"enum":        []string{"status", "list", "add", "update", "remove", "run", "wake"},
 				"description": "Action to perform.",
 			},
-			"message": map[string]any{
-				"type":        "string",
-				"description": "Required for 'add' unless 'command' is provided. Must be non-empty. With deliver=true, sent as-is to user. With deliver=false, sent to agent for processing.",
-			},
-			"command": map[string]any{
-				"type":        "string",
-				"description": "Shell command to execute on trigger. Its stdout is sent to the user. Use this instead of message when you need dynamic output (e.g. 'shuf -n 1 file.txt', 'date', 'curl ...').",
-			},
-			"at_seconds": map[string]any{
-				"type":        "integer",
-				"description": "One-time reminder: seconds from now when to trigger.",
-			},
-			"every_seconds": map[string]any{
-				"type":        "integer",
-				"description": "Recurring interval in seconds.",
-			},
-			"cron_expr": map[string]any{
-				"type":        "string",
-				"description": "Cron expression for complex recurring schedules.",
-			},
-			"job_id": map[string]any{
-				"type":        "string",
-				"description": "Job ID (for remove/enable/disable).",
-			},
-			"deliver": map[string]any{
+			"includeDisabled": map[string]any{
 				"type":        "boolean",
-				"description": "If true (default), send message as plain text to user. If false, send message to agent for processing (agent can use tools). Ignored when 'command' is set.",
+				"description": "For list: include disabled jobs.",
 			},
-			"session_target": map[string]any{
+			"job": map[string]any{
+				"type":                 "object",
+				"description":          "Job object for add action.",
+				"additionalProperties": true,
+			},
+			"jobId": map[string]any{
 				"type":        "string",
-				"enum":        []string{"main", "isolated"},
-				"description": "Where to run the job. 'main' batches into heartbeat (default for deliver=true). 'isolated' runs its own LLM call (default for deliver=false).",
+				"description": "Job ID for update/remove/run.",
 			},
-			"wake_mode": map[string]any{
+			"patch": map[string]any{
+				"type":                 "object",
+				"description":          "Patch object for update action.",
+				"additionalProperties": true,
+			},
+			"text": map[string]any{
+				"type":        "string",
+				"description": "Text for wake action.",
+			},
+			"mode": map[string]any{
 				"type":        "string",
 				"enum":        []string{"now", "next-heartbeat"},
-				"description": "When session_target=main: 'now' triggers immediate heartbeat, 'next-heartbeat' (default) waits for next tick.",
+				"description": "Wake mode for wake action.",
+			},
+			"runMode": map[string]any{
+				"type":        "string",
+				"enum":        []string{"due", "force"},
+				"description": "Run mode for run action.",
 			},
 		},
 		"required": []string{"action"},
 	}
+}
+
+// jobKeys are known CronJob fields. When the LLM flattens job.* to the top
+// level (common with smaller models), we detect these keys and re-wrap them.
+var jobKeys = map[string]bool{
+	"name": true, "description": true, "schedule": true, "payload": true,
+	"delivery": true, "sessionTarget": true, "wakeMode": true, "enabled": true,
+}
+
+// recoverFlatJobParams checks if the LLM flattened job fields to the top level
+// and wraps them back into a "job" object if so.
+func recoverFlatJobParams(args map[string]any) map[string]any {
+	if _, hasJob := args["job"]; hasJob {
+		return args
+	}
+	job := map[string]any{}
+	for k, v := range args {
+		if jobKeys[k] {
+			job[k] = v
+		}
+	}
+	if len(job) > 0 {
+		args["job"] = job
+	}
+	return args
 }
 
 func (t *CronTool) SetContext(channel, chatID string) {
@@ -112,12 +176,6 @@ func (t *CronTool) SetContext(channel, chatID string) {
 	t.chatID = chatID
 }
 
-func (t *CronTool) SetEventEnqueuer(fn func(source, message, channel, chatID string, wake bool)) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.enqueueEvent = fn
-}
-
 func (t *CronTool) Execute(ctx context.Context, args map[string]any) *ToolResult {
 	action, ok := args["action"].(string)
 	if !ok {
@@ -125,131 +183,127 @@ func (t *CronTool) Execute(ctx context.Context, args map[string]any) *ToolResult
 	}
 
 	switch action {
-	case "add":
-		return t.addJob(args)
+	case "status":
+		return t.statusAction()
 	case "list":
-		return t.listJobs()
+		return t.listAction(args)
+	case "add":
+		return t.addAction(args)
+	case "update":
+		return t.updateAction(args)
 	case "remove":
-		return t.removeJob(args)
-	case "enable":
-		return t.enableJob(args, true)
-	case "disable":
-		return t.enableJob(args, false)
+		return t.removeAction(args)
+	case "run":
+		return t.runAction(args)
+	case "wake":
+		return t.wakeAction(args)
 	default:
 		return ErrorResult(fmt.Sprintf("unknown action: %s", action))
 	}
 }
 
-func (t *CronTool) addJob(args map[string]any) *ToolResult {
-	t.mu.RLock()
-	channel := t.channel
-	chatID := t.chatID
-	t.mu.RUnlock()
-
-	if channel == "" || chatID == "" {
-		return ErrorResult("no session context (channel/chat_id not set)")
-	}
-
-	message, _ := args["message"].(string)
-	command, _ := args["command"].(string)
-
-	if command != "" {
-		if message == "" {
-			message = command
-		}
-	} else if message == "" {
-		return ErrorResult("'message' parameter is required and must be a non-empty string when action is 'add' (unless 'command' is provided)")
-	}
-
-	var schedule cron.CronSchedule
-
-	atSeconds, hasAt := args["at_seconds"].(float64)
-	everySeconds, hasEvery := args["every_seconds"].(float64)
-	cronExpr, hasCron := args["cron_expr"].(string)
-
-	if hasAt {
-		atMS := time.Now().UnixMilli() + int64(atSeconds)*1000
-		schedule = cron.CronSchedule{Kind: "at", AtMS: &atMS}
-	} else if hasEvery {
-		everyMS := int64(everySeconds) * 1000
-		schedule = cron.CronSchedule{Kind: "every", EveryMS: &everyMS}
-	} else if hasCron {
-		schedule = cron.CronSchedule{Kind: "cron", Expr: cronExpr}
-	} else {
-		return ErrorResult("one of at_seconds, every_seconds, or cron_expr is required")
-	}
-
-	deliver := true
-	if d, ok := args["deliver"].(bool); ok {
-		deliver = d
-	}
-
-	if command != "" {
-		deliver = false
-	}
-
-	sessionTarget, _ := args["session_target"].(string)
-	wakeMode, _ := args["wake_mode"].(string)
-
-	if sessionTarget == "" {
-		if deliver {
-			sessionTarget = "main"
-		} else {
-			sessionTarget = "isolated"
-		}
-	}
-	if wakeMode == "" {
-		wakeMode = "next-heartbeat"
-	}
-
-	messagePreview := message
-	if len([]rune(messagePreview)) > 30 {
-		messagePreview = string([]rune(messagePreview)[:27]) + "..."
-	}
-
-	job, err := t.cronService.AddJob(messagePreview, schedule, message, deliver, channel, chatID, sessionTarget, wakeMode)
-	if err != nil {
-		return ErrorResult(fmt.Sprintf("Error adding job: %v", err))
-	}
-
-	if command != "" {
-		job.Payload.Command = command
-		t.cronService.UpdateJob(job)
-	}
-
-	return SilentResult(fmt.Sprintf("Cron job added: %s (id: %s)", job.Name, job.ID))
+func (t *CronTool) statusAction() *ToolResult {
+	status := t.cronService.Status()
+	data, _ := json.MarshalIndent(status, "", "  ")
+	return SilentResult(string(data))
 }
 
-func (t *CronTool) listJobs() *ToolResult {
-	jobs := t.cronService.ListJobs(false)
+func (t *CronTool) listAction(args map[string]any) *ToolResult {
+	includeDisabled, _ := args["includeDisabled"].(bool)
+	jobs := t.cronService.ListJobs(includeDisabled)
 
 	if len(jobs) == 0 {
 		return SilentResult("No scheduled jobs")
 	}
 
-	var result strings.Builder
-	fmt.Fprintf(&result, "Scheduled jobs:\n")
-	for _, j := range jobs {
-		var scheduleInfo string
-		if j.Schedule.Kind == "every" && j.Schedule.EveryMS != nil {
-			scheduleInfo = fmt.Sprintf("every %ds", *j.Schedule.EveryMS/1000)
-		} else if j.Schedule.Kind == "cron" {
-			scheduleInfo = j.Schedule.Expr
-		} else if j.Schedule.Kind == "at" {
-			scheduleInfo = "one-time"
-		} else {
-			scheduleInfo = "unknown"
-		}
-		fmt.Fprintf(&result, "- %s (id: %s, %s)\n", j.Name, j.ID, scheduleInfo)
-	}
-
-	return SilentResult(result.String())
+	data, _ := json.MarshalIndent(jobs, "", "  ")
+	return SilentResult(string(data))
 }
 
-func (t *CronTool) removeJob(args map[string]any) *ToolResult {
-	jobID, ok := args["job_id"].(string)
+func (t *CronTool) addAction(args map[string]any) *ToolResult {
+	args = recoverFlatJobParams(args)
+
+	t.mu.RLock()
+	channel := t.channel
+	chatID := t.chatID
+	t.mu.RUnlock()
+
+	jobRaw, ok := args["job"].(map[string]any)
+	if !ok {
+		return ErrorResult("'job' object is required for add action")
+	}
+
+	data, err := json.Marshal(jobRaw)
+	if err != nil {
+		return ErrorResult(fmt.Sprintf("invalid job object: %v", err))
+	}
+
+	var job cron.CronJob
+	if err := json.Unmarshal(data, &job); err != nil {
+		return ErrorResult(fmt.Sprintf("failed to parse job: %v", err))
+	}
+
+	if job.SessionTarget == "" {
+		if job.Payload.Kind == "systemEvent" {
+			job.SessionTarget = "main"
+		} else {
+			job.SessionTarget = "isolated"
+		}
+	}
+	if job.WakeMode == "" {
+		job.WakeMode = "now"
+	}
+
+	if job.Delivery == nil {
+		mode := "none"
+		if job.SessionTarget == "isolated" && job.Payload.Kind == "agentTurn" {
+			mode = "announce"
+		}
+		job.Delivery = &cron.CronDelivery{
+			Mode:    mode,
+			Channel: channel,
+			To:      chatID,
+		}
+	} else {
+		if job.Delivery.Channel == "" {
+			job.Delivery.Channel = channel
+		}
+		if job.Delivery.To == "" {
+			job.Delivery.To = chatID
+		}
+	}
+
+	created, err := t.cronService.AddJob(job)
+	if err != nil {
+		return ErrorResult(fmt.Sprintf("error adding job: %v", err))
+	}
+
+	return SilentResult(fmt.Sprintf("Cron job added: %s (id: %s)", created.Name, created.ID))
+}
+
+func (t *CronTool) updateAction(args map[string]any) *ToolResult {
+	jobID, ok := args["jobId"].(string)
 	if !ok || jobID == "" {
-		return ErrorResult("job_id is required for remove")
+		return ErrorResult("'jobId' is required for update action")
+	}
+
+	patch, ok := args["patch"].(map[string]any)
+	if !ok {
+		return ErrorResult("'patch' object is required for update action")
+	}
+
+	job, err := t.cronService.PatchJob(jobID, patch)
+	if err != nil {
+		return ErrorResult(fmt.Sprintf("error updating job: %v", err))
+	}
+
+	return SilentResult(fmt.Sprintf("Cron job updated: %s (id: %s)", job.Name, job.ID))
+}
+
+func (t *CronTool) removeAction(args map[string]any) *ToolResult {
+	jobID, ok := args["jobId"].(string)
+	if !ok || jobID == "" {
+		return ErrorResult("'jobId' is required for remove action")
 	}
 
 	if t.cronService.RemoveJob(jobID) {
@@ -258,28 +312,65 @@ func (t *CronTool) removeJob(args map[string]any) *ToolResult {
 	return ErrorResult(fmt.Sprintf("Job %s not found", jobID))
 }
 
-func (t *CronTool) enableJob(args map[string]any, enable bool) *ToolResult {
-	jobID, ok := args["job_id"].(string)
+func (t *CronTool) runAction(args map[string]any) *ToolResult {
+	jobID, ok := args["jobId"].(string)
 	if !ok || jobID == "" {
-		return ErrorResult("job_id is required for enable/disable")
+		return ErrorResult("'jobId' is required for run action")
 	}
 
-	job := t.cronService.EnableJob(jobID, enable)
-	if job == nil {
-		return ErrorResult(fmt.Sprintf("Job %s not found", jobID))
+	runMode, _ := args["runMode"].(string)
+	force := runMode == "force"
+
+	if err := t.cronService.RunJob(jobID, force); err != nil {
+		return ErrorResult(fmt.Sprintf("error running job: %v", err))
 	}
 
-	status := "enabled"
-	if !enable {
-		status = "disabled"
+	return SilentResult(fmt.Sprintf("Job %s triggered", jobID))
+}
+
+func (t *CronTool) wakeAction(args map[string]any) *ToolResult {
+	text, _ := args["text"].(string)
+	if text == "" {
+		return ErrorResult("'text' is required for wake action")
 	}
-	return SilentResult(fmt.Sprintf("Cron job '%s' %s", job.Name, status))
+
+	mode, _ := args["mode"].(string)
+	if mode == "" {
+		mode = "next-heartbeat"
+	}
+
+	t.mu.RLock()
+	channel := t.channel
+	chatID := t.chatID
+	t.mu.RUnlock()
+
+	t.mu.RLock()
+	enqueuer := t.enqueueEvent
+	t.mu.RUnlock()
+
+	if enqueuer == nil {
+		return ErrorResult("event queue not configured")
+	}
+
+	enqueuer("wake", text, channel, chatID, mode == "now")
+
+	return SilentResult(fmt.Sprintf("Wake event enqueued (mode: %s)", mode))
 }
 
 func (t *CronTool) ExecuteJob(ctx context.Context, job *cron.CronJob) string {
-	channel := job.Payload.Channel
-	chatID := job.Payload.To
+	timeout := defaultJobTimeout
+	if job.Payload.TimeoutSeconds > 0 {
+		timeout = time.Duration(job.Payload.TimeoutSeconds) * time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
+	channel := ""
+	chatID := ""
+	if job.Delivery != nil {
+		channel = job.Delivery.Channel
+		chatID = job.Delivery.To
+	}
 	if channel == "" {
 		channel = "cli"
 	}
@@ -287,47 +378,46 @@ func (t *CronTool) ExecuteJob(ctx context.Context, job *cron.CronJob) string {
 		chatID = "direct"
 	}
 
-	t.mu.RLock()
-	enqueuer := t.enqueueEvent
-	t.mu.RUnlock()
+	if job.Payload.Kind == "systemEvent" {
+		t.mu.RLock()
+		enqueuer := t.enqueueEvent
+		t.mu.RUnlock()
 
-	if job.SessionTarget == "main" && enqueuer != nil {
-		wake := job.WakeMode == "now"
-		enqueuer(fmt.Sprintf("cron:%s", job.ID), job.Payload.Message, channel, chatID, wake)
-		return "ok"
-	}
-
-	if job.Payload.Command != "" {
-		args := map[string]any{"command": job.Payload.Command}
-		result := t.execTool.Execute(ctx, args)
-		var output string
-		if result.IsError {
-			output = fmt.Sprintf("Error executing scheduled command: %s", result.ForLLM)
-		} else {
-			output = fmt.Sprintf("Scheduled command '%s' executed:\n%s", job.Payload.Command, result.ForLLM)
+		if enqueuer != nil {
+			wake := job.WakeMode == "now"
+			enqueuer(fmt.Sprintf("cron:%s", job.ID), job.Payload.Text, channel, chatID, wake)
 		}
-		t.msgBus.PublishOutbound(bus.OutboundMessage{
-			Channel: channel,
-			ChatID:  chatID,
-			Content: output,
-		})
 		return "ok"
 	}
 
-	if job.Payload.Deliver {
-		t.msgBus.PublishOutbound(bus.OutboundMessage{
-			Channel: channel,
-			ChatID:  chatID,
-			Content: job.Payload.Message,
-		})
+	if job.Payload.Kind == "agentTurn" {
+		sessionKey := fmt.Sprintf("cron-%s", job.ID)
+		response, err := t.executor.ProcessDirectWithChannel(ctx, job.Payload.Message, sessionKey, channel, chatID)
+		if err != nil {
+			return fmt.Sprintf("Error: %v", err)
+		}
+
+		if job.Delivery != nil && job.Delivery.Mode == "announce" && response != "" {
+			t.announceResult(channel, chatID, job, response)
+		}
+
 		return "ok"
 	}
 
-	sessionKey := fmt.Sprintf("cron-%s", job.ID)
-	response, err := t.executor.ProcessDirectWithChannel(ctx, job.Payload.Message, sessionKey, channel, chatID)
-	if err != nil {
-		return fmt.Sprintf("Error: %v", err)
+	return fmt.Sprintf("unknown payload kind: %s", job.Payload.Kind)
+}
+
+func (t *CronTool) announceResult(channel, chatID string, job *cron.CronJob, response string) {
+	var content strings.Builder
+	if job.Name != "" {
+		fmt.Fprintf(&content, "[cron: %s] %s", job.Name, response)
+	} else {
+		content.WriteString(response)
 	}
-	_ = response
-	return "ok"
+
+	t.msgBus.PublishOutbound(bus.OutboundMessage{
+		Channel: channel,
+		ChatID:  chatID,
+		Content: content.String(),
+	})
 }
