@@ -24,7 +24,8 @@ const (
 // HeartbeatHandler is the function type for handling heartbeat.
 // It returns a ToolResult that can indicate async operations.
 // channel and chatID are derived from the last active user channel.
-type HeartbeatHandler func(prompt, channel, chatID string) *tools.ToolResult
+// isCronEvent indicates the prompt is a cron-triggered event (not a periodic heartbeat).
+type HeartbeatHandler func(prompt, channel, chatID string, isCronEvent bool) *tools.ToolResult
 
 // HeartbeatService manages periodic heartbeat checks
 type HeartbeatService struct {
@@ -162,8 +163,8 @@ func (hs *HeartbeatService) executeHeartbeat() {
 
 	logger.Debug("heartbeat: executing")
 
-	prompt := hs.buildPrompt()
-	if prompt == "" {
+	hp := hs.buildPrompt()
+	if hp.text == "" {
 		logger.Info("heartbeat: no prompt (HEARTBEAT.md empty or missing)")
 		return
 	}
@@ -173,21 +174,23 @@ func (hs *HeartbeatService) executeHeartbeat() {
 		return
 	}
 
-	// Get last channel info for context
-	lastChannel := hs.state.GetLastChannel()
-	channel, chatID := hs.parseLastChannel(lastChannel)
+	// Resolve delivery channel: prefer event-provided values, fall back to lastChannel
+	channel, chatID := hp.channel, hp.chatID
+	if channel == "" || chatID == "" {
+		lastChannel := hs.state.GetLastChannel()
+		channel, chatID = hs.parseLastChannel(lastChannel)
+		hs.logInfo("Resolved channel: %s, chatID: %s (from lastChannel: %s)", channel, chatID, lastChannel)
+	} else {
+		hs.logInfo("Using event channel: %s, chatID: %s", channel, chatID)
+	}
 
-	// Debug log for channel resolution
-	hs.logInfo("Resolved channel: %s, chatID: %s (from lastChannel: %s)", channel, chatID, lastChannel)
-
-	result := handler(prompt, channel, chatID)
+	result := handler(hp.text, channel, chatID, hp.isCronEvent)
 
 	if result == nil {
 		hs.logInfo("Heartbeat handler returned nil result")
 		return
 	}
 
-	// Handle different result types
 	if result.IsError {
 		hs.logError("Heartbeat error: %s", result.ForLLM)
 		return
@@ -199,13 +202,25 @@ func (hs *HeartbeatService) executeHeartbeat() {
 		return
 	}
 
-	// Check if silent
+	// For cron events, always deliver (skip the silent check)
+	if hp.isCronEvent {
+		response := result.ForUser
+		if response == "" {
+			response = result.ForLLM
+		}
+		if response != "" {
+			hs.sendResponseTo(channel, chatID, response)
+		}
+		hs.logInfo("Cron event delivered: %s", result.ForLLM)
+		return
+	}
+
+	// Regular heartbeat: respect silent flag
 	if result.Silent {
 		hs.logInfo("Heartbeat OK - silent")
 		return
 	}
 
-	// Send result to user
 	if result.ForUser != "" {
 		hs.sendResponse(result.ForUser)
 	} else if result.ForLLM != "" {
@@ -279,8 +294,15 @@ func (hs *HeartbeatService) RequestWakeNow(text string) {
 	})
 }
 
+type heartbeatPrompt struct {
+	text        string
+	isCronEvent bool
+	channel     string
+	chatID      string
+}
+
 // buildPrompt builds the heartbeat prompt from HEARTBEAT.md and pending events.
-func (hs *HeartbeatService) buildPrompt() string {
+func (hs *HeartbeatService) buildPrompt() heartbeatPrompt {
 	heartbeatPath := filepath.Join(hs.workspace, "HEARTBEAT.md")
 
 	var staticContent string
@@ -305,16 +327,25 @@ func (hs *HeartbeatService) buildPrompt() string {
 	}
 
 	if len(events) > 0 {
-		return hs.buildCronEventPrompt(events)
+		// Use channel/chatID from the first event (all events in a batch
+		// typically share the same origin).
+		return heartbeatPrompt{
+			text:        hs.buildCronEventPrompt(events),
+			isCronEvent: true,
+			channel:     events[0].Channel,
+			chatID:      events[0].ChatID,
+		}
 	}
 
 	if staticContent == "" || isHeartbeatContentEffectivelyEmpty(staticContent) {
-		return ""
+		return heartbeatPrompt{}
 	}
 
 	now := time.Now()
 	tz, _ := now.Zone()
-	return fmt.Sprintf("%s\n\nCurrent time: %s (%s)", prompts.Heartbeat, now.Format("2006-01-02 15:04:05"), tz)
+	return heartbeatPrompt{
+		text: fmt.Sprintf("%s\n\nCurrent time: %s (%s)", prompts.Heartbeat, now.Format("2006-01-02 15:04:05"), tz),
+	}
 }
 
 // buildCronEventPrompt builds a prompt for cron-triggered events.
@@ -346,8 +377,19 @@ func (hs *HeartbeatService) createDefaultHeartbeatTemplate() {
 	}
 }
 
-// sendResponse sends the heartbeat response to the last channel
+// sendResponse sends the heartbeat response to the last active channel.
 func (hs *HeartbeatService) sendResponse(response string) {
+	lastChannel := hs.state.GetLastChannel()
+	if lastChannel == "" {
+		hs.logInfo("No last channel recorded, heartbeat result not sent")
+		return
+	}
+	platform, userID := hs.parseLastChannel(lastChannel)
+	hs.sendResponseTo(platform, userID, response)
+}
+
+// sendResponseTo sends a response to a specific channel/chatID.
+func (hs *HeartbeatService) sendResponseTo(channel, chatID, response string) {
 	hs.mu.RLock()
 	msgBus := hs.bus
 	hs.mu.RUnlock()
@@ -357,27 +399,17 @@ func (hs *HeartbeatService) sendResponse(response string) {
 		return
 	}
 
-	// Get last channel from state
-	lastChannel := hs.state.GetLastChannel()
-	if lastChannel == "" {
-		hs.logInfo("No last channel recorded, heartbeat result not sent")
-		return
-	}
-
-	platform, userID := hs.parseLastChannel(lastChannel)
-
-	// Skip internal channels that can't receive messages
-	if platform == "" || userID == "" {
+	if channel == "" || chatID == "" {
 		return
 	}
 
 	msgBus.PublishOutbound(bus.OutboundMessage{
-		Channel: platform,
-		ChatID:  userID,
+		Channel: channel,
+		ChatID:  chatID,
 		Content: response,
 	})
 
-	hs.logInfo("Heartbeat result sent to %s", platform)
+	hs.logInfo("Heartbeat result sent to %s:%s", channel, chatID)
 }
 
 // parseLastChannel parses the last channel string into platform and userID.

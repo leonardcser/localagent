@@ -233,13 +233,16 @@ func gatewayCmd() {
 	)
 	heartbeatService.SetBus(msgBus)
 	heartbeatService.SetEventQueue(eventQueue)
-	heartbeatService.SetHandler(func(prompt, channel, chatID string) *tools.ToolResult {
+	heartbeatService.SetHandler(func(prompt, channel, chatID string, isCronEvent bool) *tools.ToolResult {
 		if channel == "" || chatID == "" {
 			channel, chatID = "cli", "direct"
 		}
 		response, err := agentLoop.ProcessHeartbeat(context.Background(), prompt, channel, chatID)
 		if err != nil {
 			return tools.ErrorResult(fmt.Sprintf("Heartbeat error: %v", err))
+		}
+		if isCronEvent {
+			return tools.NewToolResult(strings.TrimSpace(response))
 		}
 		text, skip := heartbeat.StripHeartbeatToken(response)
 		if skip {
