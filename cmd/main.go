@@ -362,6 +362,7 @@ func startProxy(cfg *config.Config) *proxy.Proxy {
 	wl := proxy.NewWhitelist()
 	wl.Add(cfg.ServiceDomains()...)
 	wl.Add(cfg.AllowedDomains...)
+	wl.Add("*.push.apple.com", "fcm.googleapis.com", "updates.push.services.mozilla.com")
 	p := proxy.New(wl)
 	if err := p.Start(); err != nil {
 		fmt.Printf("Error starting proxy: %v\n", err)
