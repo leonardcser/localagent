@@ -14,7 +14,7 @@ import (
 )
 
 type PDFToTextTool struct {
-	workspace string
+	workspace  string
 	serviceURL string
 	apiKey     string
 }

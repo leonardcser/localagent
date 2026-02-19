@@ -185,4 +185,3 @@ func TestShellTool_OutputTruncation(t *testing.T) {
 		t.Errorf("Expected output to be truncated, got length: %d", len(result.ForLLM))
 	}
 }
-

@@ -7,9 +7,9 @@ import (
 
 type Event struct {
 	Source     string
-	Message   string
-	Channel   string
-	ChatID    string
+	Message    string
+	Channel    string
+	ChatID     string
 	EnqueuedAt time.Time
 }
 

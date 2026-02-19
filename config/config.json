@@ -28,6 +28,11 @@
     "image": {
       "url": "",
       "api_key_env": ""
+    },
+    "home_assistant": {
+      "url": "",
+      "api_key_env": "",
+      "location_user": ""
     }
   },
   "heartbeat": {

@@ -96,15 +96,29 @@ func (i ImageConfig) ResolveAPIKey() string {
 	return os.Getenv(i.APIKeyEnv)
 }
 
+type HomeAssistantConfig struct {
+	URL          string `json:"url"`
+	APIKeyEnv    string `json:"api_key_env"`
+	LocationUser string `json:"location_user"`
+}
+
+func (h HomeAssistantConfig) ResolveAPIKey() string {
+	if h.APIKeyEnv == "" {
+		return ""
+	}
+	return os.Getenv(h.APIKeyEnv)
+}
+
 type CronToolsConfig struct {
 	ExecTimeoutMinutes int `json:"exec_timeout_minutes"`
 }
 
 type ToolsConfig struct {
-	PDF   PDFConfig       `json:"pdf"`
-	STT   STTConfig       `json:"stt"`
-	Image ImageConfig     `json:"image"`
-	Cron  CronToolsConfig `json:"cron"`
+	PDF           PDFConfig           `json:"pdf"`
+	STT           STTConfig           `json:"stt"`
+	Image         ImageConfig         `json:"image"`
+	Cron          CronToolsConfig     `json:"cron"`
+	HomeAssistant HomeAssistantConfig `json:"home_assistant"`
 }
 
 func DefaultConfig() *Config {
@@ -189,6 +203,7 @@ func (c *Config) ServiceDomains() []string {
 		c.Tools.PDF.URL,
 		c.Tools.STT.URL,
 		c.Tools.Image.URL,
+		c.Tools.HomeAssistant.URL,
 	} {
 		if rawURL == "" {
 			continue

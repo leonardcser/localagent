@@ -57,4 +57,3 @@ func SanitizeFilename(filename string) string {
 	base = strings.ReplaceAll(base, "\\", "_")
 	return base
 }
-

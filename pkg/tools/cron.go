@@ -64,7 +64,7 @@ func (t *CronTool) Parameters() map[string]any {
 			},
 			"message": map[string]any{
 				"type":        "string",
-				"description": "Plain text message. With deliver=true, sent as-is to user (no shell expansion). With deliver=false, sent to agent for processing.",
+				"description": "Required for 'add' action. Must be a non-empty string. With deliver=true, sent as-is to user (no shell expansion). With deliver=false, sent to agent for processing.",
 			},
 			"command": map[string]any{
 				"type":        "string",
@@ -152,7 +152,7 @@ func (t *CronTool) addJob(args map[string]any) *ToolResult {
 
 	message, ok := args["message"].(string)
 	if !ok || message == "" {
-		return ErrorResult("message is required for add")
+		return ErrorResult("'message' parameter is required and must be a non-empty string when action is 'add'")
 	}
 
 	var schedule cron.CronSchedule

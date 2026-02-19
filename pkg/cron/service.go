@@ -446,4 +446,3 @@ func (cs *CronService) ListJobs(includeDisabled bool) []CronJob {
 
 	return enabled
 }
-

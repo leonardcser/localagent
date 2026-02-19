@@ -355,7 +355,6 @@ func statusCmd() {
 	}
 }
 
-
 func startProxy(cfg *config.Config) *proxy.Proxy {
 	wl := proxy.NewWhitelist()
 	wl.Add(cfg.ServiceDomains()...)

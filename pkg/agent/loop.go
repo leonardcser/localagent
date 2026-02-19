@@ -83,6 +83,10 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 		registry.Register(tools.NewTranscribeAudioTool(workspace, cfg.Tools.STT.URL, cfg.Tools.STT.ResolveAPIKey()))
 	}
 
+	if cfg.Tools.HomeAssistant.URL != "" {
+		registry.Register(tools.NewLocationTool(cfg.Tools.HomeAssistant.URL, cfg.Tools.HomeAssistant.ResolveAPIKey(), cfg.Tools.HomeAssistant.LocationUser))
+	}
+
 	return registry
 }
 
