@@ -47,6 +47,7 @@ type processOptions struct {
 	SessionKey      string   // Session identifier for history/context
 	Channel         string   // Target channel for tool execution
 	ChatID          string   // Target chat ID for tool execution
+	SenderID        string   // Sender identifier (for activity events)
 	UserMessage     string   // User message content (may include prefix)
 	Media           []string // Media file paths attached to the message
 	DefaultResponse string   // Response when LLM returns empty
@@ -289,17 +290,6 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 	}
 	logger.Info("processing message from %s:%s session=%s: %s", msg.Channel, msg.SenderID, msg.SessionKey, logContent)
 
-	al.emitActivity(msg.SessionKey, activity.Event{
-		Type:      activity.ProcessingStart,
-		Timestamp: time.Now(),
-		Message:   fmt.Sprintf("Processing message from %s:%s", msg.Channel, msg.SenderID),
-		Detail: map[string]any{
-			"channel": msg.Channel,
-			"sender":  msg.SenderID,
-			"preview": utils.Truncate(msg.Content, 100),
-		},
-	})
-
 	// Route system messages to processSystemMessage
 	if msg.Channel == "system" {
 		return al.processSystemMessage(ctx, msg)
@@ -310,6 +300,7 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 		SessionKey:      msg.SessionKey,
 		Channel:         msg.Channel,
 		ChatID:          msg.ChatID,
+		SenderID:        msg.SenderID,
 		UserMessage:     msg.Content,
 		Media:           msg.Media,
 		DefaultResponse: "I've completed processing but have no response to give.",
@@ -391,7 +382,21 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 	// 3. Save user message to session
 	al.sessions.AddMessageWithMedia(opts.SessionKey, "user", opts.UserMessage, opts.Media)
 
-	// 4. Run LLM iteration loop
+	// 4. Emit processing start activity (after user message is saved so timeline order is correct)
+	if opts.SenderID != "" {
+		al.emitActivity(opts.SessionKey, activity.Event{
+			Type:      activity.ProcessingStart,
+			Timestamp: time.Now(),
+			Message:   fmt.Sprintf("Processing message from %s:%s", opts.Channel, opts.SenderID),
+			Detail: map[string]any{
+				"channel": opts.Channel,
+				"sender":  opts.SenderID,
+				"preview": utils.Truncate(opts.UserMessage, 100),
+			},
+		})
+	}
+
+	// 5. Run LLM iteration loop
 	finalContent, iteration, tokenCount, err := al.runLLMIteration(ctx, messages, opts)
 	if err != nil {
 		return "", err
@@ -400,12 +405,12 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 	// If last tool had ForUser content and we already sent it, we might not need to send final response
 	// This is controlled by the tool's Silent flag and ForUser content
 
-	// 5. Handle empty response
+	// 6. Handle empty response
 	if finalContent == "" {
 		finalContent = opts.DefaultResponse
 	}
 
-	// 6. Emit completion activity (before saving message so it sorts earlier in timeline)
+	// 7. Emit completion activity (before saving message so it sorts earlier in timeline)
 	al.emitActivity(opts.SessionKey, activity.Event{
 		Type:      activity.Complete,
 		Timestamp: time.Now(),
@@ -417,16 +422,16 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 		},
 	})
 
-	// 7. Save final assistant message to session
+	// 8. Save final assistant message to session
 	al.sessions.AddMessage(opts.SessionKey, "assistant", finalContent)
 	al.sessions.Save(opts.SessionKey)
 
-	// 8. Optional: summarization
+	// 9. Optional: summarization
 	if opts.EnableSummary {
 		al.maybeSummarize(opts.SessionKey, tokenCount)
 	}
 
-	// 9. Optional: send response via bus
+	// 10. Optional: send response via bus
 	if opts.SendResponse {
 		al.bus.PublishOutbound(bus.OutboundMessage{
 			Channel: opts.Channel,
@@ -435,7 +440,7 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 		})
 	}
 
-	// 10. Log response
+	// 11. Log response
 	responsePreview := utils.Truncate(finalContent, 120)
 	logger.Info("response: %s (session=%s iterations=%d len=%d)", responsePreview, opts.SessionKey, iteration, len(finalContent))
 
