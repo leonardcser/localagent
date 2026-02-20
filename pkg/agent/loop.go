@@ -75,6 +75,7 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 
 	// News tool
 	registry.Register(tools.NewNewsTool(15))
+	registry.Register(tools.NewAIPapersTool(15))
 
 	// Yahoo Finance tools (shared client for auth)
 	yf := finance.NewYahooClient()
