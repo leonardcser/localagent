@@ -238,7 +238,7 @@ func (s *Server) handleSSE(c *echo.Context) error {
 
 	// Send initial processing status
 	processing := s.channel.processing.Load()
-	statusEvent := OutgoingEvent{Type: "status", Processing: &processing}
+	statusEvent := OutgoingEvent{Type: "status", Processing: &processing, ClientID: clientID}
 	if data, err := json.Marshal(statusEvent); err == nil {
 		fmt.Fprintf(w, "data: %s\n\n", data)
 	}
@@ -263,6 +263,18 @@ func (s *Server) handleSSE(c *echo.Context) error {
 			rc.Flush()
 		}
 	}
+}
+
+func (s *Server) handleActive(c *echo.Context) error {
+	var req struct {
+		ClientID string `json:"client_id"`
+		Active   bool   `json:"active"`
+	}
+	if err := c.Bind(&req); err != nil || req.ClientID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+	s.channel.setClientActive(req.ClientID, req.Active)
+	return c.JSON(http.StatusOK, map[string]bool{"ok": true})
 }
 
 func (s *Server) handleVAPIDPublicKey(c *echo.Context) error {

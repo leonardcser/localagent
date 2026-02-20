@@ -128,14 +128,25 @@ function handleDrop(e: DragEvent) {
 }
 
 function handleVisibility() {
+	chat.reportVisibility();
 	if (document.visibilityState === "visible") {
 		chat.sync();
 	}
 }
 
+function handleFocus() {
+	chat.reportVisibility();
+}
+
+function handleBlur() {
+	chat.reportVisibility();
+}
+
 onMount(() => {
 	chat.init();
 	document.addEventListener("visibilitychange", handleVisibility);
+	window.addEventListener("focus", handleFocus);
+	window.addEventListener("blur", handleBlur);
 	document.addEventListener("dragenter", handleDragEnter);
 	document.addEventListener("dragover", handleDragOver);
 	document.addEventListener("dragleave", handleDragLeave);
@@ -146,6 +157,8 @@ onDestroy(() => {
 	chat.destroy();
 	if (typeof document !== "undefined") {
 		document.removeEventListener("visibilitychange", handleVisibility);
+		window.removeEventListener("focus", handleFocus);
+		window.removeEventListener("blur", handleBlur);
 		document.removeEventListener("dragenter", handleDragEnter);
 		document.removeEventListener("dragover", handleDragOver);
 		document.removeEventListener("dragleave", handleDragLeave);

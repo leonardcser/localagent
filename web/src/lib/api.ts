@@ -386,6 +386,18 @@ export async function getHistory(): Promise<HistoryResponse> {
 	return res.json();
 }
 
+export async function reportActive(
+	clientId: string,
+	active: boolean,
+): Promise<void> {
+	if (DEV) return;
+	fetch("/api/active", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ client_id: clientId, active }),
+	}).catch(() => {});
+}
+
 // --- Push API ---
 
 export async function getVAPIDPublicKey(): Promise<string | null> {
@@ -625,6 +637,7 @@ export function connectSSE(
 	onMessage: (msg: HistoryMessage) => void,
 	onActivity: (evt: ActivityEventData) => void,
 	onStatus: (processing: boolean) => void,
+	onClientId?: (id: string) => void,
 ): EventSource {
 	if (DEV) return mockSSE(onMessage, onActivity);
 
@@ -634,6 +647,9 @@ export function connectSSE(
 			const data = JSON.parse(e.data);
 			if (data.type === "status" && typeof data.processing === "boolean") {
 				onStatus(data.processing);
+				if (data.client_id && onClientId) {
+					onClientId(data.client_id);
+				}
 			} else if (data.type === "activity" && data.event) {
 				onActivity(data.event);
 			} else if (data.role && data.content) {

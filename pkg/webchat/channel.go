@@ -20,6 +20,7 @@ type OutgoingEvent struct {
 	Content    string        `json:"content,omitempty"`
 	Event      *ActivityData `json:"event,omitempty"`
 	Processing *bool         `json:"processing,omitempty"`
+	ClientID   string        `json:"client_id,omitempty"`
 }
 
 type ActivityData struct {
@@ -32,6 +33,7 @@ type ActivityData struct {
 type sseClient struct {
 	id     string
 	events chan OutgoingEvent
+	active bool
 }
 
 type WebChatChannel struct {
@@ -99,7 +101,7 @@ func (ch *WebChatChannel) Send(ctx context.Context, msg bus.OutboundMessage) err
 	}
 	ch.broadcast(event)
 
-	if ch.server != nil && ch.server.pushManager != nil {
+	if ch.server != nil && ch.server.pushManager != nil && !ch.hasActiveClient() {
 		body := msg.Content
 		if len(body) > 200 {
 			body = body[:200] + "..."
@@ -178,6 +180,28 @@ func (ch *WebChatChannel) unregisterClient(id string) {
 	}
 	ch.mu.Unlock()
 	logger.Info("webchat SSE client disconnected: %s", id)
+}
+
+func (ch *WebChatChannel) setClientActive(id string, active bool) bool {
+	ch.mu.Lock()
+	defer ch.mu.Unlock()
+	client, ok := ch.clients[id]
+	if !ok {
+		return false
+	}
+	client.active = active
+	return true
+}
+
+func (ch *WebChatChannel) hasActiveClient() bool {
+	ch.mu.RLock()
+	defer ch.mu.RUnlock()
+	for _, client := range ch.clients {
+		if client.active {
+			return true
+		}
+	}
+	return false
 }
 
 func (ch *WebChatChannel) broadcast(event OutgoingEvent) {

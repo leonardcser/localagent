@@ -2,6 +2,7 @@ import {
 	connectSSE,
 	getHistory,
 	getMockTimeline,
+	reportActive,
 	transcribeAudio,
 	type ActivityEventData,
 	type HistoryMessage,
@@ -34,6 +35,7 @@ function createChat() {
 	let recording = $state(false);
 	let pendingMedia = $state<string[]>([]);
 	let dragging = $state(false);
+	let clientId: string | null = null;
 	let eventSource: EventSource | null = null;
 	let mediaRecorder: MediaRecorder | null = null;
 	let mediaStream = $state<MediaStream | null>(null);
@@ -106,6 +108,10 @@ function createChat() {
 			},
 			(processing) => {
 				loading = processing;
+			},
+			(id) => {
+				clientId = id;
+				reportActive(id, document.visibilityState === "visible");
 			},
 		);
 	}
@@ -237,6 +243,12 @@ function createChat() {
 		}
 	}
 
+	function reportVisibility() {
+		if (clientId) {
+			reportActive(clientId, document.visibilityState === "visible");
+		}
+	}
+
 	function destroy() {
 		eventSource?.close();
 	}
@@ -274,6 +286,7 @@ function createChat() {
 		},
 		init,
 		sync,
+		reportVisibility,
 		send,
 		toggleRecording,
 		recordAndSend,
