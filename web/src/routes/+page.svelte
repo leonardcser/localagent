@@ -129,9 +129,6 @@ function handleDrop(e: DragEvent) {
 
 function handleVisibility() {
 	chat.reportVisibility();
-	if (document.visibilityState === "visible") {
-		chat.sync();
-	}
 }
 
 function handleFocus() {
@@ -177,7 +174,13 @@ onDestroy(() => {
 			{#if group.kind === "message"}
 				<ChatMessage role={group.role} content={group.content} timestamp={group.timestamp} media={group.media} queued={group.queued} />
 			{:else}
-				<ActivityGroup items={group.items} />
+				<ActivityGroup
+				items={group.items}
+				expanded={chat.isGroupExpanded(group.items[0].timestamp)}
+				onToggle={() => chat.toggleGroupExpanded(group.items[0].timestamp)}
+				isItemExpanded={chat.isGroupExpanded}
+				toggleItemExpanded={chat.toggleGroupExpanded}
+			/>
 			{/if}
 		{/each}
 		{#if chat.loading}

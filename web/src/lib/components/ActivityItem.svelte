@@ -7,15 +7,17 @@ let {
 	message,
 	detail,
 	onclick,
+	expanded = false,
+	onToggleExpand,
 }: {
 	event_type: string;
 	timestamp: string;
 	message: string;
 	detail?: Record<string, unknown>;
 	onclick?: () => void;
+	expanded?: boolean;
+	onToggleExpand?: () => void;
 } = $props();
-
-let expanded = $state(false);
 
 function isToolError(): boolean {
 	return event_type === "tool_result" && detail?.status === "error";
@@ -46,7 +48,7 @@ function label(t: string): string {
 
 <button
 	class="flex w-full items-baseline py-px text-left cursor-pointer bg-transparent border-none font-[inherit]"
-	onclick={() => { if (onclick) { onclick(); } else if (detail) { expanded = !expanded; } }}
+	onclick={() => { if (onclick) { onclick(); } else if (detail && onToggleExpand) { onToggleExpand(); } }}
 >
 	<span class={cn("text-[10px] font-bold font-mono tracking-wide shrink-0 w-12", labelColor(event_type))}>{label(event_type)}</span>
 	<span class={cn("text-[11px] leading-4.5 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap", isToolError() ? "text-error/80" : "text-text-muted")} title={message}>

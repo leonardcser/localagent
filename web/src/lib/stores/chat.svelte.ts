@@ -35,6 +35,7 @@ function createChat() {
 	let recording = $state(false);
 	let pendingMedia = $state<string[]>([]);
 	let dragging = $state(false);
+	let expandedGroups = $state<Record<string, boolean>>({});
 	let clientId: string | null = null;
 	let eventSource: EventSource | null = null;
 	let mediaRecorder: MediaRecorder | null = null;
@@ -112,6 +113,9 @@ function createChat() {
 			(id) => {
 				clientId = id;
 				reportActive(id, document.visibilityState === "visible");
+			},
+			() => {
+				sync();
 			},
 		);
 	}
@@ -249,6 +253,14 @@ function createChat() {
 		}
 	}
 
+	function isGroupExpanded(key: string): boolean {
+		return !!expandedGroups[key];
+	}
+
+	function toggleGroupExpanded(key: string) {
+		expandedGroups[key] = !expandedGroups[key];
+	}
+
 	function destroy() {
 		eventSource?.close();
 	}
@@ -285,8 +297,9 @@ function createChat() {
 			dragging = v;
 		},
 		init,
-		sync,
 		reportVisibility,
+		isGroupExpanded,
+		toggleGroupExpanded,
 		send,
 		toggleRecording,
 		recordAndSend,

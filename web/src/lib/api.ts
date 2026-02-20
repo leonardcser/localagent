@@ -638,10 +638,18 @@ export function connectSSE(
 	onActivity: (evt: ActivityEventData) => void,
 	onStatus: (processing: boolean) => void,
 	onClientId?: (id: string) => void,
+	onReconnect?: () => void,
 ): EventSource {
 	if (DEV) return mockSSE(onMessage, onActivity);
 
 	const es = new EventSource("/api/events");
+	let connected = false;
+	es.onopen = () => {
+		if (connected && onReconnect) {
+			onReconnect();
+		}
+		connected = true;
+	};
 	es.onmessage = (e) => {
 		try {
 			const data = JSON.parse(e.data);
