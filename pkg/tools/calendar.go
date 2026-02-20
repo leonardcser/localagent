@@ -40,9 +40,10 @@ func (t *CalendarTool) Parameters() map[string]any {
 				"description": "The action to perform: list_calendars, list_events, get_event, create_event, update_event, delete_event",
 				"enum":        []string{"list_calendars", "list_events", "get_event", "create_event", "update_event", "delete_event"},
 			},
-			"calendar": map[string]any{
-				"type":        "string",
-				"description": "Calendar name to target (defaults to the first calendar found)",
+			"calendars": map[string]any{
+				"type":        "array",
+				"items":       map[string]any{"type": "string"},
+				"description": "Calendar name(s) to target. Accepts one or more names. For list_events, queries all specified calendars. For create_event, uses the first. Defaults to the first calendar found if omitted.",
 			},
 			"start_date": map[string]any{
 				"type":        "string",
@@ -146,28 +147,64 @@ func (t *CalendarTool) discoverCalendars(ctx context.Context, client *caldav.Cli
 	return calendars, nil
 }
 
-func (t *CalendarTool) findCalendarByName(ctx context.Context, client *caldav.Client, name string) (*caldav.Calendar, error) {
-	calendars, err := t.discoverCalendars(ctx, client)
+func (t *CalendarTool) resolveCalendars(ctx context.Context, client *caldav.Client, args map[string]any) ([]caldav.Calendar, error) {
+	all, err := t.discoverCalendars(ctx, client)
 	if err != nil {
 		return nil, err
 	}
-
-	if len(calendars) == 0 {
+	if len(all) == 0 {
 		return nil, fmt.Errorf("no calendars found")
 	}
 
-	if name == "" {
-		return &calendars[0], nil
+	names := parseCalendarNames(args)
+	if len(names) == 0 {
+		return []caldav.Calendar{all[0]}, nil
 	}
 
-	nameLower := strings.ToLower(name)
-	for _, cal := range calendars {
-		if strings.ToLower(cal.Name) == nameLower {
-			return &cal, nil
+	byName := make(map[string]caldav.Calendar, len(all))
+	for _, cal := range all {
+		byName[strings.ToLower(cal.Name)] = cal
+	}
+
+	var result []caldav.Calendar
+	var missing []string
+	for _, name := range names {
+		if cal, ok := byName[strings.ToLower(name)]; ok {
+			result = append(result, cal)
+		} else {
+			missing = append(missing, name)
 		}
 	}
 
-	return nil, fmt.Errorf("calendar %q not found", name)
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("calendar(s) not found: %s", strings.Join(missing, ", "))
+	}
+
+	return result, nil
+}
+
+func parseCalendarNames(args map[string]any) []string {
+	raw, ok := args["calendars"]
+	if !ok {
+		return nil
+	}
+	switch v := raw.(type) {
+	case []any:
+		names := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok && s != "" {
+				names = append(names, s)
+			}
+		}
+		return names
+	case []string:
+		return v
+	case string:
+		if v != "" {
+			return []string{v}
+		}
+	}
+	return nil
 }
 
 func (t *CalendarTool) listCalendars(ctx context.Context, client *caldav.Client) *ToolResult {
@@ -197,8 +234,7 @@ func (t *CalendarTool) listCalendars(ctx context.Context, client *caldav.Client)
 }
 
 func (t *CalendarTool) listEvents(ctx context.Context, client *caldav.Client, args map[string]any) *ToolResult {
-	calName, _ := args["calendar"].(string)
-	cal, err := t.findCalendarByName(ctx, client, calName)
+	calendars, err := t.resolveCalendars(ctx, client, args)
 	if err != nil {
 		return ErrorResult(err.Error())
 	}
@@ -244,28 +280,42 @@ func (t *CalendarTool) listEvents(ctx context.Context, client *caldav.Client, ar
 		},
 	}
 
-	objects, err := client.QueryCalendar(ctx, cal.Path, query)
-	if err != nil {
-		return ErrorResult(fmt.Sprintf("failed to query events: %v", err))
-	}
-
-	if len(objects) == 0 {
-		return SilentResult(fmt.Sprintf("No events found in %q from %s to %s.", cal.Name, start.Format("2006-01-02"), end.Format("2006-01-02")))
-	}
-
 	var b strings.Builder
-	fmt.Fprintf(&b, "Events in %q (%s to %s):\n\n", cal.Name, start.Format("2006-01-02"), end.Format("2006-01-02"))
+	totalEvents := 0
 
-	for _, obj := range objects {
-		if obj.Data == nil {
+	for _, cal := range calendars {
+		objects, err := client.QueryCalendar(ctx, cal.Path, query)
+		if err != nil {
+			fmt.Fprintf(&b, "Error querying %q: %v\n\n", cal.Name, err)
 			continue
 		}
-		for _, event := range obj.Data.Events() {
-			formatEventSummary(&b, obj.Path, &event)
+
+		if len(objects) == 0 {
+			continue
+		}
+
+		fmt.Fprintf(&b, "## %s\n\n", cal.Name)
+		for _, obj := range objects {
+			if obj.Data == nil {
+				continue
+			}
+			for _, event := range obj.Data.Events() {
+				formatEventSummary(&b, obj.Path, &event)
+				totalEvents++
+			}
 		}
 	}
 
-	return SilentResult(b.String())
+	if totalEvents == 0 {
+		calNames := make([]string, len(calendars))
+		for i, c := range calendars {
+			calNames[i] = c.Name
+		}
+		return SilentResult(fmt.Sprintf("No events found in %s from %s to %s.", strings.Join(calNames, ", "), start.Format("2006-01-02"), end.Format("2006-01-02")))
+	}
+
+	header := fmt.Sprintf("Events from %s to %s:\n\n", start.Format("2006-01-02"), end.Format("2006-01-02"))
+	return SilentResult(header + b.String())
 }
 
 func (t *CalendarTool) getEvent(ctx context.Context, client *caldav.Client, args map[string]any) *ToolResult {
@@ -314,12 +364,12 @@ func (t *CalendarTool) createEvent(ctx context.Context, client *caldav.Client, a
 	allDay, _ := args["all_day"].(bool)
 	location, _ := args["location"].(string)
 	desc, _ := args["description"].(string)
-	calName, _ := args["calendar"].(string)
 
-	cal, err := t.findCalendarByName(ctx, client, calName)
+	calendars, err := t.resolveCalendars(ctx, client, args)
 	if err != nil {
 		return ErrorResult(err.Error())
 	}
+	cal := &calendars[0]
 
 	uid := newUID()
 
