@@ -426,6 +426,152 @@ export async function subscribePush(sub: PushSubscription): Promise<boolean> {
 	}
 }
 
+// --- Task API ---
+
+export interface Task {
+	id: string;
+	title: string;
+	description?: string;
+	status: string;
+	priority?: string;
+	due?: string;
+	recurrence?: string;
+	tags?: string[];
+	createdAtMs: number;
+	updatedAtMs: number;
+	doneAtMs?: number;
+}
+
+const mockTasks: Task[] = [
+	{
+		id: "mock-1",
+		title: "Review pull request",
+		description: "Check the new authentication changes",
+		status: "todo",
+		priority: "high",
+		due: "2026-02-21",
+		tags: ["work", "code"],
+		createdAtMs: Date.now() - 86400000,
+		updatedAtMs: Date.now() - 86400000,
+	},
+	{
+		id: "mock-2",
+		title: "Write documentation",
+		status: "doing",
+		priority: "medium",
+		tags: ["work"],
+		createdAtMs: Date.now() - 172800000,
+		updatedAtMs: Date.now() - 3600000,
+	},
+	{
+		id: "mock-3",
+		title: "Buy groceries",
+		status: "todo",
+		priority: "low",
+		due: "2026-02-20",
+		tags: ["personal"],
+		createdAtMs: Date.now() - 259200000,
+		updatedAtMs: Date.now() - 259200000,
+	},
+	{
+		id: "mock-4",
+		title: "Deploy v2.0",
+		status: "done",
+		priority: "high",
+		tags: ["work", "code"],
+		createdAtMs: Date.now() - 345600000,
+		updatedAtMs: Date.now() - 172800000,
+		doneAtMs: Date.now() - 172800000,
+	},
+];
+
+export async function getTasks(status?: string, tag?: string): Promise<Task[]> {
+	if (DEV)
+		return mockTasks.filter(
+			(t) =>
+				(!status || t.status === status) && (!tag || t.tags?.includes(tag)),
+		);
+	try {
+		const params = new URLSearchParams();
+		if (status) params.set("status", status);
+		if (tag) params.set("tag", tag);
+		const qs = params.toString();
+		const res = await fetch(`/api/tasks${qs ? `?${qs}` : ""}`);
+		if (!res.ok) return [];
+		const data = await res.json();
+		return data.tasks || [];
+	} catch {
+		return [];
+	}
+}
+
+export async function createTask(task: Partial<Task>): Promise<Task | null> {
+	if (DEV) {
+		const t: Task = {
+			id: `mock-${Date.now()}`,
+			title: task.title || "",
+			description: task.description,
+			status: task.status || "todo",
+			priority: task.priority,
+			due: task.due,
+			tags: task.tags,
+			createdAtMs: Date.now(),
+			updatedAtMs: Date.now(),
+		};
+		return t;
+	}
+	try {
+		const res = await fetch("/api/tasks", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(task),
+		});
+		if (!res.ok) return null;
+		return res.json();
+	} catch {
+		return null;
+	}
+}
+
+export async function updateTask(
+	id: string,
+	patch: Partial<Task>,
+): Promise<Task | null> {
+	if (DEV) return null;
+	try {
+		const res = await fetch(`/api/tasks/${id}`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(patch),
+		});
+		if (!res.ok) return null;
+		return res.json();
+	} catch {
+		return null;
+	}
+}
+
+export async function completeTask(id: string): Promise<Task | null> {
+	if (DEV) return null;
+	try {
+		const res = await fetch(`/api/tasks/${id}/done`, { method: "POST" });
+		if (!res.ok) return null;
+		return res.json();
+	} catch {
+		return null;
+	}
+}
+
+export async function deleteTask(id: string): Promise<boolean> {
+	if (DEV) return true;
+	try {
+		const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+		return res.ok;
+	} catch {
+		return false;
+	}
+}
+
 // --- Image API ---
 
 export interface ImageJob {

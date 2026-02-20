@@ -5,6 +5,7 @@ import { page } from "$app/state";
 import { Icon } from "svelte-icons-pack";
 import {
 	FiMessageCircle,
+	FiCheckSquare,
 	FiImage,
 	FiMenu,
 	FiBell,
@@ -37,6 +38,7 @@ onMount(() => {
 
 const navItems = [
 	{ href: "/", icon: FiMessageCircle, label: "Chat" },
+	{ href: "/tasks", icon: FiCheckSquare, label: "Tasks" },
 	{ href: "/images", icon: FiImage, label: "Images" },
 ];
 

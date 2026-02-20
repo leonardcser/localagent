@@ -21,7 +21,8 @@ CONTAINER_IMAGE?=localagent
 CONTAINER_TAG?=$(VERSION)
 CONTAINER_NAME?=localagent-gateway
 CONFIG_FILE?=$(HOME)/.localagent/config.json
-WORKSPACE_DIR?=$(CURDIR)/.localagent/workspace
+DATA_DIR?=$(CURDIR)/.localagent
+WORKSPACE_DIR?=$(DATA_DIR)/workspace
 TZ?=$(shell cat /etc/timezone 2>/dev/null || readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||' || echo UTC)
 CA_CERT?=
 ENV_PASS?=
@@ -136,7 +137,7 @@ container-gateway:
 		$(foreach v,$(subst $(comma), ,$(ENV_PASS)),-e $(v)) \
 		$(if $(CA_CERT),-v $(CA_CERT):/usr/local/share/ca-certificates/custom-ca.crt:ro$(comma)Z) \
 		-v $(CONFIG_FILE):/home/localagent/.localagent/config.json:ro,Z \
-		-v $(WORKSPACE_DIR):/home/localagent/.localagent/workspace:Z \
+		-v $(DATA_DIR):/home/localagent/.localagent:Z \
 		-p 18790:18790 \
 		-p 18791:18791 \
 		$(CONTAINER_IMAGE):latest gateway
@@ -165,7 +166,8 @@ help:
 	@echo "  CONTAINER_ENGINE   Container runtime (default: podman)"
 	@echo "  CONTAINER_IMAGE    Image name (default: localagent)"
 	@echo "  CONFIG_FILE        Config file path (default: ~/.localagent/config.json)"
-	@echo "  WORKSPACE_DIR      Workspace directory (default: ./.localagent/workspace)"
+	@echo "  DATA_DIR           Data directory (default: ./.localagent)"
+	@echo "  WORKSPACE_DIR      Workspace directory (default: DATA_DIR/workspace)"
 	@echo ""
 	@echo "Current Configuration:"
 	@echo "  Platform: $(PLATFORM)/$(ARCH)"

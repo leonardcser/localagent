@@ -11,7 +11,6 @@ type MessageTool struct {
 	bus            *bus.MessageBus
 	defaultChannel string
 	defaultChatID  string
-	sentInRound    bool
 }
 
 func NewMessageTool(msgBus *bus.MessageBus) *MessageTool {
@@ -42,11 +41,6 @@ func (t *MessageTool) Parameters() map[string]any {
 func (t *MessageTool) SetContext(channel, chatID string) {
 	t.defaultChannel = channel
 	t.defaultChatID = chatID
-	t.sentInRound = false
-}
-
-func (t *MessageTool) HasSentInRound() bool {
-	return t.sentInRound
 }
 
 func (t *MessageTool) Execute(ctx context.Context, args map[string]any) *ToolResult {
@@ -68,7 +62,6 @@ func (t *MessageTool) Execute(ctx context.Context, args map[string]any) *ToolRes
 		Content: content,
 	})
 
-	t.sentInRound = true
 	return &ToolResult{
 		ForLLM: fmt.Sprintf("Message sent to %s:%s", channel, chatID),
 		Silent: true,

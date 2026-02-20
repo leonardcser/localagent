@@ -12,6 +12,7 @@ import (
 	"localagent/pkg/config"
 	"localagent/pkg/logger"
 	"localagent/pkg/session"
+	"localagent/pkg/todo"
 )
 
 type OutgoingEvent struct {
@@ -38,15 +39,16 @@ type sseClient struct {
 
 type WebChatChannel struct {
 	*channels.BaseChannel
-	config     *config.WebChatConfig
-	server     *Server
-	sessions   *session.SessionManager
-	dataDir    string
-	stt        config.STTConfig
-	image      config.ImageConfig
-	clients    map[string]*sseClient
-	mu         sync.RWMutex
-	processing atomic.Bool
+	config      *config.WebChatConfig
+	server      *Server
+	sessions    *session.SessionManager
+	todoService *todo.TodoService
+	dataDir     string
+	stt         config.STTConfig
+	image       config.ImageConfig
+	clients     map[string]*sseClient
+	mu          sync.RWMutex
+	processing  atomic.Bool
 }
 
 func NewWebChatChannel(cfg *config.WebChatConfig, msgBus *bus.MessageBus, dataDir string, stt config.STTConfig, image config.ImageConfig) *WebChatChannel {
@@ -64,6 +66,10 @@ func NewWebChatChannel(cfg *config.WebChatConfig, msgBus *bus.MessageBus, dataDi
 
 func (ch *WebChatChannel) SetSessionManager(sm *session.SessionManager) {
 	ch.sessions = sm
+}
+
+func (ch *WebChatChannel) SetTodoService(ts *todo.TodoService) {
+	ch.todoService = ts
 }
 
 func (ch *WebChatChannel) Start(ctx context.Context) error {

@@ -42,6 +42,7 @@ type AgentLoop struct {
 	running        atomic.Bool
 	summarizing    sync.Map // Tracks which sessions are currently being summarized
 	stopCleanup    chan struct{}
+	todoService    *todo.TodoService
 }
 
 // processOptions configures how a message is processed
@@ -61,7 +62,7 @@ type processOptions struct {
 
 // createToolRegistry creates a tool registry with common tools.
 // This is shared between main agent and subagents.
-func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.MessageBus) *tools.ToolRegistry {
+func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.MessageBus, todoService *todo.TodoService) *tools.ToolRegistry {
 	registry := tools.NewToolRegistry()
 
 	// File system tools
@@ -84,9 +85,6 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 	registry.Register(tools.NewCurrencyTool(yf))
 
 	// Tasks tool
-	todoStorePath := filepath.Join(workspace, "todo", "tasks.json")
-	todoService := todo.NewTodoService(todoStorePath)
-	todoService.Load()
 	registry.Register(tools.NewTodoTool(todoService))
 
 	registry.Register(tools.NewMessageTool(msgBus))
@@ -115,12 +113,17 @@ func NewAgentLoop(cfg *config.Config, msgBus *bus.MessageBus, provider providers
 	os.MkdirAll(workspace, 0755)
 	os.MkdirAll(filepath.Join(workspace, "media"), 0755)
 
+	// Create shared TodoService
+	todoStorePath := filepath.Join(workspace, "todo", "tasks.json")
+	todoService := todo.NewTodoService(todoStorePath)
+	todoService.Load()
+
 	// Create tool registry for main agent
-	toolsRegistry := createToolRegistry(workspace, cfg, msgBus)
+	toolsRegistry := createToolRegistry(workspace, cfg, msgBus, todoService)
 
 	// Create subagent manager with its own tool registry
 	subagentManager := tools.NewSubagentManager(provider, cfg.Agents.Defaults.Model, workspace, msgBus)
-	subagentTools := createToolRegistry(workspace, cfg, msgBus)
+	subagentTools := createToolRegistry(workspace, cfg, msgBus, todoService)
 	// Subagent doesn't need spawn/subagent tools to avoid recursion
 	subagentManager.SetTools(subagentTools)
 
@@ -177,11 +180,16 @@ func NewAgentLoop(cfg *config.Config, msgBus *bus.MessageBus, provider providers
 		activity:       activity.NopEmitter{},
 		summarizing:    sync.Map{},
 		stopCleanup:    stopCleanup,
+		todoService:    todoService,
 	}
 }
 
 func (al *AgentLoop) SetActivityEmitter(e activity.Emitter) {
 	al.activity = e
+}
+
+func (al *AgentLoop) GetTodoService() *todo.TodoService {
+	return al.todoService
 }
 
 // emitActivity broadcasts an activity event via SSE and persists it to the session.
@@ -215,22 +223,11 @@ func (al *AgentLoop) Run(ctx context.Context) error {
 			}
 
 			if response != "" {
-				// Check if the message tool already sent a response during this round.
-				// If so, skip publishing to avoid duplicate messages to the user.
-				alreadySent := false
-				if tool, ok := al.tools.Get("message"); ok {
-					if mt, ok := tool.(*tools.MessageTool); ok {
-						alreadySent = mt.HasSentInRound()
-					}
-				}
-
-				if !alreadySent {
-					al.bus.PublishOutbound(bus.OutboundMessage{
-						Channel: msg.Channel,
-						ChatID:  msg.ChatID,
-						Content: response,
-					})
-				}
+				al.bus.PublishOutbound(bus.OutboundMessage{
+					Channel: msg.Channel,
+					ChatID:  msg.ChatID,
+					Content: response,
+				})
 			}
 		}
 	}

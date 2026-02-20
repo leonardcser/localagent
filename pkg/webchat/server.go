@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"localagent/pkg/logger"
+	"localagent/pkg/todo"
 
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
@@ -24,6 +25,7 @@ type Server struct {
 	mediaDir    string
 	imageJobs   *ImageJobStore
 	pushManager *PushManager
+	todoService *todo.TodoService
 }
 
 func NewServer(addr string, channel *WebChatChannel) *Server {
@@ -51,6 +53,7 @@ func NewServer(addr string, channel *WebChatChannel) *Server {
 		mediaDir:    filepath.Join(webchatDir, "media"),
 		imageJobs:   NewImageJobStore(filepath.Join(webchatDir, "images")),
 		pushManager: pm,
+		todoService: channel.todoService,
 	}
 
 	s.setupRoutes()
@@ -80,6 +83,12 @@ func (s *Server) setupRoutes() {
 
 	s.echo.GET("/api/push/vapid-public-key", s.handleVAPIDPublicKey)
 	s.echo.POST("/api/push/subscribe", s.handlePushSubscribe)
+
+	s.echo.GET("/api/tasks", s.handleTaskList)
+	s.echo.POST("/api/tasks", s.handleTaskCreate)
+	s.echo.PUT("/api/tasks/:id", s.handleTaskUpdate)
+	s.echo.POST("/api/tasks/:id/done", s.handleTaskDone)
+	s.echo.DELETE("/api/tasks/:id", s.handleTaskDelete)
 
 	s.echo.GET("/*", s.handleSPA)
 }

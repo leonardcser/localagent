@@ -85,32 +85,6 @@ func TestMessageTool_Execute_NoContext(t *testing.T) {
 	}
 }
 
-func TestMessageTool_HasSentInRound(t *testing.T) {
-	msgBus := bus.NewMessageBus()
-	tool := NewMessageTool(msgBus)
-	tool.SetContext("web", "default")
-
-	if tool.HasSentInRound() {
-		t.Error("Expected HasSentInRound=false before sending")
-	}
-
-	ctx := context.Background()
-	tool.Execute(ctx, map[string]any{"content": "test"})
-
-	if !tool.HasSentInRound() {
-		t.Error("Expected HasSentInRound=true after sending")
-	}
-
-	// SetContext resets the flag
-	tool.SetContext("web", "default")
-	if tool.HasSentInRound() {
-		t.Error("Expected HasSentInRound=false after SetContext")
-	}
-
-	// Drain the bus
-	msgBus.SubscribeOutbound(ctx)
-}
-
 func TestMessageTool_Name(t *testing.T) {
 	tool := NewMessageTool(bus.NewMessageBus())
 	if tool.Name() != "message" {

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"localagent/pkg/logger"
+	"localagent/pkg/todo"
 	"localagent/pkg/tools"
 	"localagent/pkg/utils"
 
@@ -282,6 +283,85 @@ func (s *Server) handleVAPIDPublicKey(c *echo.Context) error {
 		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "push not available"})
 	}
 	return c.JSON(http.StatusOK, map[string]string{"key": s.pushManager.VAPIDPublicKey()})
+}
+
+// --- Task handlers ---
+
+func (s *Server) handleTaskList(c *echo.Context) error {
+	if s.todoService == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "tasks not available"})
+	}
+
+	status := c.QueryParam("status")
+	tag := c.QueryParam("tag")
+	tasks := s.todoService.ListTasks(status, tag)
+	if tasks == nil {
+		tasks = []todo.Task{}
+	}
+	return c.JSON(http.StatusOK, map[string]any{"tasks": tasks})
+}
+
+func (s *Server) handleTaskCreate(c *echo.Context) error {
+	if s.todoService == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "tasks not available"})
+	}
+
+	var task todo.Task
+	if err := c.Bind(&task); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+	if task.Title == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "title is required"})
+	}
+
+	created, err := s.todoService.AddTask(task)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, created)
+}
+
+func (s *Server) handleTaskUpdate(c *echo.Context) error {
+	if s.todoService == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "tasks not available"})
+	}
+
+	id := c.Param("id")
+	var patch map[string]any
+	if err := c.Bind(&patch); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+
+	task, err := s.todoService.UpdateTask(id, patch)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, task)
+}
+
+func (s *Server) handleTaskDone(c *echo.Context) error {
+	if s.todoService == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "tasks not available"})
+	}
+
+	id := c.Param("id")
+	task, err := s.todoService.CompleteTask(id)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, task)
+}
+
+func (s *Server) handleTaskDelete(c *echo.Context) error {
+	if s.todoService == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "tasks not available"})
+	}
+
+	id := c.Param("id")
+	if s.todoService.RemoveTask(id) {
+		return c.JSON(http.StatusOK, map[string]bool{"ok": true})
+	}
+	return c.JSON(http.StatusNotFound, map[string]string{"error": "task not found"})
 }
 
 func (s *Server) handlePushSubscribe(c *echo.Context) error {
