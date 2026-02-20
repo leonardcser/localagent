@@ -46,16 +46,26 @@ function isActive(href: string): boolean {
 	if (href === "/") return page.url.pathname === "/";
 	return page.url.pathname.startsWith(href);
 }
+
+let pageTitle = $derived(
+	navItems.find((item) => isActive(item.href))?.label ?? "Chat",
+);
 </script>
 
-<div class="fixed inset-0 flex">
-	<!-- Mobile hamburger button -->
-	<button
-		class="fixed left-2 top-[max(env(safe-area-inset-top,0px),6px)] z-30 flex h-9 w-9 items-center justify-center rounded-md text-text-secondary md:hidden"
-		onclick={() => (menuOpen = !menuOpen)}
+<div class="fixed inset-0 flex flex-col md:flex-row">
+	<!-- Mobile top bar -->
+	<header
+		class="z-30 flex shrink-0 items-center border-b border-border bg-chrome backdrop-blur-md md:hidden"
+		style="padding-top: env(safe-area-inset-top, 0px)"
 	>
-		<Icon src={FiMenu} size="20" />
-	</button>
+		<button
+			class="flex h-10 w-10 items-center justify-center text-text-secondary"
+			onclick={() => (menuOpen = !menuOpen)}
+		>
+			<Icon src={FiMenu} size="20" />
+		</button>
+		<span class="text-[13px] font-medium text-text-primary">{pageTitle}</span>
+	</header>
 
 	<!-- Mobile backdrop -->
 	{#if menuOpen}
@@ -114,7 +124,7 @@ function isActive(href: string): boolean {
 			{/if}
 		</div>
 	</nav>
-	<main class="flex-1 overflow-hidden pt-[env(safe-area-inset-top,0px)]">
+	<main class="flex-1 overflow-hidden md:pt-[env(safe-area-inset-top,0px)]">
 		{@render children()}
 	</main>
 </div>
