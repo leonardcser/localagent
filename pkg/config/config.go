@@ -113,12 +113,26 @@ type CronToolsConfig struct {
 	ExecTimeoutMinutes int `json:"exec_timeout_minutes"`
 }
 
+type CalendarConfig struct {
+	URL         string `json:"url"`
+	Username    string `json:"username"`
+	PasswordEnv string `json:"password_env"`
+}
+
+func (c CalendarConfig) ResolvePassword() string {
+	if c.PasswordEnv == "" {
+		return ""
+	}
+	return os.Getenv(c.PasswordEnv)
+}
+
 type ToolsConfig struct {
 	PDF           PDFConfig           `json:"pdf"`
 	STT           STTConfig           `json:"stt"`
 	Image         ImageConfig         `json:"image"`
 	Cron          CronToolsConfig     `json:"cron"`
 	HomeAssistant HomeAssistantConfig `json:"home_assistant"`
+	Calendar      CalendarConfig      `json:"calendar"`
 }
 
 func DefaultConfig() *Config {
@@ -204,6 +218,7 @@ func (c *Config) ServiceDomains() []string {
 		c.Tools.STT.URL,
 		c.Tools.Image.URL,
 		c.Tools.HomeAssistant.URL,
+		c.Tools.Calendar.URL,
 	} {
 		if rawURL == "" {
 			continue

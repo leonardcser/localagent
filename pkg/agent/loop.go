@@ -96,6 +96,10 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 		registry.Register(tools.NewLocationTool(cfg.Tools.HomeAssistant.URL, cfg.Tools.HomeAssistant.ResolveAPIKey(), cfg.Tools.HomeAssistant.LocationUser))
 	}
 
+	if cfg.Tools.Calendar.URL != "" {
+		registry.Register(tools.NewCalendarTool(cfg.Tools.Calendar.URL, cfg.Tools.Calendar.Username, cfg.Tools.Calendar.ResolvePassword()))
+	}
+
 	return registry
 }
 
