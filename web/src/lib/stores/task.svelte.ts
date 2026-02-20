@@ -14,6 +14,7 @@ interface TaskPrefs {
 	filterStatus: string;
 	filterTag: string;
 	filterDue: string;
+	selectedId: string;
 }
 
 function loadPrefs(): TaskPrefs {
@@ -23,7 +24,13 @@ function loadPrefs(): TaskPrefs {
 	} catch {
 		// ignore
 	}
-	return { view: "list", filterStatus: "", filterTag: "", filterDue: "" };
+	return {
+		view: "list",
+		filterStatus: "",
+		filterTag: "",
+		filterDue: "",
+		selectedId: "",
+	};
 }
 
 function savePrefs(prefs: TaskPrefs) {
@@ -43,6 +50,7 @@ function createTaskStore() {
 	let filterTag = $state(initialPrefs.filterTag);
 	let filterDue = $state(initialPrefs.filterDue);
 	let view = $state<"list" | "kanban">(initialPrefs.view);
+	let selectedId = $state(initialPrefs.selectedId);
 
 	function persistPrefs() {
 		savePrefs({
@@ -50,6 +58,7 @@ function createTaskStore() {
 			filterStatus,
 			filterTag,
 			filterDue,
+			selectedId,
 		});
 	}
 
@@ -191,6 +200,13 @@ function createTaskStore() {
 		},
 		get kanbanColumns() {
 			return kanbanColumns;
+		},
+		get selectedId() {
+			return selectedId;
+		},
+		set selectedId(v: string) {
+			selectedId = v;
+			persistPrefs();
 		},
 		load,
 		add,

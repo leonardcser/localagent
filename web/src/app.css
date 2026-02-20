@@ -10,7 +10,7 @@
 	--color-chrome: rgba(0, 0, 0, 0.8);
 
 	/* Overlays (transparency scale) */
-	--color-overlay-subtle: rgba(255, 255, 255, 0.04);
+	--color-overlay-subtle: rgba(255, 255, 255, 0.06);
 	--color-overlay-light: rgba(255, 255, 255, 0.06);
 	--color-overlay-medium: rgba(255, 255, 255, 0.12);
 	--color-overlay-strong: rgba(255, 255, 255, 0.4);

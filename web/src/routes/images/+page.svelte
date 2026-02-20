@@ -14,6 +14,7 @@ import {
 	FiUpload,
 	FiArrowUp,
 	FiPower,
+	FiPlus,
 } from "svelte-icons-pack/fi";
 
 let lightboxJob = $state<{ jobId: string; index: number } | null>(null);
@@ -23,6 +24,7 @@ let lightboxUrl = $derived(
 );
 let dragOver = $state(false);
 let fileInput = $state<HTMLInputElement>(null!);
+let controlsOpen = $state(false);
 
 function openLightbox(jobId: string, index: number) {
 	lightboxJob = { jobId, index };
@@ -36,6 +38,7 @@ function handleKeydown(e: KeyboardEvent) {
 	if (e.key === "Escape") {
 		closeLightbox();
 		upscaleMenu = null;
+		controlsOpen = false;
 	}
 	if (!lightboxJob) return;
 	const job = imageStore.jobs.find((j) => j.id === lightboxJob!.jobId);
@@ -54,6 +57,7 @@ function handleKeydown(e: KeyboardEvent) {
 function handleSubmit(e: SubmitEvent) {
 	e.preventDefault();
 	imageStore.generate();
+	controlsOpen = false;
 }
 
 function handleDrop(e: DragEvent) {
@@ -94,13 +98,249 @@ onDestroy(() => {
 });
 
 let reversedJobs = $derived([...imageStore.jobs].reverse());
+
+let modeLabel = $derived(
+	imageStore.isUpscaleModel
+		? "Upscale"
+		: imageStore.isEditModel
+			? "Edit"
+			: "Generate",
+);
 </script>
 
-<div class="flex h-full">
-	<!-- Controls Panel -->
-	<div class="flex w-72 shrink-0 flex-col border-r border-border bg-bg-secondary">
+{#snippet controlsForm()}
+	<form onsubmit={handleSubmit} class="flex flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4">
+		<!-- Model -->
+		<label class="flex flex-col gap-1">
+			<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Model</span>
+			<select
+				bind:value={imageStore.selectedModel}
+				class="rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary outline-none focus:border-accent"
+			>
+				{#if imageStore.modelGroups.generate.length > 0}
+					<optgroup label="Generate">
+						{#each imageStore.modelGroups.generate as model}
+							<option value={model}>{model}</option>
+						{/each}
+					</optgroup>
+				{/if}
+				{#if imageStore.modelGroups.edit.length > 0}
+					<optgroup label="Edit">
+						{#each imageStore.modelGroups.edit as model}
+							<option value={model}>{model}</option>
+						{/each}
+					</optgroup>
+				{/if}
+				{#if imageStore.modelGroups.upscale.length > 0}
+					<optgroup label="Upscale">
+						{#each imageStore.modelGroups.upscale as model}
+							<option value={model}>{model}</option>
+						{/each}
+					</optgroup>
+				{/if}
+				{#if imageStore.models.length === 0}
+					<option value="" disabled>No models available</option>
+				{/if}
+			</select>
+		</label>
+
+		{#if !imageStore.isUpscaleModel}
+			<!-- Prompt -->
+			<label class="flex flex-col gap-1">
+				<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Prompt</span>
+				<textarea
+					bind:value={imageStore.prompt}
+					rows="3"
+					placeholder={imageStore.isEditModel ? "Describe the edit you want to make..." : "Describe the image you want to create..."}
+					class="resize-none rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
+				></textarea>
+			</label>
+
+			<!-- Negative Prompt -->
+			<label class="flex flex-col gap-1">
+				<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Negative Prompt</span>
+				<textarea
+					bind:value={imageStore.negativePrompt}
+					rows="2"
+					placeholder="What to avoid..."
+					class="resize-none rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
+				></textarea>
+			</label>
+		{/if}
+
+		{#if imageStore.isEditModel || imageStore.isUpscaleModel}
+			<!-- Source Images Drop Zone -->
+			<div class="flex flex-col gap-1">
+				<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Source Images</span>
+				<button
+					type="button"
+					ondrop={handleDrop}
+					ondragover={handleDragOver}
+					ondragleave={handleDragLeave}
+					onclick={() => fileInput.click()}
+					class="flex flex-col items-center justify-center gap-1.5 rounded-md border-2 border-dashed px-3 py-4 text-[12px] transition-colors duration-100 {dragOver ? 'border-accent bg-accent/10 text-accent' : 'border-border text-text-muted hover:border-border-light hover:text-text-secondary'}"
+				>
+					<Icon src={FiUpload} size="16" />
+					<span>Drop images or click to browse</span>
+				</button>
+				<input
+					bind:this={fileInput}
+					type="file"
+					accept="image/*"
+					multiple
+					onchange={handleFileSelect}
+					class="hidden"
+				/>
+				{#if imageStore.sourceImages.length > 0}
+					<div class="mt-1 flex flex-wrap gap-1.5">
+						{#each imageStore.sourceImages as file, i}
+							<div class="group relative">
+								<img
+									src={URL.createObjectURL(file)}
+									alt="Source {i + 1}"
+									class="h-14 w-14 rounded border border-border object-cover"
+								/>
+								<button
+									type="button"
+									onclick={() => imageStore.removeSourceImage(i)}
+									class="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition-opacity duration-100 group-hover:opacity-100"
+								>
+									<Icon src={FiX} size="10" />
+								</button>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+		{:else}
+			<!-- Dimensions -->
+			<div class="flex gap-2">
+				<label class="flex min-w-0 flex-1 flex-col gap-1">
+					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Width</span>
+					<input
+						type="number"
+						bind:value={imageStore.width}
+						min="256"
+						max="2048"
+						step="16"
+						class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary outline-none focus:border-accent"
+					/>
+				</label>
+				<label class="flex min-w-0 flex-1 flex-col gap-1">
+					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Height</span>
+					<input
+						type="number"
+						bind:value={imageStore.height}
+						min="256"
+						max="2048"
+						step="16"
+						class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary outline-none focus:border-accent"
+					/>
+				</label>
+			</div>
+		{/if}
+
+		{#if imageStore.selectedModel === "seedvr2"}
+			<label class="flex flex-col gap-1">
+				<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Scale</span>
+				<input
+					type="text"
+					bind:value={imageStore.scale}
+					placeholder="2"
+					class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
+				/>
+			</label>
+		{:else if !imageStore.isUpscaleModel}
+			<!-- Seed + Count -->
+			<div class="flex gap-2">
+				<label class="flex min-w-0 flex-1 flex-col gap-1">
+					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Seed</span>
+					<input
+						type="text"
+						bind:value={imageStore.seed}
+						placeholder="Random"
+						class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
+					/>
+				</label>
+				<label class="flex w-16 shrink-0 flex-col gap-1">
+					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Count</span>
+					<input
+						type="number"
+						bind:value={imageStore.count}
+						min="1"
+						max="4"
+						class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary outline-none focus:border-accent"
+					/>
+				</label>
+			</div>
+
+			<!-- Steps + Guidance Scale -->
+			<div class="flex gap-2">
+				<label class="flex min-w-0 flex-1 flex-col gap-1">
+					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Steps</span>
+					<input
+						type="text"
+						bind:value={imageStore.steps}
+						placeholder="Default"
+						class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
+					/>
+				</label>
+				<label class="flex min-w-0 flex-1 flex-col gap-1">
+					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Guidance</span>
+					<input
+						type="text"
+						bind:value={imageStore.guidanceScale}
+						placeholder="Default"
+						class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
+					/>
+				</label>
+			</div>
+		{/if}
+
+		<div class="mt-auto pt-2">
+			<button
+				type="submit"
+				disabled={!imageStore.selectedModel || imageStore.generating || (imageStore.isUpscaleModel ? imageStore.sourceImages.length === 0 : !imageStore.prompt.trim() || (imageStore.isEditModel && imageStore.sourceImages.length === 0))}
+				class="flex w-full items-center justify-center gap-2 rounded-full bg-text-primary px-3 py-2 text-[13px] font-medium text-bg transition-opacity duration-100 not-disabled:hover:bg-text-secondary disabled:opacity-40"
+			>
+				{#if imageStore.generating}
+					<Icon src={FiLoader} size="14" className="animate-spin" />
+					Processing...
+				{:else if imageStore.isUpscaleModel}
+					<Icon src={FiArrowUp} size="14" />
+					Upscale
+				{:else if imageStore.isEditModel}
+					<Icon src={FiEdit2} size="14" />
+					Edit
+				{:else}
+					<Icon src={FiZap} size="14" />
+					Generate
+				{/if}
+			</button>
+		</div>
+	</form>
+{/snippet}
+
+<div class="flex h-full flex-col md:flex-row">
+	<!-- Mobile header -->
+	<div class="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5 md:hidden">
+		<h1 class="text-[13px] font-medium text-text-primary">Images</h1>
+		{#if imageStore.loadedModel}
+			<span class="text-[11px] text-text-muted truncate max-w-32" title={imageStore.loadedModel}>{imageStore.loadedModel}</span>
+		{/if}
+		<button
+			onclick={() => (controlsOpen = true)}
+			class="ml-auto flex h-7 items-center gap-1.5 rounded-md bg-overlay-medium px-2.5 text-[12px] font-medium text-text-primary transition-colors duration-100 hover:bg-overlay-strong"
+		>
+			<Icon src={FiPlus} size="14" />
+			{modeLabel}
+		</button>
+	</div>
+
+	<!-- Desktop controls panel -->
+	<div class="hidden w-72 shrink-0 flex-col border-r border-border bg-bg-secondary md:flex">
 		<div class="flex items-center justify-between p-4">
-			<h2 class="text-[13px] font-medium text-text-primary">{imageStore.isUpscaleModel ? "Upscale" : imageStore.isEditModel ? "Edit" : "Generate"}</h2>
+			<h2 class="text-[13px] font-medium text-text-primary">{modeLabel}</h2>
 			{#if imageStore.loadedModel}
 				<div class="flex items-center gap-1.5">
 					<span class="text-[11px] text-text-muted truncate max-w-24" title={imageStore.loadedModel}>{imageStore.loadedModel}</span>
@@ -119,217 +359,7 @@ let reversedJobs = $derived([...imageStore.jobs].reverse());
 				</div>
 			{/if}
 		</div>
-
-		<form onsubmit={handleSubmit} class="flex flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4">
-			<!-- Model -->
-			<label class="flex flex-col gap-1">
-				<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Model</span>
-				<select
-					bind:value={imageStore.selectedModel}
-					class="rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary outline-none focus:border-accent"
-				>
-					{#if imageStore.modelGroups.generate.length > 0}
-						<optgroup label="Generate">
-							{#each imageStore.modelGroups.generate as model}
-								<option value={model}>{model}</option>
-							{/each}
-						</optgroup>
-					{/if}
-					{#if imageStore.modelGroups.edit.length > 0}
-						<optgroup label="Edit">
-							{#each imageStore.modelGroups.edit as model}
-								<option value={model}>{model}</option>
-							{/each}
-						</optgroup>
-					{/if}
-					{#if imageStore.modelGroups.upscale.length > 0}
-						<optgroup label="Upscale">
-							{#each imageStore.modelGroups.upscale as model}
-								<option value={model}>{model}</option>
-							{/each}
-						</optgroup>
-					{/if}
-					{#if imageStore.models.length === 0}
-						<option value="" disabled>No models available</option>
-					{/if}
-				</select>
-			</label>
-
-			{#if !imageStore.isUpscaleModel}
-				<!-- Prompt -->
-				<label class="flex flex-col gap-1">
-					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Prompt</span>
-					<textarea
-						bind:value={imageStore.prompt}
-						rows="3"
-						placeholder={imageStore.isEditModel ? "Describe the edit you want to make..." : "Describe the image you want to create..."}
-						class="resize-none rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
-					></textarea>
-				</label>
-
-				<!-- Negative Prompt -->
-				<label class="flex flex-col gap-1">
-					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Negative Prompt</span>
-					<textarea
-						bind:value={imageStore.negativePrompt}
-						rows="2"
-						placeholder="What to avoid..."
-						class="resize-none rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
-					></textarea>
-				</label>
-			{/if}
-
-			{#if imageStore.isEditModel || imageStore.isUpscaleModel}
-				<!-- Source Images Drop Zone -->
-				<div class="flex flex-col gap-1">
-					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Source Images</span>
-					<button
-						type="button"
-						ondrop={handleDrop}
-						ondragover={handleDragOver}
-						ondragleave={handleDragLeave}
-						onclick={() => fileInput.click()}
-						class="flex flex-col items-center justify-center gap-1.5 rounded-md border-2 border-dashed px-3 py-4 text-[12px] transition-colors duration-100 {dragOver ? 'border-accent bg-accent/10 text-accent' : 'border-border text-text-muted hover:border-border-light hover:text-text-secondary'}"
-					>
-						<Icon src={FiUpload} size="16" />
-						<span>Drop images or click to browse</span>
-					</button>
-					<input
-						bind:this={fileInput}
-						type="file"
-						accept="image/*"
-						multiple
-						onchange={handleFileSelect}
-						class="hidden"
-					/>
-					{#if imageStore.sourceImages.length > 0}
-						<div class="mt-1 flex flex-wrap gap-1.5">
-							{#each imageStore.sourceImages as file, i}
-								<div class="group relative">
-									<img
-										src={URL.createObjectURL(file)}
-										alt="Source {i + 1}"
-										class="h-14 w-14 rounded border border-border object-cover"
-									/>
-									<button
-										type="button"
-										onclick={() => imageStore.removeSourceImage(i)}
-										class="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition-opacity duration-100 group-hover:opacity-100"
-									>
-										<Icon src={FiX} size="10" />
-									</button>
-								</div>
-							{/each}
-						</div>
-					{/if}
-				</div>
-			{:else}
-				<!-- Dimensions -->
-				<div class="flex gap-2">
-					<label class="flex min-w-0 flex-1 flex-col gap-1">
-						<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Width</span>
-						<input
-							type="number"
-							bind:value={imageStore.width}
-							min="256"
-							max="2048"
-							step="16"
-							class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary outline-none focus:border-accent"
-						/>
-					</label>
-					<label class="flex min-w-0 flex-1 flex-col gap-1">
-						<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Height</span>
-						<input
-							type="number"
-							bind:value={imageStore.height}
-							min="256"
-							max="2048"
-							step="16"
-							class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary outline-none focus:border-accent"
-						/>
-					</label>
-				</div>
-			{/if}
-
-			{#if imageStore.selectedModel === "seedvr2"}
-				<label class="flex flex-col gap-1">
-					<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Scale</span>
-					<input
-						type="text"
-						bind:value={imageStore.scale}
-						placeholder="2"
-						class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
-					/>
-				</label>
-			{:else if !imageStore.isUpscaleModel}
-				<!-- Seed + Count -->
-				<div class="flex gap-2">
-					<label class="flex min-w-0 flex-1 flex-col gap-1">
-						<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Seed</span>
-						<input
-							type="text"
-							bind:value={imageStore.seed}
-							placeholder="Random"
-							class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
-						/>
-					</label>
-					<label class="flex w-16 shrink-0 flex-col gap-1">
-						<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Count</span>
-						<input
-							type="number"
-							bind:value={imageStore.count}
-							min="1"
-							max="4"
-							class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary outline-none focus:border-accent"
-						/>
-					</label>
-				</div>
-
-				<!-- Steps + Guidance Scale -->
-				<div class="flex gap-2">
-					<label class="flex min-w-0 flex-1 flex-col gap-1">
-						<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Steps</span>
-						<input
-							type="text"
-							bind:value={imageStore.steps}
-							placeholder="Default"
-							class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
-						/>
-					</label>
-					<label class="flex min-w-0 flex-1 flex-col gap-1">
-						<span class="text-[11px] font-medium uppercase tracking-wider text-text-muted">Guidance</span>
-						<input
-							type="text"
-							bind:value={imageStore.guidanceScale}
-							placeholder="Default"
-							class="min-w-0 rounded-md border border-border bg-bg-tertiary px-2.5 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
-						/>
-					</label>
-				</div>
-			{/if}
-
-			<div class="mt-auto pt-2">
-				<button
-					type="submit"
-					disabled={!imageStore.selectedModel || imageStore.generating || (imageStore.isUpscaleModel ? imageStore.sourceImages.length === 0 : !imageStore.prompt.trim() || (imageStore.isEditModel && imageStore.sourceImages.length === 0))}
-					class="flex w-full items-center justify-center gap-2 rounded-full bg-text-primary px-3 py-2 text-[13px] font-medium text-bg transition-opacity duration-100 not-disabled:hover:bg-text-secondary disabled:opacity-40"
-				>
-					{#if imageStore.generating}
-						<Icon src={FiLoader} size="14" className="animate-spin" />
-						Processing...
-					{:else if imageStore.isUpscaleModel}
-						<Icon src={FiArrowUp} size="14" />
-						Upscale
-					{:else if imageStore.isEditModel}
-						<Icon src={FiEdit2} size="14" />
-						Edit
-					{:else}
-						<Icon src={FiZap} size="14" />
-						Generate
-					{/if}
-				</button>
-			</div>
-		</form>
+		{@render controlsForm()}
 	</div>
 
 	<!-- Gallery -->
@@ -482,6 +512,39 @@ let reversedJobs = $derived([...imageStore.jobs].reverse());
 		{/if}
 	</div>
 </div>
+
+<!-- Mobile controls modal -->
+{#if controlsOpen}
+	<div class="fixed inset-0 z-50 flex flex-col bg-bg md:hidden">
+		<div class="flex shrink-0 items-center justify-between border-b border-border px-4 py-2.5">
+			<h2 class="text-[13px] font-medium text-text-primary">{modeLabel}</h2>
+			<div class="flex items-center gap-2">
+				{#if imageStore.loadedModel}
+					<span class="text-[11px] text-text-muted truncate max-w-24" title={imageStore.loadedModel}>{imageStore.loadedModel}</span>
+					<button
+						onclick={() => imageStore.unload()}
+						disabled={imageStore.unloading}
+						class="flex h-5 w-5 items-center justify-center rounded text-text-muted transition-colors duration-100 hover:bg-overlay-light hover:text-danger disabled:opacity-40"
+						title="Unload model"
+					>
+						{#if imageStore.unloading}
+							<Icon src={FiLoader} size="12" className="animate-spin" />
+						{:else}
+							<Icon src={FiPower} size="12" />
+						{/if}
+					</button>
+				{/if}
+				<button
+					onclick={() => (controlsOpen = false)}
+					class="flex h-7 w-7 items-center justify-center rounded-md text-text-secondary transition-colors duration-100 hover:bg-overlay-light hover:text-text-primary"
+				>
+					<Icon src={FiX} size="18" />
+				</button>
+			</div>
+		</div>
+		{@render controlsForm()}
+	</div>
+{/if}
 
 <!-- Lightbox -->
 {#if lightboxUrl}

@@ -46,10 +46,6 @@ function isActive(href: string): boolean {
 	if (href === "/") return page.url.pathname === "/";
 	return page.url.pathname.startsWith(href);
 }
-
-let pageTitle = $derived(
-	navItems.find((item) => isActive(item.href))?.label ?? "Chat",
-);
 </script>
 
 <div class="fixed inset-0 flex flex-col md:flex-row">
@@ -64,7 +60,6 @@ let pageTitle = $derived(
 		>
 			<Icon src={FiMenu} size="20" />
 		</button>
-		<span class="text-[13px] font-medium text-text-primary">{pageTitle}</span>
 	</header>
 
 	<!-- Mobile backdrop -->
@@ -79,11 +74,11 @@ let pageTitle = $derived(
 
 	<!-- Sidebar nav -->
 	<nav
-		class="fixed left-0 top-0 z-20 flex h-full w-48 flex-col border-r border-border bg-bg-secondary transition-transform duration-200
+		class="fixed left-0 top-[calc(env(safe-area-inset-top,0px)+2.5rem)] z-20 flex h-[calc(100%-env(safe-area-inset-top,0px)-2.5rem)] w-48 flex-col border-r border-border bg-bg-secondary transition-transform duration-200
 			{menuOpen ? 'translate-x-0' : '-translate-x-full'}
-			md:relative md:w-12 md:translate-x-0"
+			md:relative md:top-0 md:h-full md:w-12 md:translate-x-0"
 	>
-		<div class="flex flex-col gap-1 p-1.5 pt-[max(env(safe-area-inset-top,0px),6px)]">
+		<div class="flex flex-col gap-1 p-1.5 md:pt-[max(env(safe-area-inset-top,0px),6px)]">
 			{#each navItems as item}
 				<a
 					href={item.href}
