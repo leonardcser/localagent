@@ -20,6 +20,7 @@ import (
 	"localagent/pkg/logger"
 	"localagent/pkg/providers"
 	"localagent/pkg/proxy"
+	"localagent/pkg/todo"
 	"localagent/pkg/tools"
 	"localagent/pkg/webchat"
 )
@@ -223,6 +224,8 @@ func gatewayCmd() {
 	skillsInfo := startupInfo["skills"].(map[string]any)
 	fmt.Printf("Agent: tools=%d skills=%d/%d\n", toolsInfo["count"], skillsInfo["available"], skillsInfo["total"])
 
+	setupTodoTool(agentLoop, cfg.WorkspacePath())
+
 	eventQueue := heartbeat.NewEventQueue()
 	cronService := setupCronTool(agentLoop, msgBus, cfg.WorkspacePath(), eventQueue)
 
@@ -404,4 +407,12 @@ func setupCronTool(agentLoop *agent.AgentLoop, msgBus *bus.MessageBus, workspace
 	})
 
 	return cronService
+}
+
+func setupTodoTool(agentLoop *agent.AgentLoop, workspace string) {
+	storePath := filepath.Join(workspace, "todo", "tasks.json")
+	service := todo.NewTodoService(storePath)
+	service.Load()
+	tool := tools.NewTodoTool(service)
+	agentLoop.RegisterTool(tool)
 }

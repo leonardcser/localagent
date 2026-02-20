@@ -18,6 +18,7 @@ import (
 	"localagent/pkg/constants"
 	"localagent/pkg/finance"
 	"localagent/pkg/logger"
+	"localagent/pkg/todo"
 	"localagent/pkg/prompts"
 	"localagent/pkg/providers"
 	"localagent/pkg/session"
@@ -81,6 +82,12 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 	yf := finance.NewYahooClient()
 	registry.Register(tools.NewStockTool(yf))
 	registry.Register(tools.NewCurrencyTool(yf))
+
+	// Tasks tool
+	todoStorePath := filepath.Join(workspace, "todo", "tasks.json")
+	todoService := todo.NewTodoService(todoStorePath)
+	todoService.Load()
+	registry.Register(tools.NewTodoTool(todoService))
 
 	registry.Register(tools.NewMessageTool(msgBus))
 
@@ -201,6 +208,10 @@ func (al *AgentLoop) Run(ctx context.Context) error {
 			response, err := al.processMessage(ctx, msg)
 			if err != nil {
 				response = fmt.Sprintf("Error processing message: %v", err)
+				// Persist the error response so it survives page reload
+				if msg.SessionKey != "" {
+					al.sessions.AddMessage(msg.SessionKey, "assistant", response)
+				}
 			}
 
 			if response != "" {
@@ -425,6 +436,17 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 	// 5. Run LLM iteration loop
 	finalContent, iteration, tokenCount, err := al.runLLMIteration(ctx, messages, opts)
 	if err != nil {
+		// Emit completion activity so the processing state resets
+		al.emitActivity(opts.SessionKey, activity.Event{
+			Type:      activity.Complete,
+			Timestamp: time.Now(),
+			Message:   fmt.Sprintf("Error after %d iterations", iteration),
+			Detail: map[string]any{
+				"session":    opts.SessionKey,
+				"iterations": iteration,
+				"error":      err.Error(),
+			},
+		})
 		return "", err
 	}
 

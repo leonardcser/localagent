@@ -133,7 +133,7 @@ container-gateway:
 		--network=pasta \
 		--restart=unless-stopped \
 		-e TZ=$(TZ) \
-		$(foreach v,$(ENV_PASS),-e $(v)) \
+		$(foreach v,$(subst $(comma), ,$(ENV_PASS)),-e $(v)) \
 		$(if $(CA_CERT),-v $(CA_CERT):/usr/local/share/ca-certificates/custom-ca.crt:ro$(comma)Z) \
 		-v $(CONFIG_FILE):/home/localagent/.localagent/config.json:ro,Z \
 		-v $(WORKSPACE_DIR):/home/localagent/.localagent/workspace:Z \
