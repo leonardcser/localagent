@@ -54,6 +54,7 @@ type processOptions struct {
 	EnableSummary   bool     // Whether to trigger summarization
 	SendResponse    bool     // Whether to send response via bus
 	NoHistory       bool     // If true, don't load session history (for heartbeat)
+	Persisted       bool     // If true, user message was already saved to session by the channel
 }
 
 // createToolRegistry creates a tool registry with common tools.
@@ -306,6 +307,7 @@ func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage)
 		DefaultResponse: "I've completed processing but have no response to give.",
 		EnableSummary:   true,
 		SendResponse:    false,
+		Persisted:       msg.Persisted,
 	})
 }
 
@@ -369,6 +371,17 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 	if !opts.NoHistory {
 		history = al.sessions.GetHistory(opts.SessionKey)
 		summary = al.sessions.GetSummary(opts.SessionKey)
+
+		// If the message was already persisted by the channel, trim queued
+		// user messages from the tail of history. These are messages that
+		// were saved to session on arrival but haven't been processed yet.
+		// BuildMessages will re-add the current user message with proper
+		// media handling.
+		if opts.Persisted {
+			for len(history) > 0 && history[len(history)-1].Role == "user" {
+				history = history[:len(history)-1]
+			}
+		}
 	}
 	messages := al.contextBuilder.BuildMessages(
 		history,
@@ -379,8 +392,10 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 		opts.ChatID,
 	)
 
-	// 3. Save user message to session
-	al.sessions.AddMessageWithMedia(opts.SessionKey, "user", opts.UserMessage, opts.Media)
+	// 3. Save user message to session (skip if already persisted by channel)
+	if !opts.Persisted {
+		al.sessions.AddMessageWithMedia(opts.SessionKey, "user", opts.UserMessage, opts.Media)
+	}
 
 	// 4. Emit processing start activity (after user message is saved so timeline order is correct)
 	if opts.SenderID != "" {

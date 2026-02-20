@@ -98,6 +98,10 @@ func (c *BaseChannel) HandleMessage(senderID, chatID, content string, media []st
 	c.bus.PublishInbound(msg)
 }
 
+func (c *BaseChannel) Bus() *bus.MessageBus {
+	return c.bus
+}
+
 func (c *BaseChannel) SetRunning(running bool) {
 	c.running = running
 }

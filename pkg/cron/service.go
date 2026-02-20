@@ -54,14 +54,14 @@ type CronDelivery struct {
 }
 
 type CronJobState struct {
-	NextRunAtMS       *int64 `json:"nextRunAtMs,omitempty"`
-	LastRunAtMS       *int64 `json:"lastRunAtMs,omitempty"`
-	LastStatus        string `json:"lastStatus,omitempty"`
-	LastError         string `json:"lastError,omitempty"`
-	RunningAtMS       *int64 `json:"runningAtMs,omitempty"`
-	LastDurationMS    *int64 `json:"lastDurationMs,omitempty"`
-	ConsecutiveErrors int    `json:"consecutiveErrors,omitempty"`
-	ScheduleErrorCount int   `json:"scheduleErrorCount,omitempty"`
+	NextRunAtMS        *int64 `json:"nextRunAtMs,omitempty"`
+	LastRunAtMS        *int64 `json:"lastRunAtMs,omitempty"`
+	LastStatus         string `json:"lastStatus,omitempty"`
+	LastError          string `json:"lastError,omitempty"`
+	RunningAtMS        *int64 `json:"runningAtMs,omitempty"`
+	LastDurationMS     *int64 `json:"lastDurationMs,omitempty"`
+	ConsecutiveErrors  int    `json:"consecutiveErrors,omitempty"`
+	ScheduleErrorCount int    `json:"scheduleErrorCount,omitempty"`
 }
 
 type CronJob struct {

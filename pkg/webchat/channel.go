@@ -134,7 +134,28 @@ func (ch *WebChatChannel) IsAllowed(senderID string) bool {
 }
 
 func (ch *WebChatChannel) HandleIncoming(content string, media []string, metadata map[string]string) {
-	ch.HandleMessage("web-user", "default", content, media, metadata)
+	if !ch.IsAllowed("web-user") {
+		return
+	}
+
+	sessionKey := fmt.Sprintf("%s:default", ch.Name())
+
+	// Persist user message to session immediately so it survives page refresh
+	// even if the agent hasn't picked it up from the bus yet.
+	if ch.sessions != nil {
+		ch.sessions.AddMessageWithMedia(sessionKey, "user", content, media)
+	}
+
+	ch.Bus().PublishInbound(bus.InboundMessage{
+		Channel:    ch.Name(),
+		SenderID:   "web-user",
+		ChatID:     "default",
+		Content:    content,
+		Media:      media,
+		SessionKey: sessionKey,
+		Metadata:   metadata,
+		Persisted:  true,
+	})
 }
 
 func (ch *WebChatChannel) registerClient(id string) *sseClient {

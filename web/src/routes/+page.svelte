@@ -162,7 +162,7 @@ onDestroy(() => {
 	>
 		{#each groups as group (group.id)}
 			{#if group.kind === "message"}
-				<ChatMessage role={group.role} content={group.content} timestamp={group.timestamp} media={group.media} />
+				<ChatMessage role={group.role} content={group.content} timestamp={group.timestamp} media={group.media} queued={group.queued} />
 			{:else}
 				<ActivityGroup items={group.items} />
 			{/if}

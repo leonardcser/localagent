@@ -10,8 +10,14 @@ let {
 	content,
 	timestamp,
 	media,
-}: { role: string; content: string; timestamp: string; media?: string[] } =
-	$props();
+	queued,
+}: {
+	role: string;
+	content: string;
+	timestamp: string;
+	media?: string[];
+	queued?: boolean;
+} = $props();
 
 let html = $state("");
 
@@ -58,7 +64,9 @@ function handleClick(e: MouseEvent) {
 				<div class="msg-content" onclick={handleClick} onkeydown={() => {}}>{@html html}</div>
 			{/if}
 		</div>
-		<span class="mt-1 text-[10px] font-mono text-text-muted">{timestamp}</span>
+		<span class="mt-1 text-[10px] font-mono text-text-muted">
+			{#if queued}<span class="text-text-muted/60">queued &middot; </span>{/if}{timestamp}
+		</span>
 	</div>
 {:else}
 	<div class="flex flex-col items-start self-start min-w-0 max-w-[95%] sm:max-w-[85%]">

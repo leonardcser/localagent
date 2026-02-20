@@ -8,6 +8,7 @@ type InboundMessage struct {
 	Media      []string          `json:"media,omitempty"`
 	SessionKey string            `json:"session_key"`
 	Metadata   map[string]string `json:"metadata,omitempty"`
+	Persisted  bool              `json:"persisted,omitempty"` // true if user message was already saved to session
 }
 
 type OutboundMessage struct {

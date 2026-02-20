@@ -18,6 +18,7 @@ export type TimelineItem =
 			content: string;
 			timestamp: string;
 			media?: string[];
+			queued?: boolean;
 	  }
 	| ({ kind: "activity"; id: number } & ActivityEventData);
 
@@ -48,6 +49,15 @@ function createChat() {
 	}
 
 	function addActivity(evt: ActivityEventData) {
+		// When the agent starts processing, clear "queued" from the first queued message
+		if (evt.event_type === "processing_start") {
+			for (const item of timeline) {
+				if (item.kind === "message" && item.queued) {
+					item.queued = false;
+					break;
+				}
+			}
+		}
 		timeline.push({ kind: "activity", ...evt, id: ++nextId });
 	}
 
@@ -112,6 +122,7 @@ function createChat() {
 			timestamp: nowTimestamp(),
 			id: ++nextId,
 			media: media.length > 0 ? media : undefined,
+			queued: loading ? true : undefined,
 		});
 		input = "";
 		pendingMedia = [];
