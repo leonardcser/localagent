@@ -90,7 +90,7 @@ $effect(() => {
 			type="button"
 			class={cn(
 				"flex size-10.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-muted transition-[color,background] duration-150 hover:bg-border hover:text-text-primary disabled:cursor-not-allowed",
-				chat.transcribing && "animate-pulse bg-surface! text-text-secondary! cursor-wait",
+				chat.transcribing && "animate-pulse bg-surface! text-text-secondary! cursor-wait transition-none!",
 				!chat.transcribing && chat.recording && "recording",
 			)}
 			onclick={() => chat.toggleRecording()}

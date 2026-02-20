@@ -169,7 +169,8 @@ function createChat() {
 				const text = await transcribeAudio(file);
 				transcribing = false;
 				if (text) {
-					input = input ? input + " " + text : text;
+					const trimmed = text.trim();
+					input = input ? input + " " + trimmed : trimmed;
 				}
 				if (shouldSend) {
 					await send();
