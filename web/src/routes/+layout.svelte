@@ -112,7 +112,7 @@ function isActive(href: string): boolean {
 			{/if}
 		</div>
 	</nav>
-	<main class="flex-1 overflow-hidden">
+	<main class="flex-1 overflow-hidden pt-[env(safe-area-inset-top,0px)]">
 		{@render children()}
 	</main>
 </div>
