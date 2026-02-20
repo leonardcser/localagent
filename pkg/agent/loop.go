@@ -16,6 +16,7 @@ import (
 	"localagent/pkg/bus"
 	"localagent/pkg/config"
 	"localagent/pkg/constants"
+	"localagent/pkg/finance"
 	"localagent/pkg/logger"
 	"localagent/pkg/prompts"
 	"localagent/pkg/providers"
@@ -74,6 +75,11 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 
 	// News tool
 	registry.Register(tools.NewNewsTool(15))
+
+	// Yahoo Finance tools (shared client for auth)
+	yf := finance.NewYahooClient()
+	registry.Register(tools.NewStockTool(yf))
+	registry.Register(tools.NewCurrencyTool(yf))
 
 	registry.Register(tools.NewMessageTool(msgBus))
 
