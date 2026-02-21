@@ -17,6 +17,7 @@ const defaultJobTimeout = 10 * time.Minute
 
 type JobExecutor interface {
 	ProcessDirectWithChannel(ctx context.Context, content, sessionKey, channel, chatID string) (string, error)
+	WasMessageToolCalled() bool
 }
 
 type EventEnqueuer func(source, message, channel, chatID string, wake bool)
@@ -405,7 +406,7 @@ func (t *CronTool) ExecuteJob(ctx context.Context, job *cron.CronJob) string {
 			return fmt.Sprintf("Error: %v", err)
 		}
 
-		if job.Delivery != nil && job.Delivery.Mode == "announce" && response != "" {
+		if job.Delivery != nil && job.Delivery.Mode == "announce" && response != "" && !t.executor.WasMessageToolCalled() {
 			t.announceResult(channel, chatID, job, response)
 		}
 

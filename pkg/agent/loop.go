@@ -137,6 +137,13 @@ func NewAgentLoop(cfg *config.Config, msgBus *bus.MessageBus, provider providers
 
 	sessionsManager := session.NewSessionManager(filepath.Join(workspace, "sessions"))
 
+	// Wire session manager into message tool so outbound messages are persisted
+	if tool, ok := toolsRegistry.Get("message"); ok {
+		if mt, ok := tool.(*tools.MessageTool); ok {
+			mt.SetSessionManager(sessionsManager)
+		}
+	}
+
 	// Create state manager for atomic state persistence
 	stateManager := state.NewManager(workspace)
 
@@ -250,6 +257,15 @@ func (al *AgentLoop) GetSessionManager() *session.SessionManager {
 
 func (al *AgentLoop) RegisterTool(tool tools.Tool) {
 	al.tools.Register(tool)
+}
+
+func (al *AgentLoop) WasMessageToolCalled() bool {
+	if tool, ok := al.tools.Get("message"); ok {
+		if mt, ok := tool.(*tools.MessageTool); ok {
+			return mt.WasCalled()
+		}
+	}
+	return false
 }
 
 // GetToolDomains returns all domains declared by registered tools.

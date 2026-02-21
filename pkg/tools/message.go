@@ -5,16 +5,23 @@ import (
 	"fmt"
 
 	"localagent/pkg/bus"
+	"localagent/pkg/session"
 )
 
 type MessageTool struct {
 	bus            *bus.MessageBus
+	sessions       *session.SessionManager
 	defaultChannel string
 	defaultChatID  string
+	called         bool
 }
 
 func NewMessageTool(msgBus *bus.MessageBus) *MessageTool {
 	return &MessageTool{bus: msgBus}
+}
+
+func (t *MessageTool) SetSessionManager(sm *session.SessionManager) {
+	t.sessions = sm
 }
 
 func (t *MessageTool) Name() string {
@@ -41,6 +48,11 @@ func (t *MessageTool) Parameters() map[string]any {
 func (t *MessageTool) SetContext(channel, chatID string) {
 	t.defaultChannel = channel
 	t.defaultChatID = chatID
+	t.called = false
+}
+
+func (t *MessageTool) WasCalled() bool {
+	return t.called
 }
 
 func (t *MessageTool) Execute(ctx context.Context, args map[string]any) *ToolResult {
@@ -56,11 +68,18 @@ func (t *MessageTool) Execute(ctx context.Context, args map[string]any) *ToolRes
 		return &ToolResult{ForLLM: "No target channel/chat specified", IsError: true}
 	}
 
+	if t.sessions != nil {
+		sessionKey := fmt.Sprintf("%s:%s", channel, chatID)
+		t.sessions.AddMessage(sessionKey, "assistant", content)
+	}
+
 	t.bus.PublishOutbound(bus.OutboundMessage{
 		Channel: channel,
 		ChatID:  chatID,
 		Content: content,
 	})
+
+	t.called = true
 
 	return &ToolResult{
 		ForLLM: fmt.Sprintf("Message sent to %s:%s", channel, chatID),
