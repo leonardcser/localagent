@@ -3,7 +3,6 @@ package tools
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -111,12 +110,5 @@ func ConvertPDF(ctx context.Context, filePath, serviceURL, apiKey string) (strin
 		return "", fmt.Errorf("service returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	var result struct {
-		Text string `json:"text"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("parse response: %w", err)
-	}
-
-	return result.Text, nil
+	return string(body), nil
 }
