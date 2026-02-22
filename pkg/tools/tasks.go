@@ -25,19 +25,24 @@ func (t *TodoTool) Description() string {
 
 ACTIONS:
 - list: List tasks (optional filters: status, tag)
-- add: Create a task (requires title)
-- update: Modify a task (requires taskId + fields to change)
+- add: Create a task (requires task object with title)
+- update: Modify a task (requires taskId + patch object)
 - done: Mark a task as done (requires taskId). Recurring tasks auto-create the next instance.
 - remove: Delete a task (requires taskId)
 
-FIELDS:
-- title: Task title (string)
-- description: Optional details (string)
-- priority: "low", "medium", or "high"
-- due: Due date as "YYYY-MM-DD"
-- recurrence: "daily", "weekly", or "monthly" (requires due date)
-- tags: Array of string tags
-- status: "todo", "doing", or "done"`
+TASK SCHEMA (for add action):
+{
+  "title": "string",
+  "description": "string (optional)",
+  "priority": "low" | "medium" | "high",
+  "due": "YYYY-MM-DD",
+  "recurrence": "daily" | "weekly" | "monthly",
+  "tags": ["string"],
+  "status": "todo" | "doing" | "done"
+}
+
+PATCH SCHEMA (for update action):
+Same fields as task schema, all optional. Only provided fields are changed.`
 }
 
 func (t *TodoTool) Parameters() map[string]any {
@@ -49,49 +54,61 @@ func (t *TodoTool) Parameters() map[string]any {
 				"enum":        []string{"list", "add", "update", "done", "remove"},
 				"description": "Action to perform.",
 			},
-			"title": map[string]any{
-				"type":        "string",
-				"description": "Task title (for add).",
+			"task": map[string]any{
+				"type":                 "object",
+				"description":          "Task object for add action.",
+				"additionalProperties": true,
 			},
-			"description": map[string]any{
+			"taskId": map[string]any{
 				"type":        "string",
-				"description": "Task description (for add/update).",
+				"description": "Task ID for update/done/remove.",
 			},
-			"priority": map[string]any{
-				"type":        "string",
-				"enum":        []string{"low", "medium", "high"},
-				"description": "Task priority (for add/update).",
-			},
-			"due": map[string]any{
-				"type":        "string",
-				"description": "Due date as YYYY-MM-DD (for add/update).",
-			},
-			"recurrence": map[string]any{
-				"type":        "string",
-				"enum":        []string{"daily", "weekly", "monthly"},
-				"description": "Recurrence rule (for add/update).",
-			},
-			"tags": map[string]any{
-				"type":        "array",
-				"items":       map[string]any{"type": "string"},
-				"description": "Tags (for add/update).",
+			"patch": map[string]any{
+				"type":                 "object",
+				"description":          "Patch object for update action.",
+				"additionalProperties": true,
 			},
 			"status": map[string]any{
 				"type":        "string",
 				"enum":        []string{"todo", "doing", "done"},
-				"description": "Status filter (for list) or new status (for update).",
+				"description": "Status filter for list action.",
 			},
 			"tag": map[string]any{
 				"type":        "string",
-				"description": "Tag filter (for list).",
-			},
-			"taskId": map[string]any{
-				"type":        "string",
-				"description": "Task ID (for update/done/remove).",
+				"description": "Tag filter for list action.",
 			},
 		},
 		"required": []string{"action"},
 	}
+}
+
+// taskKeys are known Task fields. When the LLM flattens task/patch fields to
+// the top level, we detect these keys and re-wrap them.
+var taskKeys = map[string]bool{
+	"title": true, "description": true, "priority": true,
+	"due": true, "recurrence": true, "tags": true, "status": true,
+}
+
+// recoverFlatTaskParams checks if the LLM flattened task/patch fields to the
+// top level and wraps them back into the appropriate object.
+func recoverFlatTaskParams(action string, args map[string]any) map[string]any {
+	target := "task"
+	if action == "update" {
+		target = "patch"
+	}
+	if _, has := args[target]; has {
+		return args
+	}
+	obj := map[string]any{}
+	for k, v := range args {
+		if taskKeys[k] {
+			obj[k] = v
+		}
+	}
+	if len(obj) > 0 {
+		args[target] = obj
+	}
+	return args
 }
 
 func (t *TodoTool) Execute(_ context.Context, args map[string]any) *ToolResult {
@@ -104,8 +121,10 @@ func (t *TodoTool) Execute(_ context.Context, args map[string]any) *ToolResult {
 	case "list":
 		return t.listAction(args)
 	case "add":
+		args = recoverFlatTaskParams(action, args)
 		return t.addAction(args)
 	case "update":
+		args = recoverFlatTaskParams(action, args)
 		return t.updateAction(args)
 	case "done":
 		return t.doneAction(args)
@@ -130,31 +149,34 @@ func (t *TodoTool) listAction(args map[string]any) *ToolResult {
 }
 
 func (t *TodoTool) addAction(args map[string]any) *ToolResult {
-	title, _ := args["title"].(string)
-	if title == "" {
-		return ErrorResult("'title' is required for add action")
+	taskRaw, ok := args["task"].(map[string]any)
+	if !ok {
+		return ErrorResult("'task' object is required for add action")
 	}
 
-	task := todo.Task{
-		Title: title,
+	title, _ := taskRaw["title"].(string)
+	if title == "" {
+		return ErrorResult("'title' is required in task object")
 	}
-	if desc, ok := args["description"].(string); ok {
-		task.Description = desc
+
+	task := todo.Task{Title: title}
+	if v, ok := taskRaw["description"].(string); ok {
+		task.Description = v
 	}
-	if priority, ok := args["priority"].(string); ok {
-		task.Priority = priority
+	if v, ok := taskRaw["priority"].(string); ok {
+		task.Priority = v
 	}
-	if due, ok := args["due"].(string); ok {
-		task.Due = due
+	if v, ok := taskRaw["due"].(string); ok {
+		task.Due = v
 	}
-	if recurrence, ok := args["recurrence"].(string); ok {
-		task.Recurrence = recurrence
+	if v, ok := taskRaw["recurrence"].(string); ok {
+		task.Recurrence = v
 	}
-	if tags, ok := args["tags"]; ok {
-		task.Tags = toStringSliceFromAny(tags)
+	if v, ok := taskRaw["tags"]; ok {
+		task.Tags = toStringSliceFromAny(v)
 	}
-	if status, ok := args["status"].(string); ok {
-		task.Status = status
+	if v, ok := taskRaw["status"].(string); ok {
+		task.Status = v
 	}
 
 	created, err := t.service.AddTask(task)
@@ -171,18 +193,9 @@ func (t *TodoTool) updateAction(args map[string]any) *ToolResult {
 		return ErrorResult("'taskId' is required for update action")
 	}
 
-	patch := make(map[string]any)
-	for _, key := range []string{"title", "description", "priority", "due", "recurrence", "status"} {
-		if v, ok := args[key]; ok {
-			patch[key] = v
-		}
-	}
-	if v, ok := args["tags"]; ok {
-		patch["tags"] = v
-	}
-
-	if len(patch) == 0 {
-		return ErrorResult("no fields to update")
+	patch, ok := args["patch"].(map[string]any)
+	if !ok || len(patch) == 0 {
+		return ErrorResult("'patch' object is required for update action")
 	}
 
 	task, err := t.service.UpdateTask(taskID, patch)
