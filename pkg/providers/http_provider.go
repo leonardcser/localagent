@@ -69,11 +69,15 @@ func (p *HTTPProvider) Chat(ctx context.Context, messages []Message, tools []Too
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	// Log the last 3 serialized messages to verify tool results reach the LLM
+	// Log the tools array to verify schema reaches the LLM correctly
 	var debugPayload struct {
 		Messages []json.RawMessage `json:"messages"`
+		Tools    json.RawMessage   `json:"tools"`
 	}
 	if err := json.Unmarshal(jsonData, &debugPayload); err == nil {
+		if debugPayload.Tools != nil {
+			logger.Info("LLM request tools: %s", string(debugPayload.Tools))
+		}
 		start := len(debugPayload.Messages) - 3
 		if start < 0 {
 			start = 0
