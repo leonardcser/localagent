@@ -1,6 +1,5 @@
 <script lang="ts">
-import { cn } from "$lib/cn";
-import { formatTimestamp } from "$lib/utils";
+import { cn, formatTimestamp } from "$lib/utils";
 
 let {
 	event_type,

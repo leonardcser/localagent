@@ -1,7 +1,6 @@
 <script lang="ts">
-import { cn } from "$lib/cn";
 import { renderMarkdown, COPY_SVG, CHECK_SVG } from "$lib/markdown";
-import { filename, isAudio, mediaUrl, formatTimestamp } from "$lib/utils";
+import { cn, filename, isAudio, mediaUrl, formatTimestamp } from "$lib/utils";
 import { Icon } from "svelte-icons-pack";
 import { FiFile } from "svelte-icons-pack/fi";
 

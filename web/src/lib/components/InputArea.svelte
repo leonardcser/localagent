@@ -1,5 +1,5 @@
 <script lang="ts">
-import { cn } from "$lib/cn";
+import { cn } from "$lib/utils";
 import { chat } from "$lib/stores/chat.svelte";
 import MediaPreview from "./MediaPreview.svelte";
 import AudioWaveform from "./AudioWaveform.svelte";
