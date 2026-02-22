@@ -55,18 +55,19 @@ func (t *TodoTool) Parameters() map[string]any {
 				"description": "Action to perform.",
 			},
 			"task": map[string]any{
-				"type":                 "object",
-				"description":          "Task object for add action.",
-				"additionalProperties": true,
+				"type":        "object",
+				"description": "Task object for add action.",
+				"properties":  taskFieldProperties(),
+				"required":    []string{"title"},
 			},
 			"taskId": map[string]any{
 				"type":        "string",
 				"description": "Task ID for update/done/remove.",
 			},
 			"patch": map[string]any{
-				"type":                 "object",
-				"description":          "Patch object for update action.",
-				"additionalProperties": true,
+				"type":        "object",
+				"description": "Patch object for update action.",
+				"properties":  taskFieldProperties(),
 			},
 			"status": map[string]any{
 				"type":        "string",
@@ -79,6 +80,18 @@ func (t *TodoTool) Parameters() map[string]any {
 			},
 		},
 		"required": []string{"action"},
+	}
+}
+
+func taskFieldProperties() map[string]any {
+	return map[string]any{
+		"title":       map[string]any{"type": "string", "description": "Task title."},
+		"description": map[string]any{"type": "string", "description": "Task description."},
+		"priority":    map[string]any{"type": "string", "enum": []string{"low", "medium", "high"}, "description": "Task priority."},
+		"due":         map[string]any{"type": "string", "description": "Due date as YYYY-MM-DD."},
+		"recurrence":  map[string]any{"type": "string", "enum": []string{"daily", "weekly", "monthly"}, "description": "Recurrence rule."},
+		"tags":        map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Tags for categorization."},
+		"status":      map[string]any{"type": "string", "enum": []string{"todo", "doing", "done"}, "description": "Task status."},
 	}
 }
 
