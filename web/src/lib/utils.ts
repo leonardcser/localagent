@@ -23,5 +23,11 @@ export function mediaUrl(path: string): string {
 }
 
 export function nowTimestamp(): string {
-	return new Date().toLocaleTimeString("en-GB", { hour12: false });
+	return new Date().toISOString();
+}
+
+export function formatTimestamp(ts: string): string {
+	const d = new Date(ts);
+	if (isNaN(d.getTime())) return ts;
+	return d.toLocaleTimeString(undefined, { hour12: false });
 }

@@ -205,7 +205,7 @@ func (s *Server) handleHistory(c *echo.Context) error {
 				Role:      msg.Role,
 				Content:   msg.Content,
 				Media:     entry.Media,
-				Timestamp: entry.Timestamp.Format("15:04:05"),
+				Timestamp: entry.Timestamp.Format(time.RFC3339),
 			})
 		} else if entry.Activity != nil {
 			evt := entry.Activity
@@ -214,7 +214,7 @@ func (s *Server) handleHistory(c *echo.Context) error {
 				EventType: string(evt.Type),
 				Message:   evt.Message,
 				Detail:    evt.Detail,
-				Timestamp: entry.Timestamp.Format("15:04:05"),
+				Timestamp: entry.Timestamp.Format(time.RFC3339),
 			})
 		}
 	}

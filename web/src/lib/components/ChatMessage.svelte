@@ -1,7 +1,7 @@
 <script lang="ts">
 import { cn } from "$lib/cn";
 import { renderMarkdown, COPY_SVG, CHECK_SVG } from "$lib/markdown";
-import { filename, isAudio, mediaUrl } from "$lib/utils";
+import { filename, isAudio, mediaUrl, formatTimestamp } from "$lib/utils";
 import { Icon } from "svelte-icons-pack";
 import { FiFile } from "svelte-icons-pack/fi";
 
@@ -65,7 +65,7 @@ function handleClick(e: MouseEvent) {
 			{/if}
 		</div>
 		<span class="mt-1 text-[10px] font-mono text-text-muted">
-			{#if queued}<span class="text-text-muted/60">queued &middot; </span>{/if}{timestamp}
+			{#if queued}<span class="text-text-muted/60">queued &middot; </span>{/if}{formatTimestamp(timestamp)}
 		</span>
 	</div>
 {:else}
@@ -74,7 +74,7 @@ function handleClick(e: MouseEvent) {
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div class="msg-content" onclick={handleClick} onkeydown={() => {}}>{@html html}</div>
 		</div>
-		<span class="mt-1 text-[10px] font-mono text-text-muted">{timestamp}</span>
+		<span class="mt-1 text-[10px] font-mono text-text-muted">{formatTimestamp(timestamp)}</span>
 	</div>
 {/if}
 

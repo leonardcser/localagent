@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"localagent/pkg/activity"
 	"localagent/pkg/bus"
@@ -129,7 +130,7 @@ func (ch *WebChatChannel) Emit(evt activity.Event) {
 		Type: "activity",
 		Event: &ActivityData{
 			EventType: string(evt.Type),
-			Timestamp: evt.Timestamp.Format("15:04:05"),
+			Timestamp: evt.Timestamp.Format(time.RFC3339),
 			Message:   evt.Message,
 			Detail:    evt.Detail,
 		},

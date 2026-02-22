@@ -1,5 +1,6 @@
 <script lang="ts">
 import { cn } from "$lib/cn";
+import { formatTimestamp } from "$lib/utils";
 
 let {
 	event_type,
@@ -54,7 +55,7 @@ function label(t: string): string {
 	<span class={cn("text-[11px] leading-4.5 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap", isToolError() ? "text-error/80" : "text-text-muted")} title={message}>
 		{message}
 	</span>
-	<span class="ml-auto pl-2 text-[10px] text-text-muted/50 font-mono shrink-0">{timestamp}</span>
+	<span class="ml-auto pl-2 text-[10px] text-text-muted/50 font-mono shrink-0">{formatTimestamp(timestamp)}</span>
 </button>
 {#if expanded && detail}
 	<pre class="ml-12 mb-0.5 px-2 py-1 text-[10px] font-mono text-text-muted bg-bg-tertiary rounded overflow-x-auto whitespace-pre-wrap break-all">{JSON.stringify(detail, null, 2)}</pre>
