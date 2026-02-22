@@ -151,7 +151,9 @@ func (p *HTTPProvider) parseResponse(body []byte) (*LLMResponse, error) {
 		if tc.Function != nil {
 			name = tc.Function.Name
 			if tc.Function.Arguments != "" {
+				logger.Info("raw tool call arguments for %s: %s", name, tc.Function.Arguments)
 				if err := json.Unmarshal([]byte(tc.Function.Arguments), &arguments); err != nil {
+					logger.Warn("failed to parse tool arguments for %s: %v (raw: %s)", name, err, tc.Function.Arguments)
 					arguments["raw"] = tc.Function.Arguments
 				}
 			}
