@@ -137,12 +137,6 @@ func NewAgentLoop(cfg *config.Config, msgBus *bus.MessageBus, provider providers
 
 	sessionsManager := session.NewSessionManager(filepath.Join(workspace, "sessions"))
 
-	// Wire session manager into message tool so outbound messages are persisted
-	if tool, ok := toolsRegistry.Get("message"); ok {
-		if mt, ok := tool.(*tools.MessageTool); ok {
-			mt.SetSessionManager(sessionsManager)
-		}
-	}
 
 	// Create state manager for atomic state persistence
 	stateManager := state.NewManager(workspace)
@@ -671,7 +665,7 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 				logger.Debug("sent tool result to user: %s content_len=%d", tc.Name, len(toolResult.ForUser))
 			}
 
-			toolResultMsg := tools.BuildToolResultMessage(tc.ID, toolResult)
+			toolResultMsg := tools.BuildToolResultMessage(tc.ID, tc.Name, toolResult)
 			messages = append(messages, toolResultMsg)
 
 			// Save tool result message to session

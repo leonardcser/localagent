@@ -197,16 +197,22 @@ func (s *Server) handleHistory(c *echo.Context) error {
 	for _, entry := range timeline {
 		if entry.Kind == "message" {
 			msg := entry.Message
-			if msg.Role != "user" && msg.Role != "assistant" {
-				continue
+			if msg.Role == "tool" && msg.ToolName == "message" {
+				items = append(items, timelineItem{
+					Type:      "message",
+					Role:      "assistant",
+					Content:   msg.Content,
+					Timestamp: entry.Timestamp.Format(time.RFC3339),
+				})
+			} else if msg.Role == "user" || msg.Role == "assistant" {
+				items = append(items, timelineItem{
+					Type:      "message",
+					Role:      msg.Role,
+					Content:   msg.Content,
+					Media:     entry.Media,
+					Timestamp: entry.Timestamp.Format(time.RFC3339),
+				})
 			}
-			items = append(items, timelineItem{
-				Type:      "message",
-				Role:      msg.Role,
-				Content:   msg.Content,
-				Media:     entry.Media,
-				Timestamp: entry.Timestamp.Format(time.RFC3339),
-			})
 		} else if entry.Activity != nil {
 			evt := entry.Activity
 			items = append(items, timelineItem{

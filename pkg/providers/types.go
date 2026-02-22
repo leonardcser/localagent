@@ -53,6 +53,7 @@ type Message struct {
 	ContentParts []ContentPart `json:"-"`
 	ToolCalls    []ToolCall    `json:"-"`
 	ToolCallID   string        `json:"-"`
+	ToolName     string        `json:"-"` // name of the tool that produced this result (role=tool only)
 }
 
 func (m Message) MarshalJSON() ([]byte, error) {

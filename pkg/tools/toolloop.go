@@ -43,7 +43,7 @@ func BuildAssistantToolCallMessage(content string, toolCalls []providers.ToolCal
 }
 
 // BuildToolResultMessage builds a tool result message with ForLLM/Err fallback logic.
-func BuildToolResultMessage(toolCallID string, result *ToolResult) providers.Message {
+func BuildToolResultMessage(toolCallID, toolName string, result *ToolResult) providers.Message {
 	contentForLLM := result.ForLLM
 	if contentForLLM == "" && result.Err != nil {
 		contentForLLM = result.Err.Error()
@@ -52,6 +52,7 @@ func BuildToolResultMessage(toolCallID string, result *ToolResult) providers.Mes
 		Role:       "tool",
 		Content:    contentForLLM,
 		ToolCallID: toolCallID,
+		ToolName:   toolName,
 	}
 }
 
@@ -106,7 +107,7 @@ func RunToolLoop(ctx context.Context, config ToolLoopConfig, messages []provider
 				toolResult = ErrorResult("No tools available")
 			}
 
-			messages = append(messages, BuildToolResultMessage(tc.ID, toolResult))
+			messages = append(messages, BuildToolResultMessage(tc.ID, tc.Name, toolResult))
 		}
 	}
 
