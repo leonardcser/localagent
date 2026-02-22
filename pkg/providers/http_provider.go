@@ -69,24 +69,6 @@ func (p *HTTPProvider) Chat(ctx context.Context, messages []Message, tools []Too
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	// Log the tools array to verify schema reaches the LLM correctly
-	var debugPayload struct {
-		Messages []json.RawMessage `json:"messages"`
-		Tools    json.RawMessage   `json:"tools"`
-	}
-	if err := json.Unmarshal(jsonData, &debugPayload); err == nil {
-		if debugPayload.Tools != nil {
-			logger.Info("LLM request tools: %s", string(debugPayload.Tools))
-		}
-		start := len(debugPayload.Messages) - 3
-		if start < 0 {
-			start = 0
-		}
-		for i := start; i < len(debugPayload.Messages); i++ {
-			logger.Info("LLM request msg[%d/%d]: %s", i, len(debugPayload.Messages), string(debugPayload.Messages[i]))
-		}
-	}
-
 	req, err := http.NewRequestWithContext(ctx, "POST", p.apiBase+"/chat/completions", bytes.NewReader(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -155,7 +137,6 @@ func (p *HTTPProvider) parseResponse(body []byte) (*LLMResponse, error) {
 		if tc.Function != nil {
 			name = tc.Function.Name
 			if tc.Function.Arguments != "" {
-				logger.Info("raw tool call arguments for %s: %s", name, tc.Function.Arguments)
 				if err := json.Unmarshal([]byte(tc.Function.Arguments), &arguments); err != nil {
 					logger.Warn("failed to parse tool arguments for %s: %v (raw: %s)", name, err, tc.Function.Arguments)
 					arguments["raw"] = tc.Function.Arguments
