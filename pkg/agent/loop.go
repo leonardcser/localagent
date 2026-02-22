@@ -84,12 +84,8 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 	registry.Register(tools.NewStockTool(yf))
 	registry.Register(tools.NewCurrencyTool(yf))
 
-	// Task tools
-	registry.Register(tools.NewListTasksTool(todoService))
-	registry.Register(tools.NewAddTaskTool(todoService))
-	registry.Register(tools.NewUpdateTaskTool(todoService))
-	registry.Register(tools.NewCompleteTaskTool(todoService))
-	registry.Register(tools.NewRemoveTaskTool(todoService))
+	// Tasks tool
+	registry.Register(tools.NewTodoTool(todoService))
 
 	registry.Register(tools.NewMessageTool(msgBus))
 
