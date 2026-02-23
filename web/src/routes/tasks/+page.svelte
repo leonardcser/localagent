@@ -614,7 +614,7 @@ function handleKeydown(e: KeyboardEvent) {
 														: taskStore.complete(task.id);
 												}
 											}}
-											class="flex h-5 w-5 shrink-0 items-center justify-center rounded border-[1.5px] transition-colors duration-100
+											class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
 												{task.status === 'done' ? 'border-success bg-success text-white' : 'border-border-light text-transparent hover:border-text-muted hover:text-text-muted/50'}"
 										>
 											<Icon src={FiCheck} size="11" />
