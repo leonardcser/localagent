@@ -244,8 +244,6 @@ function handleClick(e: MouseEvent) {
 	.msg-content :global(.table-wrapper) {
 		overflow-x: auto;
 		margin: 0.5em 0;
-		border: 1px solid var(--color-border-light);
-		border-radius: 0.5rem;
 	}
 
 	.msg-content :global(table) {
@@ -253,6 +251,7 @@ function handleClick(e: MouseEvent) {
 		border-spacing: 0;
 		font-size: 0.875em;
 		min-width: 100%;
+		border: 1px solid var(--color-border-light);
 		border-radius: 0.5rem;
 		overflow: hidden;
 	}

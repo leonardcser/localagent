@@ -9,26 +9,40 @@ import {
 
 const PREFS_KEY = "tasks-prefs";
 
+export type SmartList =
+	| "all"
+	| "today"
+	| "tomorrow"
+	| "next7"
+	| "inbox"
+	| "done";
+
 interface TaskPrefs {
 	view: "list" | "kanban";
-	filterStatus: string;
+	smartList: SmartList;
 	filterTag: string;
-	filterDue: string;
 	selectedId: string;
 }
 
 function loadPrefs(): TaskPrefs {
 	try {
 		const raw = localStorage.getItem(PREFS_KEY);
-		if (raw) return JSON.parse(raw);
+		if (raw) {
+			const parsed = JSON.parse(raw);
+			return {
+				view: parsed.view ?? "list",
+				smartList: parsed.smartList ?? "all",
+				filterTag: parsed.filterTag ?? "",
+				selectedId: parsed.selectedId ?? "",
+			};
+		}
 	} catch {
 		// ignore
 	}
 	return {
 		view: "list",
-		filterStatus: "",
+		smartList: "all",
 		filterTag: "",
-		filterDue: "",
 		selectedId: "",
 	};
 }
@@ -41,25 +55,30 @@ function savePrefs(prefs: TaskPrefs) {
 	}
 }
 
+function todayStr(): string {
+	return new Date().toISOString().slice(0, 10);
+}
+
+function tomorrowStr(): string {
+	return new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+}
+
+function next7Str(): string {
+	return new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+}
+
 function createTaskStore() {
 	const initialPrefs = loadPrefs();
 	let tasks = $state<Task[]>([]);
 	let loading = $state(false);
 	let search = $state("");
-	let filterStatus = $state(initialPrefs.filterStatus);
+	let smartList = $state<SmartList>(initialPrefs.smartList);
 	let filterTag = $state(initialPrefs.filterTag);
-	let filterDue = $state(initialPrefs.filterDue);
 	let view = $state<"list" | "kanban">(initialPrefs.view);
 	let selectedId = $state(initialPrefs.selectedId);
 
 	function persistPrefs() {
-		savePrefs({
-			view,
-			filterStatus,
-			filterTag,
-			filterDue,
-			selectedId,
-		});
+		savePrefs({ view, smartList, filterTag, selectedId });
 	}
 
 	let allTags = $derived.by(() => {
@@ -68,6 +87,41 @@ function createTaskStore() {
 			for (const tag of t.tags ?? []) set.add(tag);
 		}
 		return [...set].sort();
+	});
+
+	let counts = $derived.by(() => {
+		const today = todayStr();
+		const tomorrow = tomorrowStr();
+		const next7 = next7Str();
+		let all = 0;
+		let todayCount = 0;
+		let tomorrowCount = 0;
+		let next7Count = 0;
+		let inbox = 0;
+		let done = 0;
+		for (const t of tasks) {
+			if (t.status === "done") {
+				done++;
+				continue;
+			}
+			all++;
+			if (t.due) {
+				if (t.due <= today) todayCount++;
+				if (t.due === tomorrow) tomorrowCount++;
+				if (t.due <= next7) next7Count++;
+			} else {
+				inbox++;
+				todayCount++;
+			}
+		}
+		return {
+			all,
+			today: todayCount,
+			tomorrow: tomorrowCount,
+			next7: next7Count,
+			inbox,
+			done,
+		};
 	});
 
 	let filtered = $derived.by(() => {
@@ -80,18 +134,44 @@ function createTaskStore() {
 					t.title.toLowerCase().includes(q) ||
 					(t.description?.toLowerCase().includes(q) ?? false),
 			);
+			return result;
 		}
 
-		if (filterStatus) {
-			result = result.filter((t) => t.status === filterStatus);
+		switch (smartList) {
+			case "today": {
+				const today = todayStr();
+				result = result.filter(
+					(t) => t.status !== "done" && (!t.due || t.due <= today),
+				);
+				break;
+			}
+			case "tomorrow": {
+				const tomorrow = tomorrowStr();
+				result = result.filter(
+					(t) => t.status !== "done" && t.due === tomorrow,
+				);
+				break;
+			}
+			case "next7": {
+				const next7 = next7Str();
+				result = result.filter(
+					(t) => t.status !== "done" && t.due && t.due <= next7,
+				);
+				break;
+			}
+			case "inbox":
+				result = result.filter((t) => t.status !== "done" && !t.due);
+				break;
+			case "done":
+				result = result.filter((t) => t.status === "done");
+				break;
+			case "all":
+				result = result.filter((t) => t.status !== "done");
+				break;
 		}
 
 		if (filterTag) {
 			result = result.filter((t) => t.tags?.includes(filterTag));
-		}
-
-		if (filterDue) {
-			result = result.filter((t) => t.due === filterDue);
 		}
 
 		return result;
@@ -164,11 +244,11 @@ function createTaskStore() {
 		set search(v: string) {
 			search = v;
 		},
-		get filterStatus() {
-			return filterStatus;
+		get smartList() {
+			return smartList;
 		},
-		set filterStatus(v: string) {
-			filterStatus = v;
+		set smartList(v: SmartList) {
+			smartList = v;
 			persistPrefs();
 		},
 		get filterTag() {
@@ -176,13 +256,6 @@ function createTaskStore() {
 		},
 		set filterTag(v: string) {
 			filterTag = v;
-			persistPrefs();
-		},
-		get filterDue() {
-			return filterDue;
-		},
-		set filterDue(v: string) {
-			filterDue = v;
 			persistPrefs();
 		},
 		get view() {
@@ -207,6 +280,9 @@ function createTaskStore() {
 		set selectedId(v: string) {
 			selectedId = v;
 			persistPrefs();
+		},
+		get counts() {
+			return counts;
 		},
 		load,
 		add,
