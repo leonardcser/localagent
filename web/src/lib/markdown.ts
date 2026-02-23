@@ -21,6 +21,12 @@ function escapeHtml(s: string): string {
 		.replace(/"/g, "&quot;");
 }
 
+const inlineMarked = new Marked();
+
+function parseInline(text: string): string {
+	return inlineMarked.parseInline(text) as string;
+}
+
 const marked = new Marked({
 	renderer: {
 		code({ text, lang }) {
@@ -32,6 +38,18 @@ const marked = new Marked({
 				lang: lang || "",
 			});
 			return placeholder;
+		},
+		table(token) {
+			const headerCells = (token.header as Array<{ text: string }>)
+				.map((h) => `<th>${parseInline(h.text)}</th>`)
+				.join("");
+			const bodyRows = (token.rows as Array<Array<{ text: string }>>)
+				.map(
+					(row) =>
+						`<tr>${row.map((cell) => `<td>${parseInline(cell.text)}</td>`).join("")}</tr>`,
+				)
+				.join("");
+			return `<div class="table-wrapper"><table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table></div>`;
 		},
 	},
 });

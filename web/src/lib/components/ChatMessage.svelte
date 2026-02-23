@@ -241,13 +241,18 @@ function handleClick(e: MouseEvent) {
 		margin: 0.75em 0;
 	}
 
+	.msg-content :global(.table-wrapper) {
+		overflow-x: auto;
+		margin: 0.5em 0;
+		border: 1px solid var(--color-border-light);
+		border-radius: 0.5rem;
+	}
+
 	.msg-content :global(table) {
 		border-collapse: separate;
 		border-spacing: 0;
-		margin: 0.5em 0;
 		font-size: 0.875em;
-		width: 100%;
-		border: 1px solid var(--color-border-light);
+		min-width: 100%;
 		border-radius: 0.5rem;
 		overflow: hidden;
 	}
