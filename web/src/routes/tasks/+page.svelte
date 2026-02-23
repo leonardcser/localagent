@@ -615,7 +615,7 @@ function handleKeydown(e: KeyboardEvent) {
 												}
 											}}
 											class="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
-												{task.status === 'done' ? 'border-success bg-success text-white' : task.priority === 'high' ? 'border-error/50 text-transparent hover:border-error hover:text-error/50' : task.priority === 'medium' ? 'border-warning/50 text-transparent hover:border-warning hover:text-warning/50' : 'border-border-light text-transparent hover:border-text-muted hover:text-text-muted/50'}"
+												{task.status === 'done' ? 'border-success bg-success text-white' : 'border-border-light text-transparent hover:border-text-muted hover:text-text-muted/50'}"
 										>
 											<Icon src={FiCheck} size="11" />
 										</span>
