@@ -380,6 +380,7 @@ function handleKeydown(e: KeyboardEvent) {
 						size="13"
 						className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted"
 					/>
+					<!-- svelte-ignore a11y_autofocus -->
 					<input
 						type="text"
 						placeholder="Search tasks..."
@@ -486,6 +487,7 @@ function handleKeydown(e: KeyboardEvent) {
 						size="14"
 						className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted"
 					/>
+					<!-- svelte-ignore a11y_autofocus -->
 					<input
 						type="text"
 						placeholder="Search tasks..."
@@ -893,7 +895,7 @@ function handleKeydown(e: KeyboardEvent) {
 					<Icon
 						src={item.icon}
 						size="17"
-						className="{taskStore.smartList === item.key && !taskStore.search ? 'text-accent' : 'text-text-muted'}"
+						className={taskStore.smartList === item.key && !taskStore.search ? 'text-accent' : 'text-text-muted'}
 					/>
 					<span class="flex-1 text-left">{item.label}</span>
 					<span class="text-[12px] tabular-nums text-text-muted">{taskStore.counts[item.key]}</span>
@@ -908,7 +910,7 @@ function handleKeydown(e: KeyboardEvent) {
 						class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[14px] transition-colors
 							{taskStore.filterTag === tag ? 'bg-accent/10 text-accent' : 'text-text-secondary hover:bg-overlay-light'}"
 					>
-						<Icon src={FiTag} size="14" className="{taskStore.filterTag === tag ? 'text-accent' : 'text-text-muted'}" />
+						<Icon src={FiTag} size="14" className={taskStore.filterTag === tag ? 'text-accent' : 'text-text-muted'} />
 						<span>{tag}</span>
 					</button>
 				{/each}
@@ -952,6 +954,7 @@ function handleKeydown(e: KeyboardEvent) {
 			</div>
 
 			<div class="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+				<!-- svelte-ignore a11y_autofocus -->
 				<input
 					type="text"
 					bind:value={panelTitle}
