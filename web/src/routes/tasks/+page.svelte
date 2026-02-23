@@ -413,7 +413,7 @@ function handleKeydown(e: KeyboardEvent) {
 			{#each smartLists as item}
 				<button
 					onclick={() => { taskStore.smartList = item.key; taskStore.search = ""; showSearch = false; showSidebar = false; }}
-					class="group flex items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[13px] transition-colors
+					class="group flex items-center gap-2.5 rounded-lg px-2.5 py-1.75 text-[13px] transition-colors
 						{taskStore.smartList === item.key && !taskStore.search ? 'bg-accent/10 text-accent font-medium' : 'text-text-secondary hover:bg-overlay-light hover:text-text-primary'}"
 				>
 					<Icon
@@ -422,7 +422,7 @@ function handleKeydown(e: KeyboardEvent) {
 						className="shrink-0 {taskStore.smartList === item.key && !taskStore.search ? 'text-accent' : 'text-text-muted group-hover:text-text-secondary'}"
 					/>
 					<span class="flex-1 text-left">{item.label}</span>
-					<span class="min-w-[20px] text-right text-[11px] tabular-nums {taskStore.smartList === item.key && !taskStore.search ? 'text-accent/70' : 'text-text-muted'}">
+					<span class="min-w-5 text-right text-[11px] tabular-nums {taskStore.smartList === item.key && !taskStore.search ? 'text-accent/70' : 'text-text-muted'}">
 						{taskStore.counts[item.key]}
 					</span>
 				</button>
@@ -439,7 +439,7 @@ function handleKeydown(e: KeyboardEvent) {
 							taskStore.filterTag = taskStore.filterTag === tag ? "" : tag;
 							showSidebar = false;
 						}}
-						class="flex items-center gap-2.5 rounded-lg px-2.5 py-[6px] text-[13px] transition-colors
+						class="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors
 							{taskStore.filterTag === tag ? 'bg-accent/10 text-accent' : 'text-text-secondary hover:bg-overlay-light hover:text-text-primary'}"
 					>
 						<Icon src={FiTag} size="13" className="shrink-0 {taskStore.filterTag === tag ? 'text-accent' : 'text-text-muted'}" />
@@ -547,7 +547,7 @@ function handleKeydown(e: KeyboardEvent) {
 					<!-- Quick add -->
 					<div class="border-b border-border px-4 py-2 md:px-5">
 						<div class="flex items-center gap-2.5">
-							<div class="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-dashed border-text-muted/40 text-text-muted/40">
+							<div class="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border border-dashed border-text-muted/40 text-text-muted/40">
 								<Icon src={FiPlus} size="10" />
 							</div>
 							<input
@@ -614,7 +614,7 @@ function handleKeydown(e: KeyboardEvent) {
 														: taskStore.complete(task.id);
 												}
 											}}
-											class="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
+											class="flex h-5 w-5 shrink-0 items-center justify-center rounded border-[1.5px] transition-colors duration-100
 												{task.status === 'done' ? 'border-success bg-success text-white' : 'border-border-light text-transparent hover:border-text-muted hover:text-text-muted/50'}"
 										>
 											<Icon src={FiCheck} size="11" />
@@ -685,7 +685,7 @@ function handleKeydown(e: KeyboardEvent) {
 						>
 							<div class="flex items-center gap-2 px-3 py-2.5 border-b border-border">
 								<span class="text-[12px] font-semibold {col.color}">{col.label}</span>
-								<span class="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-overlay-light px-1 text-[10px] text-text-muted">
+								<span class="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-overlay-light px-1 text-[10px] text-text-muted">
 									{taskStore.kanbanColumns[col.key as keyof typeof taskStore.kanbanColumns].length}
 								</span>
 							</div>
@@ -700,7 +700,7 @@ function handleKeydown(e: KeyboardEvent) {
 										ondragend={handleDragEnd}
 										onclick={() => openDetail(task)}
 										onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(task); } }}
-										class="group flex cursor-pointer flex-col gap-1 rounded-lg border bg-bg p-2.5 transition-all duration-150 {draggingId === task.id ? 'border-border rotate-[-2deg] scale-[0.97] cursor-grabbing opacity-40' : panelOpen && taskStore.selectedId === task.id ? 'border-accent shadow-sm' : 'border-border hover:border-border-light hover:shadow-sm'}"
+										class="group flex cursor-pointer flex-col gap-1 rounded-lg border bg-bg p-2.5 transition-all duration-150 {draggingId === task.id ? 'border-border -rotate-2 scale-[0.97] cursor-grabbing opacity-40' : panelOpen && taskStore.selectedId === task.id ? 'border-accent shadow-sm' : 'border-border hover:border-border-light hover:shadow-sm'}"
 									>
 										<div class="flex items-start justify-between gap-1.5">
 											<span class="text-[12px] leading-snug text-text-primary {task.status === 'done' ? 'line-through text-text-muted' : ''}">{task.title}</span>
