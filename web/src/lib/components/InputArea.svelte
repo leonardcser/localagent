@@ -90,15 +90,15 @@ $effect(() => {
 			type="button"
 			class={cn(
 				"flex size-10.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-muted transition-[color,background] duration-150 hover:bg-border hover:text-text-primary disabled:cursor-not-allowed",
-				chat.transcribing && "animate-pulse bg-surface! text-text-secondary! cursor-wait transition-none!",
+				chat.transcribing && "transcribing",
 				!chat.transcribing && chat.recording && "recording",
 			)}
 			onclick={() => chat.toggleRecording()}
-			disabled={chat.loading || chat.transcribing}
+			disabled={chat.transcribing}
 			title={chat.transcribing ? "Transcribing..." : "Voice"}
 		>
 			{#if chat.transcribing}
-				<Icon src={FiMic} size="18" />
+				<span class="spinner"></span>
 			{:else if chat.recording}
 				<span class="block size-3.5 rounded-xs bg-current"></span>
 			{:else}
@@ -137,6 +137,27 @@ $effect(() => {
 		background: var(--color-danger) !important;
 		color: white !important;
 		animation: pulse-ring 1.5s infinite;
+	}
+
+	.transcribing {
+		background: var(--color-overlay-medium) !important;
+		color: var(--color-text-muted) !important;
+		cursor: wait !important;
+		animation: none !important;
+	}
+
+	.spinner {
+		display: block;
+		width: 16px;
+		height: 16px;
+		border: 2px solid var(--color-border);
+		border-top-color: var(--color-text-muted);
+		border-radius: 50%;
+		animation: spin 0.75s linear infinite;
+	}
+
+	@keyframes spin {
+		to { transform: rotate(360deg); }
 	}
 
 	.send-btn.has-input {

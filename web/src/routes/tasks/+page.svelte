@@ -547,7 +547,7 @@ function handleKeydown(e: KeyboardEvent) {
 									ondragend={handleDragEnd}
 									onclick={() => openDetail(task)}
 									onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(task); } }}
-									class="group flex cursor-pointer flex-col gap-1 rounded-md border-l-2 border bg-bg p-2.5 transition-[border-color,box-shadow,transform,opacity] duration-150 hover:border-border-light {panelOpen && taskStore.selectedId === task.id ? 'border-accent border-l-accent' : 'border-border border-l-transparent'} {draggingId === task.id ? 'rotate-[-2deg] scale-[0.97] cursor-grabbing opacity-40' : ''}"
+									class="group flex cursor-pointer flex-col gap-1 rounded-md border-l-2 border bg-bg p-2.5 transition-[border-color,box-shadow,transform,opacity] duration-150 hover:border-border-light {panelOpen && taskStore.selectedId === task.id && draggingId !== task.id ? 'border-accent border-l-accent' : 'border-border border-l-transparent'} {draggingId === task.id ? 'rotate-[-2deg] scale-[0.97] cursor-grabbing opacity-40' : ''}"
 								>
 									<div class="flex items-start justify-between gap-1.5">
 										<span class="text-[12px] leading-snug text-text-primary {task.status === 'done' ? 'line-through text-text-muted' : ''}">{task.title}</span>
