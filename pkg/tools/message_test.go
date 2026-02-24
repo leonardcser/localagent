@@ -9,7 +9,7 @@ import (
 
 func TestMessageTool_Execute_Success(t *testing.T) {
 	msgBus := bus.NewMessageBus()
-	tool := NewMessageTool(msgBus)
+	tool := NewMessageTool(msgBus, nil)
 	tool.SetContext("web", "default")
 
 	ctx := context.Background()
@@ -22,8 +22,8 @@ func TestMessageTool_Execute_Success(t *testing.T) {
 	if !result.Silent {
 		t.Error("Expected Silent=true for successful send")
 	}
-	if result.ForLLM != "Message sent to web:default" {
-		t.Errorf("Expected ForLLM 'Message sent to web:default', got '%s'", result.ForLLM)
+	if result.ForLLM != "Hello, world!" {
+		t.Errorf("Expected ForLLM 'Hello, world!', got '%s'", result.ForLLM)
 	}
 	if result.ForUser != "" {
 		t.Errorf("Expected ForUser to be empty, got '%s'", result.ForUser)
@@ -50,7 +50,7 @@ func TestMessageTool_Execute_Success(t *testing.T) {
 
 func TestMessageTool_Execute_MissingContent(t *testing.T) {
 	msgBus := bus.NewMessageBus()
-	tool := NewMessageTool(msgBus)
+	tool := NewMessageTool(msgBus, nil)
 	tool.SetContext("web", "default")
 
 	ctx := context.Background()
@@ -68,7 +68,7 @@ func TestMessageTool_Execute_MissingContent(t *testing.T) {
 
 func TestMessageTool_Execute_NoContext(t *testing.T) {
 	msgBus := bus.NewMessageBus()
-	tool := NewMessageTool(msgBus)
+	tool := NewMessageTool(msgBus, nil)
 
 	ctx := context.Background()
 	args := map[string]any{
@@ -86,14 +86,14 @@ func TestMessageTool_Execute_NoContext(t *testing.T) {
 }
 
 func TestMessageTool_Name(t *testing.T) {
-	tool := NewMessageTool(bus.NewMessageBus())
+	tool := NewMessageTool(bus.NewMessageBus(), nil)
 	if tool.Name() != "message" {
 		t.Errorf("Expected name 'message', got '%s'", tool.Name())
 	}
 }
 
 func TestMessageTool_Parameters(t *testing.T) {
-	tool := NewMessageTool(bus.NewMessageBus())
+	tool := NewMessageTool(bus.NewMessageBus(), nil)
 	params := tool.Parameters()
 
 	typ, ok := params["type"].(string)

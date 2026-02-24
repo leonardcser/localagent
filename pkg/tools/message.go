@@ -2,19 +2,22 @@ package tools
 
 import (
 	"context"
+	"fmt"
 
 	"localagent/pkg/bus"
+	"localagent/pkg/session"
 )
 
 type MessageTool struct {
 	bus            *bus.MessageBus
+	sessions       *session.SessionManager
 	defaultChannel string
 	defaultChatID  string
 	called         bool
 }
 
-func NewMessageTool(msgBus *bus.MessageBus) *MessageTool {
-	return &MessageTool{bus: msgBus}
+func NewMessageTool(msgBus *bus.MessageBus, sessions *session.SessionManager) *MessageTool {
+	return &MessageTool{bus: msgBus, sessions: sessions}
 }
 
 func (t *MessageTool) Name() string {
@@ -66,6 +69,11 @@ func (t *MessageTool) Execute(ctx context.Context, args map[string]any) *ToolRes
 		ChatID:  chatID,
 		Content: content,
 	})
+
+	if t.sessions != nil {
+		sessionKey := fmt.Sprintf("%s:%s", channel, chatID)
+		t.sessions.AddMessage(sessionKey, "assistant", content)
+	}
 
 	t.called = true
 

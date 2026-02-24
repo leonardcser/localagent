@@ -62,7 +62,7 @@ type processOptions struct {
 
 // createToolRegistry creates a tool registry with common tools.
 // This is shared between main agent and subagents.
-func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.MessageBus, todoService *todo.TodoService) *tools.ToolRegistry {
+func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.MessageBus, todoService *todo.TodoService, sessions *session.SessionManager) *tools.ToolRegistry {
 	registry := tools.NewToolRegistry()
 
 	// File system tools
@@ -91,7 +91,7 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 	registry.Register(tools.NewCompleteTaskTool(todoService))
 	registry.Register(tools.NewRemoveTaskTool(todoService))
 
-	registry.Register(tools.NewMessageTool(msgBus))
+	registry.Register(tools.NewMessageTool(msgBus, sessions))
 
 	if cfg.Tools.PDF.URL != "" {
 		registry.Register(tools.NewPDFToTextTool(workspace, cfg.Tools.PDF.URL, cfg.Tools.PDF.ResolveAPIKey()))
@@ -122,24 +122,16 @@ func NewAgentLoop(cfg *config.Config, msgBus *bus.MessageBus, provider providers
 	todoService := todo.NewTodoService(todoStorePath)
 	todoService.Load()
 
+	sessionsManager := session.NewSessionManager(filepath.Join(workspace, "sessions"))
+
 	// Create tool registry for main agent
-	toolsRegistry := createToolRegistry(workspace, cfg, msgBus, todoService)
+	toolsRegistry := createToolRegistry(workspace, cfg, msgBus, todoService, sessionsManager)
 
 	// Create subagent manager with its own tool registry
 	subagentManager := tools.NewSubagentManager(provider, cfg.Agents.Defaults.Model, workspace, msgBus)
-	subagentTools := createToolRegistry(workspace, cfg, msgBus, todoService)
+	subagentTools := createToolRegistry(workspace, cfg, msgBus, todoService, sessionsManager)
 	// Subagent doesn't need spawn/subagent tools to avoid recursion
 	subagentManager.SetTools(subagentTools)
-
-	// Register spawn tool (for main agent)
-	spawnTool := tools.NewSpawnTool(subagentManager)
-	toolsRegistry.Register(spawnTool)
-
-	// Register subagent tool (synchronous execution)
-	subagentTool := tools.NewSubagentTool(subagentManager)
-	toolsRegistry.Register(subagentTool)
-
-	sessionsManager := session.NewSessionManager(filepath.Join(workspace, "sessions"))
 
 
 	// Create state manager for atomic state persistence
