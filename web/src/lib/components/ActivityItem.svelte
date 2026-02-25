@@ -20,13 +20,13 @@ let {
 } = $props();
 
 function isToolError(): boolean {
-	return event_type === "tool_result" && detail?.status === "error";
+	return event_type === "tool_exec" && detail?.status === "error";
 }
 
 function labelColor(t: string): string {
 	if (t === "llm_error" || isToolError()) return "text-error";
-	if (t.startsWith("llm_")) return "text-accent";
-	if (t.startsWith("tool_")) return "text-warning";
+	if (t === "llm_turn") return "text-accent";
+	if (t === "tool_exec") return "text-warning";
 	if (t === "complete") return "text-success";
 	return "text-text-muted";
 }
@@ -34,12 +34,9 @@ function labelColor(t: string): string {
 function label(t: string): string {
 	if (isToolError()) return "ERROR";
 	const labels: Record<string, string> = {
-		processing_start: "START",
-		llm_request: "LLM",
-		llm_response: "LLM",
+		llm_turn: "LLM",
 		llm_error: "ERROR",
-		tool_call: "TOOL",
-		tool_result: "RESULT",
+		tool_exec: "TOOL",
 		complete: "DONE",
 	};
 	return labels[t] ?? t.toUpperCase();

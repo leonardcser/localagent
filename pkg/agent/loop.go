@@ -432,19 +432,8 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 		al.sessions.AddMessageWithMedia(opts.SessionKey, "user", opts.UserMessage, opts.Media)
 	}
 
-	// 4. Emit processing start activity (after user message is saved so timeline order is correct)
-	if opts.SenderID != "" {
-		al.emitActivity(opts.SessionKey, activity.Event{
-			Type:      activity.ProcessingStart,
-			Timestamp: time.Now(),
-			Message:   fmt.Sprintf("Processing message from %s:%s", opts.Channel, opts.SenderID),
-			Detail: map[string]any{
-				"channel": opts.Channel,
-				"sender":  opts.SenderID,
-				"preview": utils.Truncate(opts.UserMessage, 100),
-			},
-		})
-	}
+	// 4. Signal processing started (for webchat processing indicator)
+	al.activity.Emit(activity.Event{Type: "processing_start"})
 
 	// 5. Run LLM iteration loop
 	finalContent, iteration, tokenCount, err := al.runLLMIteration(ctx, messages, opts)
@@ -527,24 +516,6 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 		logger.Debug("LLM request: iteration=%d model=%s messages=%d tools=%d", iteration, al.model, len(messages), len(providerToolDefs))
 		logger.Debug("full LLM request: iteration=%d messages=%s tools=%s", iteration, formatMessagesForLog(messages), formatToolsForLog(providerToolDefs))
 
-		lastMsgPreview := ""
-		if len(messages) > 0 {
-			last := messages[len(messages)-1]
-			lastMsgPreview = utils.Truncate(last.Content, 300)
-		}
-		al.emitActivity(opts.SessionKey, activity.Event{
-			Type:      activity.LLMRequest,
-			Timestamp: time.Now(),
-			Message:   fmt.Sprintf("LLM request #%d (%s)", iteration, al.model),
-			Detail: map[string]any{
-				"iteration":    iteration,
-				"model":        al.model,
-				"messages":     len(messages),
-				"tools":        len(providerToolDefs),
-				"last_message": lastMsgPreview,
-			},
-		})
-
 		// Call LLM
 		response, err := al.provider.Chat(ctx, messages, providerToolDefs, al.model, map[string]any{
 			"max_tokens":  8192,
@@ -570,23 +541,23 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 		if len(response.ToolCalls) == 0 {
 			finalContent = response.Content
 			logger.Info("LLM response (direct answer): iteration=%d chars=%d", iteration, len(finalContent))
-			responseDetail := map[string]any{
+			turnDetail := map[string]any{
 				"iteration": iteration,
+				"model":     al.model,
 				"chars":     len(finalContent),
-				"content":   utils.Truncate(finalContent, 500),
 			}
 			if response.Usage != nil {
-				responseDetail["usage"] = map[string]any{
+				turnDetail["usage"] = map[string]any{
 					"prompt_tokens":     response.Usage.PromptTokens,
 					"completion_tokens": response.Usage.CompletionTokens,
 					"total_tokens":      response.Usage.TotalTokens,
 				}
 			}
 			al.emitActivity(opts.SessionKey, activity.Event{
-				Type:      activity.LLMResponse,
+				Type:      activity.LLMTurn,
 				Timestamp: time.Now(),
-				Message:   fmt.Sprintf("LLM response #%d (%d chars)", iteration, len(finalContent)),
-				Detail:    responseDetail,
+				Message:   fmt.Sprintf("LLM #%d — %d chars (%s)", iteration, len(finalContent), al.model),
+				Detail:    turnDetail,
 			})
 			break
 		}
@@ -598,14 +569,15 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 		}
 		logger.Info("LLM requested tool calls: %v (count=%d iteration=%d)", toolNames, len(response.ToolCalls), iteration)
 
+		// Emit LLM turn that produced tool calls
 		al.emitActivity(opts.SessionKey, activity.Event{
-			Type:      activity.ToolCall,
+			Type:      activity.LLMTurn,
 			Timestamp: time.Now(),
-			Message:   fmt.Sprintf("Calling %d tool(s): %s", len(response.ToolCalls), strings.Join(toolNames, ", ")),
+			Message:   fmt.Sprintf("LLM #%d — calling %s (%s)", iteration, strings.Join(toolNames, ", "), al.model),
 			Detail: map[string]any{
-				"tools":     toolNames,
-				"count":     len(response.ToolCalls),
 				"iteration": iteration,
+				"model":     al.model,
+				"tools":     toolNames,
 			},
 		})
 
@@ -623,20 +595,7 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 			argsPreview := utils.Truncate(string(argsJSON), 200)
 			logger.Info("tool call: %s(%s) iteration=%d", tc.Name, argsPreview, iteration)
 
-			al.emitActivity(opts.SessionKey, activity.Event{
-				Type:      activity.ToolCall,
-				Timestamp: time.Now(),
-				Message:   fmt.Sprintf("Tool: %s", tc.Name),
-				Detail: map[string]any{
-					"tool":   tc.Name,
-					"params": utils.Truncate(string(argsJSON), 500),
-				},
-			})
-
 			// Create async callback for tools that implement AsyncTool
-			// NOTE: Following openclaw's design, async tools do NOT send results directly to users.
-			// Instead, they notify the agent via PublishInbound, and the agent decides
-			// whether to forward the result to the user (in processSystemMessage).
 			asyncCallback := func(_ context.Context, result *tools.ToolResult) {
 				if !result.Silent && result.ForUser != "" {
 					logger.Info("async tool completed: %s content_len=%d", tc.Name, len(result.ForUser))
@@ -649,16 +608,16 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 			if toolResult.IsError {
 				status = "error"
 			}
-			resultDetail := map[string]any{
-				"tool":    tc.Name,
-				"status":  status,
-				"content": utils.Truncate(toolResult.ForLLM, 500),
-			}
 			al.emitActivity(opts.SessionKey, activity.Event{
-				Type:      activity.ToolResult,
+				Type:      activity.ToolExec,
 				Timestamp: time.Now(),
-				Message:   fmt.Sprintf("Tool result: %s", tc.Name),
-				Detail:    resultDetail,
+				Message:   fmt.Sprintf("%s — %s", tc.Name, status),
+				Detail: map[string]any{
+					"tool":   tc.Name,
+					"params": utils.Truncate(string(argsJSON), 500),
+					"status": status,
+					"result": utils.Truncate(toolResult.ForLLM, 500),
+				},
 			})
 
 			// Send ForUser content to user immediately if not Silent

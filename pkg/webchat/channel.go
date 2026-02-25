@@ -120,9 +120,12 @@ func (ch *WebChatChannel) Send(ctx context.Context, msg bus.OutboundMessage) err
 }
 
 func (ch *WebChatChannel) Emit(evt activity.Event) {
-	if evt.Type == activity.ProcessingStart {
+	// processing_start is an internal signal, not a persisted activity event
+	if evt.Type == "processing_start" {
 		ch.processing.Store(true)
-	} else if evt.Type == activity.Complete {
+		return
+	}
+	if evt.Type == activity.Complete {
 		ch.processing.Store(false)
 	}
 

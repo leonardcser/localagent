@@ -52,13 +52,11 @@ function createChat() {
 	}
 
 	function addActivity(evt: ActivityEventData) {
-		// When the agent starts processing, clear "queued" from the first queued message
-		if (evt.event_type === "processing_start") {
-			for (const item of timeline) {
-				if (item.kind === "message" && item.queued) {
-					item.queued = false;
-					break;
-				}
+		// Any activity event means the agent is processing — dequeue first waiting message
+		for (const item of timeline) {
+			if (item.kind === "message" && item.queued) {
+				item.queued = false;
+				break;
 			}
 		}
 		timeline.push({ kind: "activity", ...evt, id: ++nextId });

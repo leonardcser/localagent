@@ -5,13 +5,10 @@ import "time"
 type EventType string
 
 const (
-	ProcessingStart EventType = "processing_start"
-	LLMRequest      EventType = "llm_request"
-	LLMResponse     EventType = "llm_response"
-	LLMError        EventType = "llm_error"
-	ToolCall        EventType = "tool_call"
-	ToolResult      EventType = "tool_result"
-	Complete        EventType = "complete"
+	LLMTurn  EventType = "llm_turn"
+	LLMError EventType = "llm_error"
+	ToolExec EventType = "tool_exec"
+	Complete EventType = "complete"
 )
 
 type Event struct {

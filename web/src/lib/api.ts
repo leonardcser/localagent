@@ -54,42 +54,29 @@ const mockTimeline: MockTimelineItem[] = [
 	},
 	{
 		kind: "activity",
-		event_type: "processing_start",
+		event_type: "llm_turn",
 		timestamp: "14:20:12",
-		message: "Processing message from web:web-user",
+		message: "LLM #1 — calling list_dir (gpt-4o)",
+		detail: { iteration: 1, model: "gpt-4o", tools: ["list_dir"] },
+	},
+	{
+		kind: "activity",
+		event_type: "tool_exec",
+		timestamp: "14:20:14",
+		message: "list_dir — success",
 		detail: {
-			channel: "web",
-			sender: "web-user",
-			preview: "What files are in the workspace?",
+			tool: "list_dir",
+			params: '{"path":"."}',
+			status: "success",
+			result: "src/ pkg/ go.mod go.sum",
 		},
 	},
 	{
 		kind: "activity",
-		event_type: "llm_request",
-		timestamp: "14:20:12",
-		message: "LLM request #1 (gpt-4o)",
-		detail: { iteration: 1, model: "gpt-4o", messages: 2, tools: 12 },
-	},
-	{
-		kind: "activity",
-		event_type: "tool_call",
-		timestamp: "14:20:14",
-		message: "Tool: list_dir",
-		detail: { tool: "list_dir", args: '{"path":"."}' },
-	},
-	{
-		kind: "activity",
-		event_type: "tool_result",
-		timestamp: "14:20:14",
-		message: "Tool result: list_dir (success)",
-		detail: { tool: "list_dir", status: "success", content_length: 312 },
-	},
-	{
-		kind: "activity",
-		event_type: "llm_response",
+		event_type: "llm_turn",
 		timestamp: "14:20:16",
-		message: "LLM response #2 (445 chars)",
-		detail: { iteration: 2, chars: 445 },
+		message: "LLM #2 — 445 chars (gpt-4o)",
+		detail: { iteration: 2, model: "gpt-4o", chars: 445 },
 	},
 	{
 		kind: "activity",
@@ -115,42 +102,29 @@ const mockTimeline: MockTimelineItem[] = [
 	},
 	{
 		kind: "activity",
-		event_type: "processing_start",
+		event_type: "llm_turn",
 		timestamp: "14:21:03",
-		message: "Processing message from web:web-user",
+		message: "LLM #1 — calling read_file (gpt-4o)",
+		detail: { iteration: 1, model: "gpt-4o", tools: ["read_file"] },
+	},
+	{
+		kind: "activity",
+		event_type: "tool_exec",
+		timestamp: "14:21:05",
+		message: "read_file — success",
 		detail: {
-			channel: "web",
-			sender: "web-user",
-			preview: "Show me the main.go file",
+			tool: "read_file",
+			params: '{"path":"src/main.go"}',
+			status: "success",
+			result: "package main...",
 		},
 	},
 	{
 		kind: "activity",
-		event_type: "llm_request",
-		timestamp: "14:21:03",
-		message: "LLM request #1 (gpt-4o)",
-		detail: { iteration: 1, model: "gpt-4o", messages: 6, tools: 12 },
-	},
-	{
-		kind: "activity",
-		event_type: "tool_call",
-		timestamp: "14:21:05",
-		message: "Tool: read_file",
-		detail: { tool: "read_file", args: '{"path":"src/main.go"}' },
-	},
-	{
-		kind: "activity",
-		event_type: "tool_result",
-		timestamp: "14:21:05",
-		message: "Tool result: read_file (success)",
-		detail: { tool: "read_file", status: "success", content_length: 286 },
-	},
-	{
-		kind: "activity",
-		event_type: "llm_response",
+		event_type: "llm_turn",
 		timestamp: "14:21:07",
-		message: "LLM response #2 (320 chars)",
-		detail: { iteration: 2, chars: 320 },
+		message: "LLM #2 — 320 chars (gpt-4o)",
+		detail: { iteration: 2, model: "gpt-4o", chars: 320 },
 	},
 	{
 		kind: "activity",
@@ -167,7 +141,7 @@ const mockTimeline: MockTimelineItem[] = [
 		timestamp: "14:21:07",
 	},
 
-	// -- Third exchange --
+	// -- Third exchange (multi-tool) --
 	{
 		kind: "message",
 		role: "user",
@@ -176,94 +150,60 @@ const mockTimeline: MockTimelineItem[] = [
 	},
 	{
 		kind: "activity",
-		event_type: "processing_start",
+		event_type: "llm_turn",
 		timestamp: "14:23:01",
-		message: "Processing message from web:web-user",
+		message: "LLM #1 — calling read_file, list_dir (gpt-4o)",
+		detail: { iteration: 1, model: "gpt-4o", tools: ["read_file", "list_dir"] },
+	},
+	{
+		kind: "activity",
+		event_type: "tool_exec",
+		timestamp: "14:23:03",
+		message: "read_file — success",
 		detail: {
-			channel: "web",
-			sender: "web-user",
-			preview: "Can you add a health check endpoint to the gateway?",
+			tool: "read_file",
+			params: '{"path":"pkg/health/server.go"}',
+			status: "success",
+			result: "package health...",
 		},
 	},
 	{
 		kind: "activity",
-		event_type: "llm_request",
-		timestamp: "14:23:01",
-		message: "LLM request #1 (gpt-4o)",
-		detail: { iteration: 1, model: "gpt-4o", messages: 8, tools: 12 },
-	},
-	{
-		kind: "activity",
-		event_type: "tool_call",
-		timestamp: "14:23:03",
-		message: "Calling 2 tool(s): read_file, list_dir",
-		detail: { tools: ["read_file", "list_dir"], count: 2, iteration: 1 },
-	},
-	{
-		kind: "activity",
-		event_type: "tool_call",
-		timestamp: "14:23:03",
-		message: "Tool: read_file",
-		detail: { tool: "read_file", args: '{"path":"pkg/health/server.go"}' },
-	},
-	{
-		kind: "activity",
-		event_type: "tool_result",
-		timestamp: "14:23:03",
-		message: "Tool result: read_file (success)",
-		detail: { tool: "read_file", status: "success", content_length: 1842 },
-	},
-	{
-		kind: "activity",
-		event_type: "tool_call",
-		timestamp: "14:23:03",
-		message: "Tool: list_dir",
-		detail: { tool: "list_dir", args: '{"path":"pkg/health"}' },
-	},
-	{
-		kind: "activity",
-		event_type: "tool_result",
+		event_type: "tool_exec",
 		timestamp: "14:23:04",
-		message: "Tool result: list_dir (success)",
-		detail: { tool: "list_dir", status: "success", content_length: 256 },
+		message: "list_dir — success",
+		detail: {
+			tool: "list_dir",
+			params: '{"path":"pkg/health"}',
+			status: "success",
+			result: "server.go handler.go",
+		},
 	},
 	{
 		kind: "activity",
-		event_type: "llm_request",
-		timestamp: "14:23:04",
-		message: "LLM request #2 (gpt-4o)",
-		detail: { iteration: 2, model: "gpt-4o", messages: 12, tools: 12 },
+		event_type: "llm_turn",
+		timestamp: "14:23:05",
+		message: "LLM #2 — calling edit_file (gpt-4o)",
+		detail: { iteration: 2, model: "gpt-4o", tools: ["edit_file"] },
 	},
 	{
 		kind: "activity",
-		event_type: "tool_call",
+		event_type: "tool_exec",
 		timestamp: "14:23:07",
-		message: "Tool: edit_file",
+		message: "edit_file — success",
 		detail: {
 			tool: "edit_file",
-			args: '{"path":"pkg/health/server.go","old_string":"func (s *Server) setupRoutes()..."}',
+			params: '{"path":"pkg/health/server.go","old_string":"..."}',
+			status: "success",
+			result: "File edited successfully",
 		},
 	},
 	{
 		kind: "activity",
-		event_type: "tool_result",
-		timestamp: "14:23:07",
-		message: "Tool result: edit_file (success)",
-		detail: { tool: "edit_file", status: "success", content_length: 45 },
-	},
-	{
-		kind: "activity",
-		event_type: "llm_request",
-		timestamp: "14:23:08",
-		message: "LLM request #3 (gpt-4o)",
-		detail: { iteration: 3, model: "gpt-4o", messages: 14, tools: 12 },
-	},
-	{
-		kind: "activity",
-		event_type: "llm_response",
+		event_type: "llm_turn",
 		timestamp: "14:23:11",
-		message: "LLM response #3 (482 chars)",
-		detail: { iteration: 3, chars: 482 },
+		message: "LLM #3 — 482 chars (gpt-4o)",
+		detail: { iteration: 3, model: "gpt-4o", chars: 482 },
 	},
 	{
 		kind: "activity",
@@ -292,29 +232,14 @@ function mockSSE(
 ): EventSource {
 	setTimeout(() => {
 		onActivity({
-			event_type: "processing_start",
+			event_type: "llm_turn",
 			timestamp: nowTimestamp(),
-			message: "Processing message from web:web-user",
-			detail: { channel: "web", sender: "web-user", preview: "Hello!" },
-		});
-	}, 3000);
-
-	setTimeout(() => {
-		onActivity({
-			event_type: "llm_request",
-			timestamp: nowTimestamp(),
-			message: "LLM request #1 (gpt-4o)",
-			detail: { iteration: 1, model: "gpt-4o", messages: 4, tools: 12 },
+			message: "LLM #1 — 128 chars (gpt-4o)",
+			detail: { iteration: 1, model: "gpt-4o", chars: 128 },
 		});
 	}, 3500);
 
 	setTimeout(() => {
-		onActivity({
-			event_type: "llm_response",
-			timestamp: nowTimestamp(),
-			message: "LLM response #1 (128 chars)",
-			detail: { iteration: 1, chars: 128 },
-		});
 		onActivity({
 			event_type: "complete",
 			timestamp: nowTimestamp(),
