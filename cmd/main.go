@@ -233,10 +233,20 @@ func gatewayCmd() {
 	)
 	heartbeatService.SetBus(msgBus)
 	heartbeatService.SetEventQueue(eventQueue)
+	if ah := cfg.Heartbeat.ActiveHours; ah != nil {
+		heartbeatService.SetActiveHours(&heartbeat.ActiveHours{
+			Start:    ah.Start,
+			End:      ah.End,
+			Timezone: ah.Timezone,
+		})
+	}
+	sessions := agentLoop.GetSessionManager()
 	heartbeatService.SetHandler(func(prompt, channel, chatID string, isCronEvent bool) *tools.ToolResult {
 		if channel == "" || chatID == "" {
 			channel, chatID = "cli", "direct"
 		}
+		// Snapshot history length so we can roll back HEARTBEAT_OK turns
+		prevLen := len(sessions.GetHistory("heartbeat"))
 		response, err := agentLoop.ProcessHeartbeat(context.Background(), prompt, channel, chatID)
 		if err != nil {
 			return tools.ErrorResult(fmt.Sprintf("Heartbeat error: %v", err))
@@ -246,6 +256,9 @@ func gatewayCmd() {
 		}
 		text, skip := heartbeat.StripHeartbeatToken(response)
 		if skip {
+			// Remove the HEARTBEAT_OK turn from session so only
+			// actual alerts survive in the rolling history.
+			sessions.TruncateHistory("heartbeat", prevLen)
 			return tools.SilentResult("Heartbeat OK")
 		}
 		return tools.NewToolResult(text)

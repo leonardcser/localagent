@@ -291,19 +291,29 @@ func (al *AgentLoop) ProcessDirectWithChannel(ctx context.Context, content, sess
 	return al.processMessage(ctx, msg)
 }
 
-// ProcessHeartbeat processes a heartbeat request without session history.
-// Each heartbeat is independent and doesn't accumulate context.
+// ProcessHeartbeat processes a heartbeat with a rolling session history.
+// Keeps the last heartbeatMaxHistory messages so the agent has context
+// from recent heartbeats (avoids repeating itself, can track changes).
 func (al *AgentLoop) ProcessHeartbeat(ctx context.Context, content, channel, chatID string) (string, error) {
-	return al.runAgentLoop(ctx, processOptions{
-		SessionKey:      "heartbeat",
+	const sessionKey = "heartbeat"
+	const maxHistory = 10
+
+	response, err := al.runAgentLoop(ctx, processOptions{
+		SessionKey:      sessionKey,
 		Channel:         channel,
 		ChatID:          chatID,
 		UserMessage:     content,
 		DefaultResponse: "I've completed processing but have no response to give.",
 		EnableSummary:   false,
 		SendResponse:    false,
-		NoHistory:       true, // Don't load session history for heartbeat
 	})
+
+	// Trim heartbeat session to keep only recent turns
+	if history := al.sessions.GetHistory(sessionKey); len(history) > maxHistory {
+		al.sessions.TruncateHistory(sessionKey, maxHistory)
+	}
+
+	return response, err
 }
 
 func (al *AgentLoop) processMessage(ctx context.Context, msg bus.InboundMessage) (string, error) {

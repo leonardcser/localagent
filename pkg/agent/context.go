@@ -123,6 +123,9 @@ func (cb *ContextBuilder) BuildSystemPrompt() string {
 		parts = append(parts, bootstrapContent)
 	}
 
+	// Heartbeat behavior
+	parts = append(parts, prompts.HeartbeatSystem)
+
 	// Skills - show summary, AI can read full content with read_file tool
 	skillsSummary := cb.skillsLoader.BuildSkillsSummary()
 	if skillsSummary != "" {

@@ -37,7 +37,12 @@
   },
   "heartbeat": {
     "enabled": true,
-    "interval": 30
+    "interval": 30,
+    "active_hours": {
+      "start": "08:00",
+      "end": "22:00",
+      "timezone": "Europe/Zurich"
+    }
   },
   "webchat": {
     "host": "0.0.0.0",

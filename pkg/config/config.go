@@ -51,8 +51,15 @@ func (p ProviderConfig) ResolveAPIKey() string {
 }
 
 type HeartbeatConfig struct {
-	Enabled  bool `json:"enabled"`
-	Interval int  `json:"interval"` // minutes, min 5
+	Enabled     bool              `json:"enabled"`
+	Interval    int               `json:"interval"` // minutes, min 5
+	ActiveHours *ActiveHoursConfig `json:"active_hours,omitempty"`
+}
+
+type ActiveHoursConfig struct {
+	Start    string `json:"start"`    // "HH:MM" e.g. "08:00"
+	End      string `json:"end"`      // "HH:MM" e.g. "22:00"
+	Timezone string `json:"timezone"` // e.g. "America/New_York"
 }
 
 type GatewayConfig struct {

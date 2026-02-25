@@ -1,1 +1,5 @@
-Read HEARTBEAT.md if it exists (workspace context). Follow it strictly. Do not infer or repeat old tasks from prior chats. If nothing needs attention, reply HEARTBEAT_OK.
+Read HEARTBEAT.md if it exists (workspace context). Follow it strictly. Do not infer or repeat old tasks from prior chats.
+
+Gather context before evaluating: use get_user_location (if available) to check the user's location, and calendar with action list_events (if available) to check upcoming events.
+
+If nothing needs attention, reply HEARTBEAT_OK.

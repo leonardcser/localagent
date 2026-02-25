@@ -19,7 +19,15 @@ import (
 const (
 	minIntervalMinutes     = 5
 	defaultIntervalMinutes = 30
+	dedupWindow            = 24 * time.Hour
 )
+
+// ActiveHours defines a time window during which heartbeats are allowed.
+type ActiveHours struct {
+	Start    string // "HH:MM"
+	End      string // "HH:MM"
+	Timezone string // IANA timezone, e.g. "America/New_York"
+}
 
 // HeartbeatHandler is the function type for handling heartbeat.
 // It returns a ToolResult that can indicate async operations.
@@ -38,6 +46,13 @@ type HeartbeatService struct {
 	enabled    bool
 	mu         sync.RWMutex
 	stopChan   chan struct{}
+
+	// Active hours gating
+	activeHours *ActiveHours
+
+	// Deduplication: suppress identical alerts within dedupWindow
+	lastAlertText   string
+	lastAlertSentAt time.Time
 }
 
 // NewHeartbeatService creates a new heartbeat service
@@ -78,6 +93,14 @@ func (hs *HeartbeatService) SetEventQueue(eq *EventQueue) {
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
 	hs.eventQueue = eq
+}
+
+// SetActiveHours configures the active hours window.
+// Heartbeats outside this window are skipped (cron events still go through).
+func (hs *HeartbeatService) SetActiveHours(ah *ActiveHours) {
+	hs.mu.Lock()
+	defer hs.mu.Unlock()
+	hs.activeHours = ah
 }
 
 // Start begins the heartbeat service
@@ -169,6 +192,13 @@ func (hs *HeartbeatService) executeHeartbeat() {
 		return
 	}
 
+	// Active hours gate: skip periodic heartbeats outside the window.
+	// Cron events always go through regardless of active hours.
+	if !hp.isCronEvent && !hs.isWithinActiveHours() {
+		hs.logInfo("Skipped: outside active hours")
+		return
+	}
+
 	if handler == nil {
 		hs.logError("Heartbeat handler not configured")
 		return
@@ -221,12 +251,23 @@ func (hs *HeartbeatService) executeHeartbeat() {
 		return
 	}
 
-	if result.ForUser != "" {
-		hs.sendResponse(result.ForUser)
-	} else if result.ForLLM != "" {
-		hs.sendResponse(result.ForLLM)
+	response := result.ForUser
+	if response == "" {
+		response = result.ForLLM
 	}
 
+	if response == "" {
+		return
+	}
+
+	// Deduplication: suppress identical alerts within the window
+	if hs.isDuplicate(response) {
+		hs.logInfo("Suppressed duplicate alert: %s", response)
+		return
+	}
+
+	hs.recordAlert(response)
+	hs.sendResponse(response)
 	hs.logInfo("Heartbeat completed: %s", result.ForLLM)
 }
 
@@ -377,6 +418,84 @@ func (hs *HeartbeatService) createDefaultHeartbeatTemplate() {
 	}
 }
 
+// --- Active hours ---
+
+// isWithinActiveHours checks whether the current time falls inside the
+// configured active hours window. Returns true if no window is configured.
+func (hs *HeartbeatService) isWithinActiveHours() bool {
+	hs.mu.RLock()
+	ah := hs.activeHours
+	hs.mu.RUnlock()
+
+	if ah == nil || ah.Start == "" || ah.End == "" {
+		return true
+	}
+
+	loc := time.UTC
+	if ah.Timezone != "" {
+		var err error
+		loc, err = time.LoadLocation(ah.Timezone)
+		if err != nil {
+			hs.logError("Invalid active_hours timezone %q: %v", ah.Timezone, err)
+			return true
+		}
+	}
+
+	now := time.Now().In(loc)
+	cur := now.Hour()*60 + now.Minute()
+
+	start := parseTimeMinutes(ah.Start)
+	end := parseTimeMinutes(ah.End)
+	if start < 0 || end < 0 {
+		hs.logError("Invalid active_hours start/end: %s-%s", ah.Start, ah.End)
+		return true
+	}
+
+	if start <= end {
+		return cur >= start && cur < end
+	}
+	// Overnight window (e.g. 22:00–06:00)
+	return cur >= start || cur < end
+}
+
+// parseTimeMinutes parses "HH:MM" into minutes since midnight. Returns -1 on error.
+func parseTimeMinutes(t string) int {
+	parts := strings.SplitN(t, ":", 2)
+	if len(parts) != 2 {
+		return -1
+	}
+	var h, m int
+	if _, err := fmt.Sscanf(parts[0], "%d", &h); err != nil {
+		return -1
+	}
+	if _, err := fmt.Sscanf(parts[1], "%d", &m); err != nil {
+		return -1
+	}
+	if h < 0 || h > 23 || m < 0 || m > 59 {
+		return -1
+	}
+	return h*60 + m
+}
+
+// --- Deduplication ---
+
+// isDuplicate returns true if the response is identical to the last alert
+// and was sent within the dedup window.
+func (hs *HeartbeatService) isDuplicate(text string) bool {
+	if hs.lastAlertText == "" {
+		return false
+	}
+	return text == hs.lastAlertText && time.Since(hs.lastAlertSentAt) < dedupWindow
+}
+
+// recordAlert stores the alert text and timestamp for dedup comparison.
+func (hs *HeartbeatService) recordAlert(text string) {
+	hs.lastAlertText = text
+	hs.lastAlertSentAt = time.Now()
+}
+
+// --- Response delivery ---
+
 // sendResponse sends the heartbeat response to the last active channel.
 func (hs *HeartbeatService) sendResponse(response string) {
 	lastChannel := hs.state.GetLastChannel()
@@ -436,6 +555,8 @@ func (hs *HeartbeatService) parseLastChannel(lastChannel string) (platform, user
 
 	return platform, userID
 }
+
+// --- Logging ---
 
 // logInfo logs an informational message to the heartbeat log
 func (hs *HeartbeatService) logInfo(format string, args ...any) {
