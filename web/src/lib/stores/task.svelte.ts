@@ -111,7 +111,6 @@ function createTaskStore() {
 				if (t.due <= next7) next7Count++;
 			} else {
 				inbox++;
-				todayCount++;
 			}
 		}
 		return {
@@ -141,7 +140,7 @@ function createTaskStore() {
 			case "today": {
 				const today = todayStr();
 				result = result.filter(
-					(t) => t.status !== "done" && (!t.due || t.due <= today),
+					(t) => t.status !== "done" && t.due && t.due <= today,
 				);
 				break;
 			}

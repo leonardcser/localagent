@@ -623,6 +623,8 @@ function handleKeydown(e: KeyboardEvent) {
 											>
 												<Icon src={FiChevronDown} size="13" />
 											</span>
+										{:else}
+											<span class="w-5 shrink-0"></span>
 										{/if}
 										<span
 											role="checkbox"
