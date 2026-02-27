@@ -21,6 +21,7 @@ type Task struct {
 	Due         string   `json:"due,omitempty"`
 	Recurrence  string   `json:"recurrence,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
+	ParentID    string   `json:"parentId,omitempty"`
 	CreatedAtMS int64    `json:"createdAtMs"`
 	UpdatedAtMS int64    `json:"updatedAtMs"`
 	DoneAtMS    *int64   `json:"doneAtMs,omitempty"`
@@ -156,6 +157,9 @@ func (s *TodoService) UpdateTask(taskID string, patch map[string]any) (*Task, er
 	if tags, ok := patch["tags"]; ok {
 		task.Tags = toStringSlice(tags)
 	}
+	if parentID, ok := patch["parentId"].(string); ok {
+		task.ParentID = parentID
+	}
 
 	task.UpdatedAtMS = time.Now().UnixMilli()
 	if err := s.saveStoreUnsafe(); err != nil {
@@ -218,7 +222,7 @@ func (s *TodoService) RemoveTask(taskID string) bool {
 	before := len(s.store.Tasks)
 	var tasks []Task
 	for _, t := range s.store.Tasks {
-		if t.ID != taskID {
+		if t.ID != taskID && t.ParentID != taskID {
 			tasks = append(tasks, t)
 		}
 	}

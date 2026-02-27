@@ -362,6 +362,7 @@ export interface Task {
 	due?: string;
 	recurrence?: string;
 	tags?: string[];
+	parentId?: string;
 	createdAtMs: number;
 	updatedAtMs: number;
 	doneAtMs?: number;

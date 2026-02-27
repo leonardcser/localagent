@@ -95,6 +95,10 @@ func (t *AddTaskTool) Parameters() map[string]any {
 				"items":       map[string]any{"type": "string"},
 				"description": "Tags for categorization.",
 			},
+			"parentId": map[string]any{
+				"type":        "string",
+				"description": "Parent task ID to create this as a subtask.",
+			},
 		},
 		"required": []string{"title"},
 	}
@@ -121,6 +125,9 @@ func (t *AddTaskTool) Execute(_ context.Context, args map[string]any) *ToolResul
 	}
 	if v, ok := args["tags"]; ok {
 		task.Tags = toStringSliceFromAny(v)
+	}
+	if v, ok := args["parentId"].(string); ok {
+		task.ParentID = v
 	}
 
 	created, err := t.service.AddTask(task)
@@ -183,6 +190,10 @@ func (t *UpdateTaskTool) Parameters() map[string]any {
 				"items":       map[string]any{"type": "string"},
 				"description": "New tags.",
 			},
+			"parentId": map[string]any{
+				"type":        "string",
+				"description": "New parent task ID (empty string to remove parent).",
+			},
 		},
 		"required": []string{"taskId"},
 	}
@@ -195,7 +206,7 @@ func (t *UpdateTaskTool) Execute(_ context.Context, args map[string]any) *ToolRe
 	}
 
 	patch := make(map[string]any)
-	for _, key := range []string{"title", "description", "priority", "due", "recurrence", "status"} {
+	for _, key := range []string{"title", "description", "priority", "due", "recurrence", "status", "parentId"} {
 		if v, ok := args[key]; ok {
 			patch[key] = v
 		}

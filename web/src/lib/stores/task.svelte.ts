@@ -185,6 +185,30 @@ function createTaskStore() {
 		};
 	});
 
+	let childrenMap = $derived.by(() => {
+		const map = new Map<string, Task[]>();
+		for (const t of tasks) {
+			if (t.parentId) {
+				const list = map.get(t.parentId) ?? [];
+				list.push(t);
+				map.set(t.parentId, list);
+			}
+		}
+		return map;
+	});
+
+	function subtasksOf(id: string): Task[] {
+		return childrenMap.get(id) ?? [];
+	}
+
+	function isParent(id: string): boolean {
+		return childrenMap.has(id);
+	}
+
+	let topLevelFiltered = $derived.by(() => {
+		return filtered.filter((t) => !t.parentId);
+	});
+
 	async function load() {
 		loading = true;
 		tasks = await getTasks();
@@ -284,6 +308,11 @@ function createTaskStore() {
 		get counts() {
 			return counts;
 		},
+		get topLevelFiltered() {
+			return topLevelFiltered;
+		},
+		subtasksOf,
+		isParent,
 		load,
 		add,
 		update,
