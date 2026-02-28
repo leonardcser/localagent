@@ -198,7 +198,7 @@ function handleClick(e: MouseEvent) {
 	}
 
 	.msg-content :global(ol) {
-		padding-left: 1.5em;
+		padding-left: 2em;
 		margin: 0.25em 0;
 		list-style: decimal;
 	}
