@@ -14,7 +14,7 @@ import (
 	"github.com/labstack/echo/v5/middleware"
 )
 
-//go:embed static/*
+//go:embed all:static
 var staticFiles embed.FS
 
 type Server struct {
