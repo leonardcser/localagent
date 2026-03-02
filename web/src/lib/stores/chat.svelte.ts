@@ -151,6 +151,7 @@ function createChat() {
 
 	let transcribing = $state(false);
 	let sendAfterTranscribe = false;
+	let inputBeforeRecording = "";
 
 	function stopRecording() {
 		mediaRecorder?.stop();
@@ -164,6 +165,7 @@ function createChat() {
 			stopRecording();
 			return;
 		}
+		inputBeforeRecording = input;
 		recording = true;
 		try {
 			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -183,10 +185,14 @@ function createChat() {
 				sendAfterTranscribe = false;
 				const text = await transcribeAudio(file);
 				transcribing = false;
-				if (text) {
-					const trimmed = text.trim();
-					input = input ? input + " " + trimmed : trimmed;
+				const prefix = inputBeforeRecording.trim();
+				const transcribed = text?.trim() ?? "";
+				if (prefix && transcribed) {
+					input = prefix + " " + transcribed;
+				} else {
+					input = prefix || transcribed;
 				}
+				inputBeforeRecording = "";
 				if (shouldSend) {
 					await send();
 				}
