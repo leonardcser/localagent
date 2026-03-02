@@ -762,14 +762,11 @@ const priorityOptions = [
 				<span class="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-text-muted">Tags</span>
 				{#each taskStore.allTags as tag}
 					<button
-						onclick={() => {
-							taskStore.filterTag = taskStore.filterTag === tag ? "" : tag;
-							showSidebar = false;
-						}}
+						onclick={() => taskStore.toggleTag(tag)}
 						class="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors
-							{taskStore.filterTag === tag ? 'bg-accent/10 text-accent' : 'text-text-secondary hover:bg-overlay-light hover:text-text-primary'}"
+							{taskStore.filterTags.includes(tag) ? 'bg-accent/10 text-accent' : 'text-text-secondary hover:bg-overlay-light hover:text-text-primary'}"
 					>
-						<Icon src={FiTag} size="13" className="shrink-0 {taskStore.filterTag === tag ? 'text-accent' : 'text-text-muted'}" />
+						<Icon src={FiTag} size="13" className="shrink-0 {taskStore.filterTags.includes(tag) ? 'text-accent' : 'text-text-muted'}" />
 						<span>{tag}</span>
 					</button>
 				{/each}
@@ -834,15 +831,15 @@ const priorityOptions = [
 		<!-- Desktop header -->
 		<div class="hidden shrink-0 items-center gap-2 border-b border-border px-5 py-3 md:flex">
 			<h1 class="text-[15px] font-semibold text-text-primary">{smartListLabel()}</h1>
-			{#if taskStore.filterTag}
+			{#each taskStore.filterTags as tag}
 				<span class="flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-[11px] text-accent">
 					<Icon src={FiTag} size="10" />
-					{taskStore.filterTag}
-					<button onclick={() => (taskStore.filterTag = "")} class="ml-0.5 hover:text-text-primary">
+					{tag}
+					<button onclick={() => taskStore.toggleTag(tag)} class="ml-0.5 hover:text-text-primary">
 						<Icon src={FiX} size="10" />
 					</button>
 				</span>
-			{/if}
+			{/each}
 			<span class="text-[12px] text-text-muted">{taskStore.filtered.length} tasks</span>
 			<div class="ml-auto flex items-center gap-1.5">
 				<button
@@ -1284,11 +1281,11 @@ const priorityOptions = [
 				<span class="px-2 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-widest text-text-muted">Tags</span>
 				{#each taskStore.allTags as tag}
 					<button
-						onclick={() => { taskStore.filterTag = taskStore.filterTag === tag ? "" : tag; showSidebar = false; }}
+						onclick={() => { taskStore.toggleTag(tag); showSidebar = false; }}
 						class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[14px] transition-colors
-							{taskStore.filterTag === tag ? 'bg-accent/10 text-accent' : 'text-text-secondary hover:bg-overlay-light'}"
+							{taskStore.filterTags.includes(tag) ? 'bg-accent/10 text-accent' : 'text-text-secondary hover:bg-overlay-light'}"
 					>
-						<Icon src={FiTag} size="14" className={taskStore.filterTag === tag ? 'text-accent' : 'text-text-muted'} />
+						<Icon src={FiTag} size="14" className={taskStore.filterTags.includes(tag) ? 'text-accent' : 'text-text-muted'} />
 						<span>{tag}</span>
 					</button>
 				{/each}

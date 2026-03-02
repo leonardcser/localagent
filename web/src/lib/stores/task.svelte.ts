@@ -21,7 +21,7 @@ export type SmartList =
 interface TaskPrefs {
 	view: "list" | "kanban";
 	smartList: SmartList;
-	filterTag: string;
+	filterTags: string[];
 	selectedId: string;
 }
 
@@ -33,7 +33,8 @@ function loadPrefs(): TaskPrefs {
 			return {
 				view: parsed.view ?? "list",
 				smartList: parsed.smartList ?? "all",
-				filterTag: parsed.filterTag ?? "",
+				filterTags:
+					parsed.filterTags ?? (parsed.filterTag ? [parsed.filterTag] : []),
 				selectedId: parsed.selectedId ?? "",
 			};
 		}
@@ -43,7 +44,7 @@ function loadPrefs(): TaskPrefs {
 	return {
 		view: "list",
 		smartList: "all",
-		filterTag: "",
+		filterTags: [],
 		selectedId: "",
 	};
 }
@@ -78,12 +79,12 @@ function createTaskStore() {
 	let loading = $state(false);
 	let search = $state("");
 	let smartList = $state<SmartList>(initialPrefs.smartList);
-	let filterTag = $state(initialPrefs.filterTag);
+	let filterTags = $state<string[]>(initialPrefs.filterTags);
 	let view = $state<"list" | "kanban">(initialPrefs.view);
 	let selectedId = $state(initialPrefs.selectedId);
 
 	function persistPrefs() {
-		savePrefs({ view, smartList, filterTag, selectedId });
+		savePrefs({ view, smartList, filterTags, selectedId });
 	}
 
 	let allTags = $derived.by(() => {
@@ -186,8 +187,10 @@ function createTaskStore() {
 				break;
 		}
 
-		if (filterTag) {
-			result = result.filter((t) => t.tags?.includes(filterTag));
+		if (filterTags.length > 0) {
+			result = result.filter((t) =>
+				filterTags.every((tag) => t.tags?.includes(tag)),
+			);
 		}
 
 		return [...result].sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -311,11 +314,19 @@ function createTaskStore() {
 			smartList = v;
 			persistPrefs();
 		},
-		get filterTag() {
-			return filterTag;
+		get filterTags() {
+			return filterTags;
 		},
-		set filterTag(v: string) {
-			filterTag = v;
+		set filterTags(v: string[]) {
+			filterTags = v;
+			persistPrefs();
+		},
+		toggleTag(tag: string) {
+			if (filterTags.includes(tag)) {
+				filterTags = filterTags.filter((t) => t !== tag);
+			} else {
+				filterTags = [...filterTags, tag];
+			}
 			persistPrefs();
 		},
 		get view() {
