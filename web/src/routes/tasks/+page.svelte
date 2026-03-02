@@ -5,22 +5,22 @@ import type { Task } from "$lib/api";
 import { Select } from "bits-ui";
 import { Icon } from "svelte-icons-pack";
 import {
-	FiSearch,
-	FiPlus,
-	FiCheck,
-	FiTrash2,
-	FiList,
-	FiColumns,
-	FiX,
-	FiCalendar,
-	FiTag,
-	FiArrowLeft,
-	FiSun,
-	FiInbox,
-	FiChevronRight,
-	FiChevronDown,
-	FiCornerDownRight,
-	FiAlertCircle,
+  FiSearch,
+  FiPlus,
+  FiCheck,
+  FiTrash2,
+  FiList,
+  FiColumns,
+  FiX,
+  FiCalendar,
+  FiTag,
+  FiArrowLeft,
+  FiSun,
+  FiInbox,
+  FiChevronRight,
+  FiChevronDown,
+  FiCornerDownRight,
+  FiAlertCircle,
 } from "svelte-icons-pack/fi";
 import TaskContextMenu from "$lib/components/TaskContextMenu.svelte";
 import DatePicker from "$lib/components/DatePicker.svelte";
@@ -46,6 +46,8 @@ let showSearch = $state(false);
 let dragOverCol = $state<string | null>(null);
 let draggingId = $state<string | null>(null);
 let dragGhost: HTMLElement | null = null;
+let dragOverTaskId = $state<string | null>(null);
+let dragOverBefore = $state(true);
 
 let swipeTaskId = $state<string | null>(null);
 let swipeX = $state(0);
@@ -58,364 +60,450 @@ const SWIPE_MAX = 120;
 let lastKeyD = 0;
 
 onMount(async () => {
-	await taskStore.load();
-	if (taskStore.selectedId) {
-		const task = taskStore.tasks.find((t) => t.id === taskStore.selectedId);
-		if (task) openDetail(task);
-	}
+  await taskStore.load();
+  if (taskStore.selectedId) {
+    const task = taskStore.tasks.find((t) => t.id === taskStore.selectedId);
+    if (task) openDetail(task);
+  }
 });
 
 const smartLists: { key: SmartList; label: string; icon: typeof FiSun }[] = [
-	{ key: "all", label: "All", icon: FiList },
-	{ key: "today", label: "Today", icon: FiSun },
-	{ key: "tomorrow", label: "Tomorrow", icon: FiCalendar },
-	{ key: "next7", label: "Next 7 Days", icon: FiCalendar },
-	{ key: "overdue", label: "Overdue", icon: FiAlertCircle },
-	{ key: "inbox", label: "Inbox", icon: FiInbox },
-	{ key: "done", label: "Completed", icon: FiCheck },
+  { key: "all", label: "All", icon: FiList },
+  { key: "today", label: "Today", icon: FiSun },
+  { key: "tomorrow", label: "Tomorrow", icon: FiCalendar },
+  { key: "next7", label: "Next 7 Days", icon: FiCalendar },
+  { key: "overdue", label: "Overdue", icon: FiAlertCircle },
+  { key: "inbox", label: "Inbox", icon: FiInbox },
+  { key: "done", label: "Completed", icon: FiCheck },
 ];
 
 function smartListLabel(): string {
-	return smartLists.find((s) => s.key === taskStore.smartList)?.label ?? "All";
+  return smartLists.find((s) => s.key === taskStore.smartList)?.label ?? "All";
 }
 
 function handleTouchStart(e: TouchEvent, id: string) {
-	swipeTaskId = id;
-	swipeX = 0;
-	swipeDirection = null;
-	swipeStartX = e.touches[0].clientX;
-	swipeStartY = e.touches[0].clientY;
+  swipeTaskId = id;
+  swipeX = 0;
+  swipeDirection = null;
+  swipeStartX = e.touches[0].clientX;
+  swipeStartY = e.touches[0].clientY;
 }
 
 function handleTouchMove(e: TouchEvent) {
-	if (!swipeTaskId) return;
-	const dx = e.touches[0].clientX - swipeStartX;
-	const dy = e.touches[0].clientY - swipeStartY;
+  if (!swipeTaskId) return;
+  const dx = e.touches[0].clientX - swipeStartX;
+  const dy = e.touches[0].clientY - swipeStartY;
 
-	if (!swipeDirection) {
-		if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
-			swipeDirection = Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical";
-		}
-		return;
-	}
+  if (!swipeDirection) {
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+      swipeDirection = Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical";
+    }
+    return;
+  }
 
-	if (swipeDirection === "vertical") return;
+  if (swipeDirection === "vertical") return;
 
-	e.preventDefault();
-	swipeX = Math.max(-SWIPE_MAX, Math.min(SWIPE_MAX, dx));
+  e.preventDefault();
+  swipeX = Math.max(-SWIPE_MAX, Math.min(SWIPE_MAX, dx));
 }
 
 async function handleTouchEnd() {
-	if (!swipeTaskId || swipeDirection !== "horizontal") {
-		swipeTaskId = null;
-		swipeX = 0;
-		return;
-	}
+  if (!swipeTaskId || swipeDirection !== "horizontal") {
+    swipeTaskId = null;
+    swipeX = 0;
+    return;
+  }
 
-	const id = swipeTaskId;
-	if (swipeX >= SWIPE_THRESHOLD) {
-		swipeX = 0;
-		swipeTaskId = null;
-		await taskStore.complete(id);
-	} else if (swipeX <= -SWIPE_THRESHOLD) {
-		swipeX = 0;
-		swipeTaskId = null;
-		await taskStore.remove(id);
-		if (panelOpen && taskStore.selectedId === id) closePanel();
-	} else {
-		swipeX = 0;
-		swipeTaskId = null;
-	}
+  const id = swipeTaskId;
+  if (swipeX >= SWIPE_THRESHOLD) {
+    swipeX = 0;
+    swipeTaskId = null;
+    await taskStore.complete(id);
+  } else if (swipeX <= -SWIPE_THRESHOLD) {
+    swipeX = 0;
+    swipeTaskId = null;
+    await taskStore.remove(id);
+    if (panelOpen && taskStore.selectedId === id) closePanel();
+  } else {
+    swipeX = 0;
+    swipeTaskId = null;
+  }
 }
 
 function openAdd(parentId = "") {
-	panelMode = "add";
-	taskStore.selectedId = "";
-	panelTitle = "";
-	panelDescription = "";
-	panelPriority = "";
-	panelDue = "";
-	panelTags = "";
-	panelStatus = "todo";
-	panelParentId = parentId;
-	panelOpen = true;
+  panelMode = "add";
+  taskStore.selectedId = "";
+  panelTitle = "";
+  panelDescription = "";
+  panelPriority = "";
+  panelDue = "";
+  panelTags = "";
+  panelStatus = "todo";
+  panelParentId = parentId;
+  panelOpen = true;
 }
 
 function openDetail(task: Task) {
-	panelMode = "edit";
-	taskStore.selectedId = task.id;
-	panelTitle = task.title;
-	panelDescription = task.description ?? "";
-	panelPriority = task.priority ?? "";
-	panelDue = task.due ?? "";
-	panelTags = task.tags?.join(", ") ?? "";
-	panelStatus = task.status;
-	panelParentId = task.parentId ?? "";
-	panelOpen = true;
+  panelMode = "edit";
+  taskStore.selectedId = task.id;
+  panelTitle = task.title;
+  panelDescription = task.description ?? "";
+  panelPriority = task.priority ?? "";
+  panelDue = task.due ?? "";
+  panelTags = task.tags?.join(", ") ?? "";
+  panelStatus = task.status;
+  panelParentId = task.parentId ?? "";
+  panelOpen = true;
 }
 
 function toggleExpand(id: string) {
-	const next = new Set(expandedParents);
-	if (next.has(id)) next.delete(id);
-	else next.add(id);
-	expandedParents = next;
+  const next = new Set(expandedParents);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  expandedParents = next;
 }
 
 function closePanel() {
-	panelOpen = false;
+  panelOpen = false;
 }
 
 function navigateTask(direction: -1 | 1) {
-	const list = taskStore.filtered;
-	if (list.length === 0) return;
+  const list = taskStore.filtered;
+  if (list.length === 0) return;
 
-	if (!panelOpen || panelMode !== "edit") {
-		openDetail(list[0]);
-		return;
-	}
+  if (!panelOpen || panelMode !== "edit") {
+    openDetail(list[0]);
+    return;
+  }
 
-	const idx = list.findIndex((t) => t.id === taskStore.selectedId);
-	const next = idx + direction;
-	if (next >= 0 && next < list.length) {
-		openDetail(list[next]);
-	}
+  const idx = list.findIndex((t) => t.id === taskStore.selectedId);
+  const next = idx + direction;
+  if (next >= 0 && next < list.length) {
+    openDetail(list[next]);
+  }
 }
 
 function parseTags(raw: string): string[] | undefined {
-	const tags = raw
-		.split(",")
-		.map((t) => t.trim())
-		.filter(Boolean);
-	return tags.length > 0 ? tags : undefined;
+  const tags = raw
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  return tags.length > 0 ? tags : undefined;
 }
 
 // Auto-save: update the task immediately when a field changes
 async function autoSave(patch: Partial<Task>) {
-	if (panelMode !== "edit" || !taskStore.selectedId) return;
-	await taskStore.update(taskStore.selectedId, patch);
+  if (panelMode !== "edit" || !taskStore.selectedId) return;
+  await taskStore.update(taskStore.selectedId, patch);
 }
 
 // Debounced auto-save for text fields
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function debouncedAutoSave(patch: Partial<Task>) {
-	if (saveTimer) clearTimeout(saveTimer);
-	saveTimer = setTimeout(() => autoSave(patch), 400);
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => autoSave(patch), 400);
 }
 
 async function handleAddSubmit(e: SubmitEvent) {
-	e.preventDefault();
-	if (!panelTitle.trim()) return;
+  e.preventDefault();
+  if (!panelTitle.trim()) return;
 
-	const data: Partial<Task> = {
-		title: panelTitle.trim(),
-		description: panelDescription.trim() || undefined,
-		priority: panelPriority || undefined,
-		due: panelDue || undefined,
-		tags: parseTags(panelTags),
-		status: panelStatus,
-		parentId: panelParentId || undefined,
-	};
+  const data: Partial<Task> = {
+    title: panelTitle.trim(),
+    description: panelDescription.trim() || undefined,
+    priority: panelPriority || undefined,
+    due: panelDue || undefined,
+    tags: parseTags(panelTags),
+    status: panelStatus,
+    parentId: panelParentId || undefined,
+  };
 
-	await taskStore.add(data);
-	closePanel();
+  await taskStore.add(data);
+  closePanel();
 }
 
 async function handleQuickAdd(e: KeyboardEvent) {
-	if (e.key !== "Enter" || !quickAddValue.trim()) return;
-	const due =
-		taskStore.smartList === "today"
-			? new Date().toISOString().slice(0, 10)
-			: taskStore.smartList === "tomorrow"
-				? new Date(Date.now() + 86400000).toISOString().slice(0, 10)
-				: undefined;
-	await taskStore.add({
-		title: quickAddValue.trim(),
-		status: "todo",
-		due,
-	});
-	quickAddValue = "";
+  if (e.key !== "Enter" || !quickAddValue.trim()) return;
+  const due =
+    taskStore.smartList === "today"
+      ? new Date().toISOString().slice(0, 10)
+      : taskStore.smartList === "tomorrow"
+        ? new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+        : undefined;
+  await taskStore.add({
+    title: quickAddValue.trim(),
+    status: "todo",
+    due,
+  });
+  quickAddValue = "";
 }
 
 async function handleDelete() {
-	if (panelMode === "edit" && taskStore.selectedId) {
-		await taskStore.remove(taskStore.selectedId);
-		closePanel();
-	}
+  if (panelMode === "edit" && taskStore.selectedId) {
+    await taskStore.remove(taskStore.selectedId);
+    closePanel();
+  }
 }
 
 function priorityColor(p?: string): string {
-	if (p === "high") return "bg-error";
-	if (p === "medium") return "bg-warning";
-	if (p === "low") return "bg-text-muted";
-	return "";
+  if (p === "high") return "bg-error";
+  if (p === "medium") return "bg-warning";
+  if (p === "low") return "bg-text-muted";
+  return "";
 }
 
 function isOverdue(due?: string): boolean {
-	if (!due) return false;
-	const datePart = due.includes("T") ? due.split("T")[0] : due;
-	return datePart < new Date().toISOString().slice(0, 10);
+  if (!due) return false;
+  const datePart = due.includes("T") ? due.split("T")[0] : due;
+  return datePart < new Date().toISOString().slice(0, 10);
 }
 
 function formatDate(due: string): string {
-	const datePart = due.includes("T") ? due.split("T")[0] : due;
-	const timePart = due.includes("T") ? due.split("T")[1] : "";
-	const today = new Date().toISOString().slice(0, 10);
-	const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const datePart = due.includes("T") ? due.split("T")[0] : due;
+  const timePart = due.includes("T") ? due.split("T")[1] : "";
+  const today = new Date().toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 
-	let label: string;
-	if (datePart === today) label = "Today";
-	else if (datePart === tomorrow) label = "Tomorrow";
-	else {
-		const d = new Date(datePart + "T00:00:00");
-		label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-	}
+  let label: string;
+  if (datePart === today) label = "Today";
+  else if (datePart === tomorrow) label = "Tomorrow";
+  else {
+    const d = new Date(datePart + "T00:00:00");
+    label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
 
-	if (timePart) {
-		const [h, m] = timePart.split(":");
-		const hour = parseInt(h);
-		const suffix = hour >= 12 ? "pm" : "am";
-		const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-		label += ` ${h12}:${m}${suffix}`;
-	}
+  if (timePart) {
+    const [h, m] = timePart.split(":");
+    const hour = parseInt(h);
+    const suffix = hour >= 12 ? "pm" : "am";
+    const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    label += ` ${h12}:${m}${suffix}`;
+  }
 
-	return label;
+  return label;
 }
 
 async function handleDrop(e: DragEvent, status: string) {
-	e.preventDefault();
-	dragOverCol = null;
-	const id = e.dataTransfer?.getData("text/plain");
-	if (id) {
-		await taskStore.moveStatus(id, status);
-	}
+  e.preventDefault();
+  const id = e.dataTransfer?.getData("text/plain");
+  const overTaskId = dragOverTaskId;
+  const before = dragOverBefore;
+  dragOverCol = null;
+  dragOverTaskId = null;
+
+  if (!id) return;
+
+  const draggingTask = taskStore.tasks.find((t) => t.id === id);
+  if (!draggingTask) return;
+
+  const needsStatusChange = draggingTask.status !== status;
+  const col =
+    taskStore.kanbanColumns[status as keyof typeof taskStore.kanbanColumns];
+
+  if (overTaskId && overTaskId !== id) {
+    const colWithoutDragging = col.filter((t) => t.id !== id);
+    const targetIdx = colWithoutDragging.findIndex((t) => t.id === overTaskId);
+    if (targetIdx !== -1) {
+      let newOrder: number;
+      if (before) {
+        const prev = targetIdx > 0 ? colWithoutDragging[targetIdx - 1] : null;
+        const tgt = colWithoutDragging[targetIdx];
+        newOrder = prev ? (prev.order + tgt.order) / 2 : tgt.order - 1;
+      } else {
+        const next =
+          targetIdx < colWithoutDragging.length - 1
+            ? colWithoutDragging[targetIdx + 1]
+            : null;
+        const tgt = colWithoutDragging[targetIdx];
+        newOrder = next ? (tgt.order + next.order) / 2 : tgt.order + 1;
+      }
+      if (needsStatusChange) await taskStore.moveStatus(id, status);
+      await taskStore.reorder(id, newOrder);
+      return;
+    }
+  }
+
+  if (needsStatusChange) await taskStore.moveStatus(id, status);
+}
+
+function handleTaskDragOver(e: DragEvent, taskId: string) {
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+  if (draggingId === taskId) return;
+  dragOverTaskId = taskId;
+  const el = e.currentTarget as HTMLElement;
+  const rect = el.getBoundingClientRect();
+  dragOverBefore = e.clientY < rect.top + rect.height / 2;
+}
+
+function handleTaskDragLeave(e: DragEvent, taskId: string) {
+  const target = e.currentTarget as HTMLElement;
+  const related = e.relatedTarget as Node | null;
+  if (related && target.contains(related)) return;
+  if (dragOverTaskId === taskId) dragOverTaskId = null;
+}
+
+async function handleListDrop(e: DragEvent, targetId: string, list: Task[]) {
+  e.preventDefault();
+  e.stopPropagation();
+  const id = e.dataTransfer?.getData("text/plain");
+  const before = dragOverBefore;
+  dragOverTaskId = null;
+  draggingId = null;
+  if (dragGhost) {
+    dragGhost.remove();
+    dragGhost = null;
+  }
+
+  if (!id || id === targetId) return;
+
+  const listWithoutDragging = list.filter((t) => t.id !== id);
+  const targetIdx = listWithoutDragging.findIndex((t) => t.id === targetId);
+  if (targetIdx === -1) return;
+
+  let newOrder: number;
+  if (before) {
+    const prev = targetIdx > 0 ? listWithoutDragging[targetIdx - 1] : null;
+    const tgt = listWithoutDragging[targetIdx];
+    newOrder = prev ? (prev.order + tgt.order) / 2 : tgt.order - 1;
+  } else {
+    const next =
+      targetIdx < listWithoutDragging.length - 1
+        ? listWithoutDragging[targetIdx + 1]
+        : null;
+    const tgt = listWithoutDragging[targetIdx];
+    newOrder = next ? (tgt.order + next.order) / 2 : tgt.order + 1;
+  }
+
+  await taskStore.reorder(id, newOrder);
 }
 
 function handleDragStart(e: DragEvent, id: string) {
-	if (!e.dataTransfer) return;
-	e.dataTransfer.setData("text/plain", id);
-	e.dataTransfer.effectAllowed = "move";
-	draggingId = id;
+  if (!e.dataTransfer) return;
+  e.dataTransfer.setData("text/plain", id);
+  e.dataTransfer.effectAllowed = "move";
+  draggingId = id;
 
-	const el = e.currentTarget as HTMLElement;
-	const rect = el.getBoundingClientRect();
+  const el = e.currentTarget as HTMLElement;
+  const rect = el.getBoundingClientRect();
 
-	const ghost = el.cloneNode(true) as HTMLElement;
-	ghost.style.position = "fixed";
-	ghost.style.top = "-9999px";
-	ghost.style.left = "-9999px";
-	ghost.style.width = `${rect.width}px`;
-	ghost.style.transform = "scale(1.02)";
-	ghost.style.opacity = "0.92";
-	ghost.style.pointerEvents = "none";
-	ghost.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
-	ghost.style.borderRadius = "8px";
-	ghost.style.border = "1px solid var(--color-border-light)";
-	ghost.style.borderLeft = "2px solid transparent";
-	document.body.appendChild(ghost);
-	dragGhost = ghost;
+  const ghost = el.cloneNode(true) as HTMLElement;
+  ghost.style.position = "fixed";
+  ghost.style.top = "-9999px";
+  ghost.style.left = "-9999px";
+  ghost.style.width = `${rect.width}px`;
+  ghost.style.transform = "scale(1.02)";
+  ghost.style.opacity = "0.92";
+  ghost.style.pointerEvents = "none";
+  ghost.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
+  ghost.style.borderRadius = "8px";
+  ghost.style.border = "1px solid var(--color-border-light)";
+  ghost.style.borderLeft = "2px solid transparent";
+  document.body.appendChild(ghost);
+  dragGhost = ghost;
 
-	const offsetX = e.clientX - rect.left;
-	const offsetY = e.clientY - rect.top;
-	e.dataTransfer.setDragImage(ghost, offsetX, offsetY);
+  const offsetX = e.clientX - rect.left;
+  const offsetY = e.clientY - rect.top;
+  e.dataTransfer.setDragImage(ghost, offsetX, offsetY);
 }
 
 function handleDragEnd() {
-	draggingId = null;
-	if (dragGhost) {
-		dragGhost.remove();
-		dragGhost = null;
-	}
+  draggingId = null;
+  if (dragGhost) {
+    dragGhost.remove();
+    dragGhost = null;
+  }
 }
 
 function handleDragOver(e: DragEvent, col: string) {
-	e.preventDefault();
-	if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-	dragOverCol = col;
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+  dragOverCol = col;
 }
 
 function handleDragLeave(e: DragEvent, col: string) {
-	const target = e.currentTarget as HTMLElement;
-	const related = e.relatedTarget as Node | null;
-	if (related && target.contains(related)) return;
-	if (dragOverCol === col) dragOverCol = null;
+  const target = e.currentTarget as HTMLElement;
+  const related = e.relatedTarget as Node | null;
+  if (related && target.contains(related)) return;
+  if (dragOverCol === col) dragOverCol = null;
 }
 
 function isInputFocused(e: KeyboardEvent): boolean {
-	const tag = (e.target as HTMLElement)?.tagName;
-	return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+  const tag = (e.target as HTMLElement)?.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
 }
 
 function handleKeydown(e: KeyboardEvent) {
-	if (e.key === "Escape") {
-		if (panelOpen) {
-			closePanel();
-			return;
-		}
-		if (showSearch) {
-			showSearch = false;
-			taskStore.search = "";
-			return;
-		}
-	}
+  if (e.key === "Escape") {
+    if (panelOpen) {
+      closePanel();
+      return;
+    }
+    if (showSearch) {
+      showSearch = false;
+      taskStore.search = "";
+      return;
+    }
+  }
 
-	if (isInputFocused(e)) return;
+  if (isInputFocused(e)) return;
 
-	if (e.key === "/" && !showSearch) {
-		e.preventDefault();
-		showSearch = true;
-		return;
-	}
+  if (e.key === "/" && !showSearch) {
+    e.preventDefault();
+    showSearch = true;
+    return;
+  }
 
-	if (
-		(e.key === "Delete" || e.key === "Backspace") &&
-		panelOpen &&
-		panelMode === "edit" &&
-		taskStore.selectedId
-	) {
-		e.preventDefault();
-		handleDelete();
-		return;
-	}
+  if (
+    (e.key === "Delete" || e.key === "Backspace") &&
+    panelOpen &&
+    panelMode === "edit" &&
+    taskStore.selectedId
+  ) {
+    e.preventDefault();
+    handleDelete();
+    return;
+  }
 
-	if (e.key === "ArrowDown" || e.key === "j") {
-		e.preventDefault();
-		navigateTask(1);
-		return;
-	}
-	if (e.key === "ArrowUp" || e.key === "k") {
-		e.preventDefault();
-		navigateTask(-1);
-		return;
-	}
+  if (e.key === "ArrowDown" || e.key === "j") {
+    e.preventDefault();
+    navigateTask(1);
+    return;
+  }
+  if (e.key === "ArrowUp" || e.key === "k") {
+    e.preventDefault();
+    navigateTask(-1);
+    return;
+  }
 
-	if (
-		e.key === "d" &&
-		panelOpen &&
-		panelMode === "edit" &&
-		taskStore.selectedId
-	) {
-		const now = Date.now();
-		if (now - lastKeyD < 400) {
-			lastKeyD = 0;
-			e.preventDefault();
-			handleDelete();
-			return;
-		}
-		lastKeyD = now;
-	}
+  if (
+    e.key === "d" &&
+    panelOpen &&
+    panelMode === "edit" &&
+    taskStore.selectedId
+  ) {
+    const now = Date.now();
+    if (now - lastKeyD < 400) {
+      lastKeyD = 0;
+      e.preventDefault();
+      handleDelete();
+      return;
+    }
+    lastKeyD = now;
+  }
 }
 
 const statusOptions = [
-	{ value: "todo", label: "To Do" },
-	{ value: "doing", label: "In Progress" },
-	{ value: "done", label: "Done" },
+  { value: "todo", label: "To Do" },
+  { value: "doing", label: "In Progress" },
+  { value: "done", label: "Done" },
 ];
 
 const priorityOptions = [
-	{ value: "", label: "None" },
-	{ value: "low", label: "Low" },
-	{ value: "medium", label: "Medium" },
-	{ value: "high", label: "High" },
+  { value: "", label: "None" },
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
 ];
 </script>
 
@@ -898,7 +986,18 @@ const priorityOptions = [
 								{@const subtasks = taskStore.subtasksOf(task.id)}
 								{@const hasChildren = subtasks.length > 0}
 								{@const isExpanded = expandedParents.has(task.id)}
-								<div class="relative overflow-hidden">
+								<div role="listitem"
+									class="relative overflow-hidden {draggingId === task.id ? 'opacity-40' : ''}"
+									draggable="true"
+									ondragstart={(e) => handleDragStart(e, task.id)}
+									ondragend={handleDragEnd}
+									ondragover={(e) => handleTaskDragOver(e, task.id)}
+									ondragleave={(e) => handleTaskDragLeave(e, task.id)}
+									ondrop={(e) => handleListDrop(e, task.id, taskStore.topLevelFiltered)}
+								>
+									{#if dragOverTaskId === task.id && draggingId !== task.id}
+										<div class="pointer-events-none absolute inset-x-0 z-10 h-0.5 bg-accent {dragOverBefore ? 'top-0' : 'bottom-0'}"></div>
+									{/if}
 									{#if swipeTaskId === task.id && swipeX > 0}
 										<div class="absolute inset-0 flex items-center bg-success/15 px-4 text-success">
 											<Icon src={FiCheck} size="16" />
@@ -1007,8 +1106,20 @@ const priorityOptions = [
 
 								<!-- Subtasks -->
 								{#if hasChildren && isExpanded}
-									{#each subtasks as sub (sub.id)}
-										<div class="relative overflow-hidden">
+									{@const sortedSubtasks = [...subtasks].sort((a, b) => (a.order || 0) - (b.order || 0))}
+									{#each sortedSubtasks as sub (sub.id)}
+										<div role="listitem"
+											class="relative overflow-hidden {draggingId === sub.id ? 'opacity-40' : ''}"
+											draggable="true"
+											ondragstart={(e) => handleDragStart(e, sub.id)}
+											ondragend={handleDragEnd}
+											ondragover={(e) => handleTaskDragOver(e, sub.id)}
+											ondragleave={(e) => handleTaskDragLeave(e, sub.id)}
+											ondrop={(e) => handleListDrop(e, sub.id, sortedSubtasks)}
+										>
+											{#if dragOverTaskId === sub.id && draggingId !== sub.id}
+												<div class="pointer-events-none absolute inset-x-0 z-10 h-0.5 bg-accent {dragOverBefore ? 'top-0' : 'bottom-0'}"></div>
+											{/if}
 											{#if swipeTaskId === sub.id && swipeX > 0}
 												<div class="absolute inset-0 flex items-center bg-success/15 px-4 text-success">
 													<Icon src={FiCheck} size="16" />
@@ -1136,10 +1247,15 @@ const priorityOptions = [
 											tabindex="0"
 											ondragstart={(e) => handleDragStart(e, task.id)}
 											ondragend={handleDragEnd}
+											ondragover={(e) => handleTaskDragOver(e, task.id)}
+											ondragleave={(e) => handleTaskDragLeave(e, task.id)}
 											onclick={() => openDetail(task)}
 											onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(task); } }}
-											class="group flex cursor-pointer flex-col gap-1.5 rounded-lg border bg-bg p-2.5 outline-none transition-all duration-150 {draggingId === task.id ? 'border-border scale-[0.97] cursor-grabbing opacity-40' : panelOpen && taskStore.selectedId === task.id ? 'border-accent shadow-sm' : 'border-border hover:border-border-light hover:shadow-sm'}"
+											class="group relative flex cursor-pointer flex-col gap-1.5 rounded-lg border bg-bg p-2.5 outline-none transition-all duration-150 {draggingId === task.id ? 'border-border scale-[0.97] cursor-grabbing opacity-40' : panelOpen && taskStore.selectedId === task.id ? 'border-accent shadow-sm' : 'border-border hover:border-border-light hover:shadow-sm'}"
 										>
+											{#if dragOverTaskId === task.id && draggingId !== task.id}
+												<div class="pointer-events-none absolute inset-x-0 z-10 h-0.5 bg-accent {dragOverBefore ? '-top-1' : '-bottom-1'}"></div>
+											{/if}
 											<div class="flex items-start justify-between gap-1.5">
 												<span class="text-[12px] leading-snug text-text-primary {task.status === 'done' ? 'line-through text-text-muted' : ''}">{task.title}</span>
 												{#if task.priority}

@@ -4,17 +4,17 @@ import ActivityItem from "./ActivityItem.svelte";
 import type { ActivityTimelineItem } from "$lib/stores/chat.svelte";
 
 let {
-	items,
-	expanded,
-	onToggle,
-	isItemExpanded,
-	toggleItemExpanded,
+  items,
+  expanded,
+  onToggle,
+  isItemExpanded,
+  toggleItemExpanded,
 }: {
-	items: ActivityTimelineItem[];
-	expanded: boolean;
-	onToggle: () => void;
-	isItemExpanded: (key: string) => boolean;
-	toggleItemExpanded: (key: string) => void;
+  items: ActivityTimelineItem[];
+  expanded: boolean;
+  onToggle: () => void;
+  isItemExpanded: (key: string) => boolean;
+  toggleItemExpanded: (key: string) => void;
 } = $props();
 
 let latest = $derived(items[items.length - 1]);

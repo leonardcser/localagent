@@ -2,39 +2,39 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
-	return twMerge(clsx(inputs));
+  return twMerge(clsx(inputs));
 }
 
 export function filename(path: string): string {
-	return path.split("/").pop() || path;
+  return path.split("/").pop() || path;
 }
 
 const AUDIO_EXTS = new Set([
-	".mp3",
-	".wav",
-	".ogg",
-	".webm",
-	".m4a",
-	".aac",
-	".flac",
-	".opus",
+  ".mp3",
+  ".wav",
+  ".ogg",
+  ".webm",
+  ".m4a",
+  ".aac",
+  ".flac",
+  ".opus",
 ]);
 
 export function isAudio(path: string): boolean {
-	const ext = path.slice(path.lastIndexOf(".")).toLowerCase();
-	return AUDIO_EXTS.has(ext);
+  const ext = path.slice(path.lastIndexOf(".")).toLowerCase();
+  return AUDIO_EXTS.has(ext);
 }
 
 export function mediaUrl(path: string): string {
-	return `/api/media/${encodeURIComponent(filename(path))}`;
+  return `/api/media/${encodeURIComponent(filename(path))}`;
 }
 
 export function nowTimestamp(): string {
-	return new Date().toISOString();
+  return new Date().toISOString();
 }
 
 export function formatTimestamp(ts: string): string {
-	const d = new Date(ts);
-	if (isNaN(d.getTime())) return ts;
-	return d.toLocaleTimeString(undefined, { hour12: false });
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return ts;
+  return d.toLocaleTimeString(undefined, { hour12: false });
 }

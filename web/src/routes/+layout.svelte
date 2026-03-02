@@ -4,12 +4,12 @@ import { onMount } from "svelte";
 import { page } from "$app/state";
 import { Icon } from "svelte-icons-pack";
 import {
-	FiMessageCircle,
-	FiCheckSquare,
-	FiImage,
-	FiMenu,
-	FiBell,
-	FiBellOff,
+  FiMessageCircle,
+  FiCheckSquare,
+  FiImage,
+  FiMenu,
+  FiBell,
+  FiBellOff,
 } from "svelte-icons-pack/fi";
 import { push } from "$lib/stores/push.svelte";
 
@@ -18,33 +18,33 @@ let { children } = $props();
 let menuOpen = $state(false);
 
 onMount(() => {
-	function preventZoom(e: TouchEvent) {
-		if (e.touches.length > 1) e.preventDefault();
-	}
-	function preventGesture(e: Event) {
-		e.preventDefault();
-	}
-	document.addEventListener("touchmove", preventZoom, { passive: false });
-	document.addEventListener("gesturestart", preventGesture, { passive: false });
-	document.addEventListener("gesturechange", preventGesture, {
-		passive: false,
-	});
-	return () => {
-		document.removeEventListener("touchmove", preventZoom);
-		document.removeEventListener("gesturestart", preventGesture);
-		document.removeEventListener("gesturechange", preventGesture);
-	};
+  function preventZoom(e: TouchEvent) {
+    if (e.touches.length > 1) e.preventDefault();
+  }
+  function preventGesture(e: Event) {
+    e.preventDefault();
+  }
+  document.addEventListener("touchmove", preventZoom, { passive: false });
+  document.addEventListener("gesturestart", preventGesture, { passive: false });
+  document.addEventListener("gesturechange", preventGesture, {
+    passive: false,
+  });
+  return () => {
+    document.removeEventListener("touchmove", preventZoom);
+    document.removeEventListener("gesturestart", preventGesture);
+    document.removeEventListener("gesturechange", preventGesture);
+  };
 });
 
 const navItems = [
-	{ href: "/", icon: FiMessageCircle, label: "Chat" },
-	{ href: "/tasks", icon: FiCheckSquare, label: "Tasks" },
-	{ href: "/images", icon: FiImage, label: "Images" },
+  { href: "/", icon: FiMessageCircle, label: "Chat" },
+  { href: "/tasks", icon: FiCheckSquare, label: "Tasks" },
+  { href: "/images", icon: FiImage, label: "Images" },
 ];
 
 function isActive(href: string): boolean {
-	if (href === "/") return page.url.pathname === "/";
-	return page.url.pathname.startsWith(href);
+  if (href === "/") return page.url.pathname === "/";
+  return page.url.pathname.startsWith(href);
 }
 </script>
 

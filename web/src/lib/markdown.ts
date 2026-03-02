@@ -10,65 +10,65 @@ let nextBlockId = 0;
 let activeBlocks: Map<string, CodeBlock> | null = null;
 
 function makePlaceholder(id: number): string {
-	return `<!--shiki-${id}-->`;
+  return `<!--shiki-${id}-->`;
 }
 
 function escapeHtml(s: string): string {
-	return s
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;");
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 const inlineMarked = new Marked();
 
 function parseInline(text: string): string {
-	return inlineMarked.parseInline(text) as string;
+  return inlineMarked.parseInline(text) as string;
 }
 
 const marked = new Marked({
-	renderer: {
-		code({ text, lang }) {
-			const id = nextBlockId++;
-			const placeholder = makePlaceholder(id);
-			activeBlocks!.set(placeholder, {
-				promise: highlightCode(text, lang || undefined),
-				text,
-				lang: lang || "",
-			});
-			return placeholder;
-		},
-		table(token) {
-			const headerCells = (token.header as Array<{ text: string }>)
-				.map((h) => `<th>${parseInline(h.text)}</th>`)
-				.join("");
-			const bodyRows = (token.rows as Array<Array<{ text: string }>>)
-				.map(
-					(row) =>
-						`<tr>${row.map((cell) => `<td>${parseInline(cell.text)}</td>`).join("")}</tr>`,
-				)
-				.join("");
-			return `<div class="table-wrapper"><table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table></div>`;
-		},
-	},
+  renderer: {
+    code({ text, lang }) {
+      const id = nextBlockId++;
+      const placeholder = makePlaceholder(id);
+      activeBlocks!.set(placeholder, {
+        promise: highlightCode(text, lang || undefined),
+        text,
+        lang: lang || "",
+      });
+      return placeholder;
+    },
+    table(token) {
+      const headerCells = (token.header as Array<{ text: string }>)
+        .map((h) => `<th>${parseInline(h.text)}</th>`)
+        .join("");
+      const bodyRows = (token.rows as Array<Array<{ text: string }>>)
+        .map(
+          (row) =>
+            `<tr>${row.map((cell) => `<td>${parseInline(cell.text)}</td>`).join("")}</tr>`,
+        )
+        .join("");
+      return `<div class="table-wrapper"><table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table></div>`;
+    },
+  },
 });
 
 export async function renderMarkdown(source: string): Promise<string> {
-	const blocks: Map<string, CodeBlock> = new Map();
-	activeBlocks = blocks;
+  const blocks: Map<string, CodeBlock> = new Map();
+  activeBlocks = blocks;
 
-	let html = await marked.parse(source);
+  let html = await marked.parse(source);
 
-	for (const [placeholder, { promise, text, lang }] of blocks) {
-		const highlighted = await promise;
-		const escapedText = escapeHtml(text);
-		const langLabel = lang
-			? `<span class="code-lang">${escapeHtml(lang)}</span>`
-			: "";
-		const wrapper = `<div class="code-block-wrapper"><div class="code-header">${langLabel}<button class="copy-btn" data-code="${escapedText}" title="Copy code">${COPY_SVG}</button></div>${highlighted}</div>`;
-		html = html.replace(placeholder, wrapper);
-	}
+  for (const [placeholder, { promise, text, lang }] of blocks) {
+    const highlighted = await promise;
+    const escapedText = escapeHtml(text);
+    const langLabel = lang
+      ? `<span class="code-lang">${escapeHtml(lang)}</span>`
+      : "";
+    const wrapper = `<div class="code-block-wrapper"><div class="code-header">${langLabel}<button class="copy-btn" data-code="${escapedText}" title="Copy code">${COPY_SVG}</button></div>${highlighted}</div>`;
+    html = html.replace(placeholder, wrapper);
+  }
 
-	return html;
+  return html;
 }

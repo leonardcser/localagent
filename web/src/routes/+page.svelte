@@ -1,9 +1,9 @@
 <script lang="ts">
 import { onMount, onDestroy } from "svelte";
 import {
-	chat,
-	type MessageTimelineItem,
-	type ActivityTimelineItem,
+  chat,
+  type MessageTimelineItem,
+  type ActivityTimelineItem,
 } from "$lib/stores/chat.svelte";
 import ChatMessage from "$lib/components/ChatMessage.svelte";
 import ActivityGroup from "$lib/components/ActivityGroup.svelte";
@@ -14,24 +14,24 @@ import { Icon } from "svelte-icons-pack";
 import { FiChevronDown } from "svelte-icons-pack/fi";
 
 type GroupedItem =
-	| MessageTimelineItem
-	| { kind: "activity-group"; id: number; items: ActivityTimelineItem[] };
+  | MessageTimelineItem
+  | { kind: "activity-group"; id: number; items: ActivityTimelineItem[] };
 
 let groups = $derived.by(() => {
-	const result: GroupedItem[] = [];
-	for (const item of chat.timeline) {
-		if (item.kind === "message") {
-			result.push(item as MessageTimelineItem);
-		} else {
-			const last = result[result.length - 1];
-			if (last?.kind === "activity-group") {
-				last.items.push(item);
-			} else {
-				result.push({ kind: "activity-group", id: item.id, items: [item] });
-			}
-		}
-	}
-	return result;
+  const result: GroupedItem[] = [];
+  for (const item of chat.timeline) {
+    if (item.kind === "message") {
+      result.push(item as MessageTimelineItem);
+    } else {
+      const last = result[result.length - 1];
+      if (last?.kind === "activity-group") {
+        last.items.push(item);
+      } else {
+        result.push({ kind: "activity-group", id: item.id, items: [item] });
+      }
+    }
+  }
+  return result;
 });
 
 let messagesEl: HTMLDivElement;
@@ -40,132 +40,132 @@ let programmaticScroll = false;
 let resizeObserver: ResizeObserver | null = null;
 
 function isScrolledToBottom(): boolean {
-	if (!messagesEl) return true;
-	return (
-		messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight <
-		40
-	);
+  if (!messagesEl) return true;
+  return (
+    messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight <
+    40
+  );
 }
 
 function snapToBottom() {
-	if (messagesEl) {
-		programmaticScroll = true;
-		messagesEl.scrollTop = messagesEl.scrollHeight;
-		requestAnimationFrame(() => {
-			programmaticScroll = false;
-			isAtBottom = true;
-		});
-	}
+  if (messagesEl) {
+    programmaticScroll = true;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    requestAnimationFrame(() => {
+      programmaticScroll = false;
+      isAtBottom = true;
+    });
+  }
 }
 
 function scrollToBottom() {
-	if (messagesEl) {
-		programmaticScroll = true;
-		messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: "smooth" });
-		setTimeout(() => {
-			programmaticScroll = false;
-			isAtBottom = true;
-		}, 300);
-	}
+  if (messagesEl) {
+    programmaticScroll = true;
+    messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: "smooth" });
+    setTimeout(() => {
+      programmaticScroll = false;
+      isAtBottom = true;
+    }, 300);
+  }
 }
 
 function handleScroll() {
-	if (programmaticScroll) return;
-	isAtBottom = isScrolledToBottom();
+  if (programmaticScroll) return;
+  isAtBottom = isScrolledToBottom();
 }
 
 $effect(() => {
-	if (!messagesEl) return;
-	resizeObserver = new ResizeObserver(() => {
-		if (isAtBottom) snapToBottom();
-	});
-	for (const child of messagesEl.children) {
-		resizeObserver.observe(child);
-	}
-	const mutObserver = new MutationObserver((mutations) => {
-		for (const m of mutations) {
-			for (const node of m.addedNodes) {
-				if (node instanceof Element) resizeObserver!.observe(node);
-			}
-		}
-		if (isAtBottom) snapToBottom();
-	});
-	mutObserver.observe(messagesEl, { childList: true });
-	return () => {
-		resizeObserver!.disconnect();
-		mutObserver.disconnect();
-	};
+  if (!messagesEl) return;
+  resizeObserver = new ResizeObserver(() => {
+    if (isAtBottom) snapToBottom();
+  });
+  for (const child of messagesEl.children) {
+    resizeObserver.observe(child);
+  }
+  const mutObserver = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      for (const node of m.addedNodes) {
+        if (node instanceof Element) resizeObserver!.observe(node);
+      }
+    }
+    if (isAtBottom) snapToBottom();
+  });
+  mutObserver.observe(messagesEl, { childList: true });
+  return () => {
+    resizeObserver!.disconnect();
+    mutObserver.disconnect();
+  };
 });
 
 let dragCounter = 0;
 
 function handleDragEnter(e: DragEvent) {
-	e.preventDefault();
-	dragCounter++;
-	if (dragCounter === 1 && e.dataTransfer?.types.includes("Files")) {
-		chat.dragging = true;
-	}
+  e.preventDefault();
+  dragCounter++;
+  if (dragCounter === 1 && e.dataTransfer?.types.includes("Files")) {
+    chat.dragging = true;
+  }
 }
 
 function handleDragOver(e: DragEvent) {
-	e.preventDefault();
+  e.preventDefault();
 }
 
 function handleDragLeave(e: DragEvent) {
-	e.preventDefault();
-	dragCounter--;
-	if (dragCounter === 0) {
-		chat.dragging = false;
-	}
+  e.preventDefault();
+  dragCounter--;
+  if (dragCounter === 0) {
+    chat.dragging = false;
+  }
 }
 
 function handleDrop(e: DragEvent) {
-	e.preventDefault();
-	dragCounter = 0;
-	if (e.dataTransfer?.files) {
-		chat.handleDrop(e.dataTransfer.files);
-	}
+  e.preventDefault();
+  dragCounter = 0;
+  if (e.dataTransfer?.files) {
+    chat.handleDrop(e.dataTransfer.files);
+  }
 }
 
 function handleVisibility() {
-	chat.reportVisibility();
+  chat.reportVisibility();
 }
 
 function handleFocus() {
-	chat.reportVisibility();
+  chat.reportVisibility();
 }
 
 function handleBlur() {
-	chat.reportVisibility();
+  chat.reportVisibility();
 }
 
 onMount(() => {
-	chat.onSend = () => {
-		isAtBottom = true;
-		requestAnimationFrame(() => snapToBottom());
-	};
-	chat.init();
-	document.addEventListener("visibilitychange", handleVisibility);
-	window.addEventListener("focus", handleFocus);
-	window.addEventListener("blur", handleBlur);
-	document.addEventListener("dragenter", handleDragEnter);
-	document.addEventListener("dragover", handleDragOver);
-	document.addEventListener("dragleave", handleDragLeave);
-	document.addEventListener("drop", handleDrop);
+  chat.onSend = () => {
+    isAtBottom = true;
+    requestAnimationFrame(() => snapToBottom());
+  };
+  chat.init();
+  document.addEventListener("visibilitychange", handleVisibility);
+  window.addEventListener("focus", handleFocus);
+  window.addEventListener("blur", handleBlur);
+  document.addEventListener("dragenter", handleDragEnter);
+  document.addEventListener("dragover", handleDragOver);
+  document.addEventListener("dragleave", handleDragLeave);
+  document.addEventListener("drop", handleDrop);
 });
 
 onDestroy(() => {
-	chat.onSend = null;
-	chat.destroy();
-	if (typeof document !== "undefined") {
-		document.removeEventListener("visibilitychange", handleVisibility);
-		window.removeEventListener("focus", handleFocus);
-		window.removeEventListener("blur", handleBlur);
-		document.removeEventListener("dragenter", handleDragEnter);
-		document.removeEventListener("dragover", handleDragOver);
-		document.removeEventListener("dragleave", handleDragLeave);
-		document.removeEventListener("drop", handleDrop);
-	}
+  chat.onSend = null;
+  chat.destroy();
+  if (typeof document !== "undefined") {
+    document.removeEventListener("visibilitychange", handleVisibility);
+    window.removeEventListener("focus", handleFocus);
+    window.removeEventListener("blur", handleBlur);
+    document.removeEventListener("dragenter", handleDragEnter);
+    document.removeEventListener("dragover", handleDragOver);
+    document.removeEventListener("dragleave", handleDragLeave);
+    document.removeEventListener("drop", handleDrop);
+  }
 });
 </script>
 

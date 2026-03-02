@@ -5,37 +5,37 @@ import { Icon } from "svelte-icons-pack";
 import { FiFile } from "svelte-icons-pack/fi";
 
 let {
-	role,
-	content,
-	timestamp,
-	media,
-	queued,
+  role,
+  content,
+  timestamp,
+  media,
+  queued,
 }: {
-	role: string;
-	content: string;
-	timestamp: string;
-	media?: string[];
-	queued?: boolean;
+  role: string;
+  content: string;
+  timestamp: string;
+  media?: string[];
+  queued?: boolean;
 } = $props();
 
 let html = $state("");
 
 $effect(() => {
-	renderMarkdown(content).then((result) => {
-		html = result;
-	});
+  renderMarkdown(content).then((result) => {
+    html = result;
+  });
 });
 
 function handleClick(e: MouseEvent) {
-	const btn = (e.target as HTMLElement).closest(
-		".copy-btn",
-	) as HTMLButtonElement | null;
-	if (!btn?.dataset.code) return;
-	navigator.clipboard.writeText(btn.dataset.code);
-	btn.innerHTML = CHECK_SVG;
-	setTimeout(() => {
-		btn.innerHTML = COPY_SVG;
-	}, 1500);
+  const btn = (e.target as HTMLElement).closest(
+    ".copy-btn",
+  ) as HTMLButtonElement | null;
+  if (!btn?.dataset.code) return;
+  navigator.clipboard.writeText(btn.dataset.code);
+  btn.innerHTML = CHECK_SVG;
+  setTimeout(() => {
+    btn.innerHTML = COPY_SVG;
+  }, 1500);
 }
 </script>
 

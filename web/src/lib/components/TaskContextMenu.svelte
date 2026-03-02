@@ -6,27 +6,27 @@ import type { Task } from "$lib/api";
 import { taskStore } from "$lib/stores/task.svelte";
 import { Icon } from "svelte-icons-pack";
 import {
-	FiCheck,
-	FiTrash2,
-	FiCalendar,
-	FiPlus,
-	FiChevronLeft,
-	FiChevronRight,
-	FiSun,
-	FiClock,
-	FiX,
+  FiCheck,
+  FiTrash2,
+  FiCalendar,
+  FiPlus,
+  FiChevronLeft,
+  FiChevronRight,
+  FiSun,
+  FiClock,
+  FiX,
 } from "svelte-icons-pack/fi";
 
 let {
-	task,
-	children,
-	onOpenDetail,
-	onAddSubtask,
+  task,
+  children,
+  onOpenDetail,
+  onAddSubtask,
 }: {
-	task: Task;
-	children: import("svelte").Snippet;
-	onOpenDetail?: (task: Task) => void;
-	onAddSubtask?: (parentId: string) => void;
+  task: Task;
+  children: import("svelte").Snippet;
+  onOpenDetail?: (task: Task) => void;
+  onAddSubtask?: (parentId: string) => void;
 } = $props();
 
 let calendarOpen = $state(false);
@@ -34,72 +34,72 @@ let calendarOpen = $state(false);
 let calendarValue = $state<DateValue | undefined>(undefined);
 
 function syncCalendarValue() {
-	if (!task.due) {
-		calendarValue = undefined;
-		return;
-	}
-	const datePart = task.due.includes("T") ? task.due.split("T")[0] : task.due;
-	calendarValue = parseDate(datePart);
+  if (!task.due) {
+    calendarValue = undefined;
+    return;
+  }
+  const datePart = task.due.includes("T") ? task.due.split("T")[0] : task.due;
+  calendarValue = parseDate(datePart);
 }
 
 function isTaskOverdue(): boolean {
-	if (!task.due || task.status === "done") return false;
-	const datePart = task.due.includes("T") ? task.due.split("T")[0] : task.due;
-	return datePart < new Date().toISOString().slice(0, 10);
+  if (!task.due || task.status === "done") return false;
+  const datePart = task.due.includes("T") ? task.due.split("T")[0] : task.due;
+  return datePart < new Date().toISOString().slice(0, 10);
 }
 
 async function setPriority(priority: string) {
-	await taskStore.update(task.id, {
-		priority: priority || undefined,
-	} as Partial<Task>);
+  await taskStore.update(task.id, {
+    priority: priority || undefined,
+  } as Partial<Task>);
 }
 
 async function setStatus(status: string) {
-	if (status === "done") {
-		await taskStore.complete(task.id);
-	} else {
-		await taskStore.update(task.id, { status } as Partial<Task>);
-	}
+  if (status === "done") {
+    await taskStore.complete(task.id);
+  } else {
+    await taskStore.update(task.id, { status } as Partial<Task>);
+  }
 }
 
 async function setDue(due: string | undefined) {
-	await taskStore.update(task.id, { due } as Partial<Task>);
+  await taskStore.update(task.id, { due } as Partial<Task>);
 }
 
 async function handleCalendarSelect(value: DateValue | undefined) {
-	if (value) {
-		await setDue(value.toString());
-	}
-	calendarOpen = false;
+  if (value) {
+    await setDue(value.toString());
+  }
+  calendarOpen = false;
 }
 
 async function handleDelete() {
-	await taskStore.remove(task.id);
+  await taskStore.remove(task.id);
 }
 
 function todayStr(): string {
-	return new Date().toISOString().slice(0, 10);
+  return new Date().toISOString().slice(0, 10);
 }
 
 function tomorrowStr(): string {
-	return new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  return new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 }
 
 function nextWeekStr(): string {
-	return new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  return new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
 }
 
 const priorities = [
-	{ value: "", label: "None", color: "" },
-	{ value: "low", label: "Low", color: "bg-text-muted" },
-	{ value: "medium", label: "Medium", color: "bg-warning" },
-	{ value: "high", label: "High", color: "bg-error" },
+  { value: "", label: "None", color: "" },
+  { value: "low", label: "Low", color: "bg-text-muted" },
+  { value: "medium", label: "Medium", color: "bg-warning" },
+  { value: "high", label: "High", color: "bg-error" },
 ];
 
 const statuses = [
-	{ value: "todo", label: "To Do" },
-	{ value: "doing", label: "In Progress" },
-	{ value: "done", label: "Done" },
+  { value: "todo", label: "To Do" },
+  { value: "doing", label: "In Progress" },
+  { value: "done", label: "Done" },
 ];
 </script>
 

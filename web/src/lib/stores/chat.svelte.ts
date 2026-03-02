@@ -1,28 +1,28 @@
 import {
-	connectSSE,
-	getHistory,
-	getMockTimeline,
-	reportActive,
-	transcribeAudio,
-	type ActivityEventData,
-	type HistoryMessage,
-	sendMessage,
-	uploadFile,
+  connectSSE,
+  getHistory,
+  getMockTimeline,
+  reportActive,
+  transcribeAudio,
+  type ActivityEventData,
+  type HistoryMessage,
+  sendMessage,
+  uploadFile,
 } from "$lib/api";
 import { taskStore } from "$lib/stores/task.svelte";
 import { nowTimestamp } from "$lib/utils";
 
 export type TimelineItem =
-	| {
-			kind: "message";
-			id: number;
-			role: string;
-			content: string;
-			timestamp: string;
-			media?: string[];
-			queued?: boolean;
-	  }
-	| ({ kind: "activity"; id: number } & ActivityEventData);
+  | {
+      kind: "message";
+      id: number;
+      role: string;
+      content: string;
+      timestamp: string;
+      media?: string[];
+      queued?: boolean;
+    }
+  | ({ kind: "activity"; id: number } & ActivityEventData);
 
 export type MessageTimelineItem = Extract<TimelineItem, { kind: "message" }>;
 export type ActivityTimelineItem = Extract<TimelineItem, { kind: "activity" }>;
@@ -30,297 +30,297 @@ export type ActivityTimelineItem = Extract<TimelineItem, { kind: "activity" }>;
 let nextId = 0;
 
 function createChat() {
-	let timeline = $state<TimelineItem[]>([]);
-	let input = $state("");
-	let loading = $state(false);
-	let recording = $state(false);
-	let pendingMedia = $state<string[]>([]);
-	let dragging = $state(false);
-	let expandedGroups = $state<Record<string, boolean>>({});
-	let clientId: string | null = null;
-	let eventSource: EventSource | null = null;
-	let mediaRecorder: MediaRecorder | null = null;
-	let mediaStream = $state<MediaStream | null>(null);
-	let onSend: (() => void) | null = null;
+  let timeline = $state<TimelineItem[]>([]);
+  let input = $state("");
+  let loading = $state(false);
+  let recording = $state(false);
+  let pendingMedia = $state<string[]>([]);
+  let dragging = $state(false);
+  let expandedGroups = $state<Record<string, boolean>>({});
+  let clientId: string | null = null;
+  let eventSource: EventSource | null = null;
+  let mediaRecorder: MediaRecorder | null = null;
+  let mediaStream = $state<MediaStream | null>(null);
+  let onSend: (() => void) | null = null;
 
-	function addMessage(msg: HistoryMessage) {
-		if (!msg.content && (!msg.media || msg.media.length === 0)) return;
-		timeline.push({
-			kind: "message",
-			...msg,
-			timestamp: nowTimestamp(),
-			id: ++nextId,
-		});
-	}
+  function addMessage(msg: HistoryMessage) {
+    if (!msg.content && (!msg.media || msg.media.length === 0)) return;
+    timeline.push({
+      kind: "message",
+      ...msg,
+      timestamp: nowTimestamp(),
+      id: ++nextId,
+    });
+  }
 
-	function addActivity(evt: ActivityEventData) {
-		// Any activity event means the agent is processing — dequeue first waiting message
-		for (const item of timeline) {
-			if (item.kind === "message" && item.queued) {
-				item.queued = false;
-				break;
-			}
-		}
-		timeline.push({ kind: "activity", ...evt, id: ++nextId });
-	}
+  function addActivity(evt: ActivityEventData) {
+    // Any activity event means the agent is processing — dequeue first waiting message
+    for (const item of timeline) {
+      if (item.kind === "message" && item.queued) {
+        item.queued = false;
+        break;
+      }
+    }
+    timeline.push({ kind: "activity", ...evt, id: ++nextId });
+  }
 
-	async function init() {
-		const mockItems = getMockTimeline();
-		if (mockItems.length > 0) {
-			timeline = mockItems.map((item) => ({ ...item, id: ++nextId }));
-		} else {
-			try {
-				const history = await getHistory();
-				timeline = history.items
-					.map((item): TimelineItem | null => {
-						if (item.type === "message") {
-							if (item.role !== "user" && !item.content) return null;
-							return {
-								kind: "message",
-								role: item.role!,
-								content: item.content ?? "",
-								timestamp: item.timestamp,
-								media: item.media,
-								id: ++nextId,
-							};
-						}
-						return {
-							kind: "activity",
-							event_type: item.event_type!,
-							timestamp: item.timestamp,
-							message: item.message!,
-							detail: item.detail,
-							id: ++nextId,
-						};
-					})
-					.filter((item): item is TimelineItem => item !== null);
-			} catch {
-				// ignore
-			}
-		}
+  async function init() {
+    const mockItems = getMockTimeline();
+    if (mockItems.length > 0) {
+      timeline = mockItems.map((item) => ({ ...item, id: ++nextId }));
+    } else {
+      try {
+        const history = await getHistory();
+        timeline = history.items
+          .map((item): TimelineItem | null => {
+            if (item.type === "message") {
+              if (item.role !== "user" && !item.content) return null;
+              return {
+                kind: "message",
+                role: item.role!,
+                content: item.content ?? "",
+                timestamp: item.timestamp,
+                media: item.media,
+                id: ++nextId,
+              };
+            }
+            return {
+              kind: "activity",
+              event_type: item.event_type!,
+              timestamp: item.timestamp,
+              message: item.message!,
+              detail: item.detail,
+              id: ++nextId,
+            };
+          })
+          .filter((item): item is TimelineItem => item !== null);
+      } catch {
+        // ignore
+      }
+    }
 
-		eventSource = connectSSE(
-			(msg) => {
-				loading = false;
-				addMessage(msg);
-			},
-			(evt) => {
-				addActivity(evt);
-			},
-			(processing) => {
-				loading = processing;
-			},
-			(id) => {
-				clientId = id;
-				reportActive(id, document.visibilityState === "visible");
-			},
-			() => {
-				sync();
-			},
-			(action, task) => {
-				taskStore.applyEvent(action, task);
-			},
-		);
-	}
+    eventSource = connectSSE(
+      (msg) => {
+        loading = false;
+        addMessage(msg);
+      },
+      (evt) => {
+        addActivity(evt);
+      },
+      (processing) => {
+        loading = processing;
+      },
+      (id) => {
+        clientId = id;
+        reportActive(id, document.visibilityState === "visible");
+      },
+      () => {
+        sync();
+      },
+      (action, task) => {
+        taskStore.applyEvent(action, task);
+      },
+    );
+  }
 
-	async function send() {
-		const content = input.trim();
-		const media = [...pendingMedia];
-		if (!content && media.length === 0) return;
+  async function send() {
+    const content = input.trim();
+    const media = [...pendingMedia];
+    if (!content && media.length === 0) return;
 
-		timeline.push({
-			kind: "message",
-			role: "user",
-			content,
-			timestamp: nowTimestamp(),
-			id: ++nextId,
-			media: media.length > 0 ? media : undefined,
-			queued: loading ? true : undefined,
-		});
-		input = "";
-		pendingMedia = [];
-		loading = true;
-		onSend?.();
+    timeline.push({
+      kind: "message",
+      role: "user",
+      content,
+      timestamp: nowTimestamp(),
+      id: ++nextId,
+      media: media.length > 0 ? media : undefined,
+      queued: loading ? true : undefined,
+    });
+    input = "";
+    pendingMedia = [];
+    loading = true;
+    onSend?.();
 
-		try {
-			await sendMessage(content, media);
-		} catch {
-			loading = false;
-		}
-	}
+    try {
+      await sendMessage(content, media);
+    } catch {
+      loading = false;
+    }
+  }
 
-	let transcribing = $state(false);
-	let sendAfterTranscribe = false;
-	let inputBeforeRecording = "";
+  let transcribing = $state(false);
+  let sendAfterTranscribe = false;
+  let inputBeforeRecording = "";
 
-	function stopRecording() {
-		mediaRecorder?.stop();
-		mediaRecorder = null;
-		recording = false;
-	}
+  function stopRecording() {
+    mediaRecorder?.stop();
+    mediaRecorder = null;
+    recording = false;
+  }
 
-	async function toggleRecording() {
-		if (recording) {
-			sendAfterTranscribe = false;
-			stopRecording();
-			return;
-		}
-		inputBeforeRecording = input;
-		recording = true;
-		try {
-			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-			mediaStream = stream;
-			const chunks: Blob[] = [];
-			mediaRecorder = new MediaRecorder(stream);
-			mediaRecorder.ondataavailable = (e) => {
-				if (e.data.size > 0) chunks.push(e.data);
-			};
-			mediaRecorder.onstop = async () => {
-				stream.getTracks().forEach((t) => t.stop());
-				mediaStream = null;
-				const blob = new Blob(chunks, { type: "audio/webm" });
-				const file = new File([blob], "voice.webm", { type: "audio/webm" });
-				transcribing = true;
-				const shouldSend = sendAfterTranscribe;
-				sendAfterTranscribe = false;
-				const text = await transcribeAudio(file);
-				transcribing = false;
-				const prefix = inputBeforeRecording.trim();
-				const transcribed = text?.trim() ?? "";
-				if (prefix && transcribed) {
-					input = prefix + " " + transcribed;
-				} else {
-					input = prefix || transcribed;
-				}
-				inputBeforeRecording = "";
-				if (shouldSend) {
-					await send();
-				}
-			};
-			mediaRecorder.start();
-		} catch {
-			recording = false;
-		}
-	}
+  async function toggleRecording() {
+    if (recording) {
+      sendAfterTranscribe = false;
+      stopRecording();
+      return;
+    }
+    inputBeforeRecording = input;
+    recording = true;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStream = stream;
+      const chunks: Blob[] = [];
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        mediaStream = null;
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        const file = new File([blob], "voice.webm", { type: "audio/webm" });
+        transcribing = true;
+        const shouldSend = sendAfterTranscribe;
+        sendAfterTranscribe = false;
+        const text = await transcribeAudio(file);
+        transcribing = false;
+        const prefix = inputBeforeRecording.trim();
+        const transcribed = text?.trim() ?? "";
+        if (prefix && transcribed) {
+          input = prefix + " " + transcribed;
+        } else {
+          input = prefix || transcribed;
+        }
+        inputBeforeRecording = "";
+        if (shouldSend) {
+          await send();
+        }
+      };
+      mediaRecorder.start();
+    } catch {
+      recording = false;
+    }
+  }
 
-	function recordAndSend() {
-		if (!recording) return;
-		sendAfterTranscribe = true;
-		stopRecording();
-	}
+  function recordAndSend() {
+    if (!recording) return;
+    sendAfterTranscribe = true;
+    stopRecording();
+  }
 
-	async function attachFiles(files: FileList) {
-		const snapshot = [...files];
-		for (const file of snapshot) {
-			const path = await uploadFile(file);
-			if (path) pendingMedia.push(path);
-		}
-	}
+  async function attachFiles(files: FileList) {
+    const snapshot = [...files];
+    for (const file of snapshot) {
+      const path = await uploadFile(file);
+      if (path) pendingMedia.push(path);
+    }
+  }
 
-	async function handleDrop(files: FileList) {
-		dragging = false;
-		await attachFiles(files);
-	}
+  async function handleDrop(files: FileList) {
+    dragging = false;
+    await attachFiles(files);
+  }
 
-	function removeMedia(index: number) {
-		pendingMedia.splice(index, 1);
-	}
+  function removeMedia(index: number) {
+    pendingMedia.splice(index, 1);
+  }
 
-	async function sync() {
-		try {
-			const history = await getHistory();
-			timeline = history.items
-				.map((item): TimelineItem | null => {
-					if (item.type === "message") {
-						if (item.role !== "user" && !item.content) return null;
-						return {
-							kind: "message",
-							role: item.role!,
-							content: item.content ?? "",
-							timestamp: item.timestamp,
-							media: item.media,
-							id: ++nextId,
-						};
-					}
-					return {
-						kind: "activity",
-						event_type: item.event_type!,
-						timestamp: item.timestamp,
-						message: item.message!,
-						detail: item.detail,
-						id: ++nextId,
-					};
-				})
-				.filter((item): item is TimelineItem => item !== null);
-		} catch {
-			// ignore
-		}
-	}
+  async function sync() {
+    try {
+      const history = await getHistory();
+      timeline = history.items
+        .map((item): TimelineItem | null => {
+          if (item.type === "message") {
+            if (item.role !== "user" && !item.content) return null;
+            return {
+              kind: "message",
+              role: item.role!,
+              content: item.content ?? "",
+              timestamp: item.timestamp,
+              media: item.media,
+              id: ++nextId,
+            };
+          }
+          return {
+            kind: "activity",
+            event_type: item.event_type!,
+            timestamp: item.timestamp,
+            message: item.message!,
+            detail: item.detail,
+            id: ++nextId,
+          };
+        })
+        .filter((item): item is TimelineItem => item !== null);
+    } catch {
+      // ignore
+    }
+  }
 
-	function reportVisibility() {
-		if (clientId) {
-			reportActive(clientId, document.visibilityState === "visible");
-		}
-	}
+  function reportVisibility() {
+    if (clientId) {
+      reportActive(clientId, document.visibilityState === "visible");
+    }
+  }
 
-	function isGroupExpanded(key: string): boolean {
-		return !!expandedGroups[key];
-	}
+  function isGroupExpanded(key: string): boolean {
+    return !!expandedGroups[key];
+  }
 
-	function toggleGroupExpanded(key: string) {
-		expandedGroups[key] = !expandedGroups[key];
-	}
+  function toggleGroupExpanded(key: string) {
+    expandedGroups[key] = !expandedGroups[key];
+  }
 
-	function destroy() {
-		eventSource?.close();
-	}
+  function destroy() {
+    eventSource?.close();
+  }
 
-	return {
-		get timeline() {
-			return timeline;
-		},
-		get input() {
-			return input;
-		},
-		set input(v: string) {
-			input = v;
-		},
-		get loading() {
-			return loading;
-		},
-		get recording() {
-			return recording;
-		},
-		get transcribing() {
-			return transcribing;
-		},
-		get mediaStream() {
-			return mediaStream;
-		},
-		get pendingMedia() {
-			return pendingMedia;
-		},
-		get dragging() {
-			return dragging;
-		},
-		set dragging(v: boolean) {
-			dragging = v;
-		},
-		set onSend(cb: (() => void) | null) {
-			onSend = cb;
-		},
-		init,
-		reportVisibility,
-		isGroupExpanded,
-		toggleGroupExpanded,
-		send,
-		toggleRecording,
-		recordAndSend,
-		attachFiles,
-		handleDrop,
-		removeMedia,
-		destroy,
-	};
+  return {
+    get timeline() {
+      return timeline;
+    },
+    get input() {
+      return input;
+    },
+    set input(v: string) {
+      input = v;
+    },
+    get loading() {
+      return loading;
+    },
+    get recording() {
+      return recording;
+    },
+    get transcribing() {
+      return transcribing;
+    },
+    get mediaStream() {
+      return mediaStream;
+    },
+    get pendingMedia() {
+      return pendingMedia;
+    },
+    get dragging() {
+      return dragging;
+    },
+    set dragging(v: boolean) {
+      dragging = v;
+    },
+    set onSend(cb: (() => void) | null) {
+      onSend = cb;
+    },
+    init,
+    reportVisibility,
+    isGroupExpanded,
+    toggleGroupExpanded,
+    send,
+    toggleRecording,
+    recordAndSend,
+    attachFiles,
+    handleDrop,
+    removeMedia,
+    destroy,
+  };
 }
 
 export const chat = createChat();

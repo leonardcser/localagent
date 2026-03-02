@@ -4,107 +4,107 @@ import { imageStore } from "$lib/stores/image.svelte";
 import { imageResultUrl, imageSourceUrl } from "$lib/api";
 import { Icon } from "svelte-icons-pack";
 import {
-	FiLoader,
-	FiAlertCircle,
-	FiZap,
-	FiDownload,
-	FiTrash2,
-	FiX,
-	FiEdit2,
-	FiUpload,
-	FiArrowUp,
-	FiPower,
-	FiPlus,
+  FiLoader,
+  FiAlertCircle,
+  FiZap,
+  FiDownload,
+  FiTrash2,
+  FiX,
+  FiEdit2,
+  FiUpload,
+  FiArrowUp,
+  FiPower,
+  FiPlus,
 } from "svelte-icons-pack/fi";
 
 let lightboxJob = $state<{ jobId: string; index: number } | null>(null);
 let upscaleMenu = $state<{ jobId: string; index: number } | null>(null);
 let lightboxUrl = $derived(
-	lightboxJob ? imageResultUrl(lightboxJob.jobId, lightboxJob.index) : null,
+  lightboxJob ? imageResultUrl(lightboxJob.jobId, lightboxJob.index) : null,
 );
 let dragOver = $state(false);
 let fileInput = $state<HTMLInputElement>(null!);
 let controlsOpen = $state(false);
 
 function openLightbox(jobId: string, index: number) {
-	lightboxJob = { jobId, index };
+  lightboxJob = { jobId, index };
 }
 
 function closeLightbox() {
-	lightboxJob = null;
+  lightboxJob = null;
 }
 
 function handleKeydown(e: KeyboardEvent) {
-	if (e.key === "Escape") {
-		closeLightbox();
-		upscaleMenu = null;
-		controlsOpen = false;
-	}
-	if (!lightboxJob) return;
-	const job = imageStore.jobs.find((j) => j.id === lightboxJob!.jobId);
-	if (!job) return;
-	if (e.key === "ArrowRight" || e.key === "l") {
-		if (lightboxJob.index < job.image_count - 1) {
-			lightboxJob = { jobId: lightboxJob.jobId, index: lightboxJob.index + 1 };
-		}
-	} else if (e.key === "ArrowLeft" || e.key === "h") {
-		if (lightboxJob.index > 0) {
-			lightboxJob = { jobId: lightboxJob.jobId, index: lightboxJob.index - 1 };
-		}
-	}
+  if (e.key === "Escape") {
+    closeLightbox();
+    upscaleMenu = null;
+    controlsOpen = false;
+  }
+  if (!lightboxJob) return;
+  const job = imageStore.jobs.find((j) => j.id === lightboxJob!.jobId);
+  if (!job) return;
+  if (e.key === "ArrowRight" || e.key === "l") {
+    if (lightboxJob.index < job.image_count - 1) {
+      lightboxJob = { jobId: lightboxJob.jobId, index: lightboxJob.index + 1 };
+    }
+  } else if (e.key === "ArrowLeft" || e.key === "h") {
+    if (lightboxJob.index > 0) {
+      lightboxJob = { jobId: lightboxJob.jobId, index: lightboxJob.index - 1 };
+    }
+  }
 }
 
 function handleSubmit(e: SubmitEvent) {
-	e.preventDefault();
-	imageStore.generate();
-	controlsOpen = false;
+  e.preventDefault();
+  imageStore.generate();
+  controlsOpen = false;
 }
 
 function handleDrop(e: DragEvent) {
-	e.preventDefault();
-	dragOver = false;
-	const files = Array.from(e.dataTransfer?.files ?? []).filter((f) =>
-		f.type.startsWith("image/"),
-	);
-	if (files.length > 0) imageStore.addSourceImages(files);
+  e.preventDefault();
+  dragOver = false;
+  const files = Array.from(e.dataTransfer?.files ?? []).filter((f) =>
+    f.type.startsWith("image/"),
+  );
+  if (files.length > 0) imageStore.addSourceImages(files);
 }
 
 function handleDragOver(e: DragEvent) {
-	e.preventDefault();
-	dragOver = true;
+  e.preventDefault();
+  dragOver = true;
 }
 
 function handleDragLeave() {
-	dragOver = false;
+  dragOver = false;
 }
 
 function handleFileSelect(e: Event) {
-	const input = e.target as HTMLInputElement;
-	const files = Array.from(input.files ?? []);
-	if (files.length > 0) imageStore.addSourceImages(files);
-	input.value = "";
+  const input = e.target as HTMLInputElement;
+  const files = Array.from(input.files ?? []);
+  if (files.length > 0) imageStore.addSourceImages(files);
+  input.value = "";
 }
 
 onMount(() => {
-	imageStore.init();
-	document.addEventListener("keydown", handleKeydown);
+  imageStore.init();
+  document.addEventListener("keydown", handleKeydown);
 });
 
 onDestroy(() => {
-	imageStore.destroy();
-	if (typeof document !== "undefined") {
-		document.removeEventListener("keydown", handleKeydown);
-	}
+  imageStore.destroy();
+  if (typeof document !== "undefined") {
+    document.removeEventListener("keydown", handleKeydown);
+  }
 });
 
 let reversedJobs = $derived([...imageStore.jobs].reverse());
 
 let modeLabel = $derived(
-	imageStore.isUpscaleModel
-		? "Upscale"
-		: imageStore.isEditModel
-			? "Edit"
-			: "Generate",
+  imageStore.isUpscaleModel
+    ? "Upscale"
+    : imageStore.isEditModel
+      ? "Edit"
+      : "Generate",
 );
 </script>
 

@@ -2,44 +2,44 @@
 import { cn, formatTimestamp } from "$lib/utils";
 
 let {
-	event_type,
-	timestamp,
-	message,
-	detail,
-	onclick,
-	expanded = false,
-	onToggleExpand,
+  event_type,
+  timestamp,
+  message,
+  detail,
+  onclick,
+  expanded = false,
+  onToggleExpand,
 }: {
-	event_type: string;
-	timestamp: string;
-	message: string;
-	detail?: Record<string, unknown>;
-	onclick?: () => void;
-	expanded?: boolean;
-	onToggleExpand?: () => void;
+  event_type: string;
+  timestamp: string;
+  message: string;
+  detail?: Record<string, unknown>;
+  onclick?: () => void;
+  expanded?: boolean;
+  onToggleExpand?: () => void;
 } = $props();
 
 function isToolError(): boolean {
-	return event_type === "tool_exec" && detail?.status === "error";
+  return event_type === "tool_exec" && detail?.status === "error";
 }
 
 function labelColor(t: string): string {
-	if (t === "llm_error" || isToolError()) return "text-error";
-	if (t === "llm_turn") return "text-accent";
-	if (t === "tool_exec") return "text-warning";
-	if (t === "complete") return "text-success";
-	return "text-text-muted";
+  if (t === "llm_error" || isToolError()) return "text-error";
+  if (t === "llm_turn") return "text-accent";
+  if (t === "tool_exec") return "text-warning";
+  if (t === "complete") return "text-success";
+  return "text-text-muted";
 }
 
 function label(t: string): string {
-	if (isToolError()) return "ERROR";
-	const labels: Record<string, string> = {
-		llm_turn: "LLM",
-		llm_error: "ERROR",
-		tool_exec: "TOOL",
-		complete: "DONE",
-	};
-	return labels[t] ?? t.toUpperCase();
+  if (isToolError()) return "ERROR";
+  const labels: Record<string, string> = {
+    llm_turn: "LLM",
+    llm_error: "ERROR",
+    tool_exec: "TOOL",
+    complete: "DONE",
+  };
+  return labels[t] ?? t.toUpperCase();
 }
 </script>
 

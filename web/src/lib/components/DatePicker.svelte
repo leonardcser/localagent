@@ -3,19 +3,19 @@ import { Popover, Calendar } from "bits-ui";
 import { parseDate, type DateValue } from "@internationalized/date";
 import { Icon } from "svelte-icons-pack";
 import {
-	FiCalendar,
-	FiChevronLeft,
-	FiChevronRight,
-	FiX,
-	FiClock,
+  FiCalendar,
+  FiChevronLeft,
+  FiChevronRight,
+  FiX,
+  FiClock,
 } from "svelte-icons-pack/fi";
 
 let {
-	value = "",
-	onchange,
+  value = "",
+  onchange,
 }: {
-	value: string;
-	onchange: (date: string) => void;
+  value: string;
+  onchange: (date: string) => void;
 } = $props();
 
 let open = $state(false);
@@ -23,82 +23,82 @@ let timeValue = $state("");
 
 // Parse "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM" into date part and time part
 function parseDueDate(v: string): { date: string; time: string } {
-	if (!v) return { date: "", time: "" };
-	if (v.includes("T")) {
-		const [d, t] = v.split("T");
-		return { date: d, time: t };
-	}
-	return { date: v, time: "" };
+  if (!v) return { date: "", time: "" };
+  if (v.includes("T")) {
+    const [d, t] = v.split("T");
+    return { date: d, time: t };
+  }
+  return { date: v, time: "" };
 }
 
 let datePart = $derived(parseDueDate(value).date);
 
 // Sync timeValue from prop on open
 function syncTime() {
-	timeValue = parseDueDate(value).time;
+  timeValue = parseDueDate(value).time;
 }
 
 let calendarValue = $derived<DateValue | undefined>(
-	datePart ? parseDate(datePart) : undefined,
+  datePart ? parseDate(datePart) : undefined,
 );
 
 function emitValue(date: string, time: string) {
-	if (!date) {
-		onchange("");
-		return;
-	}
-	onchange(time ? `${date}T${time}` : date);
+  if (!date) {
+    onchange("");
+    return;
+  }
+  onchange(time ? `${date}T${time}` : date);
 }
 
 function handleDateSelect(v: DateValue | undefined) {
-	if (v) {
-		emitValue(v.toString(), timeValue);
-	}
-	open = false;
+  if (v) {
+    emitValue(v.toString(), timeValue);
+  }
+  open = false;
 }
 
 function handleTimeChange(e: Event) {
-	const input = e.target as HTMLInputElement;
-	timeValue = input.value;
-	if (datePart) {
-		emitValue(datePart, timeValue);
-	}
+  const input = e.target as HTMLInputElement;
+  timeValue = input.value;
+  if (datePart) {
+    emitValue(datePart, timeValue);
+  }
 }
 
 function clearTime() {
-	timeValue = "";
-	if (datePart) {
-		emitValue(datePart, "");
-	}
+  timeValue = "";
+  if (datePart) {
+    emitValue(datePart, "");
+  }
 }
 
 function clear() {
-	timeValue = "";
-	onchange("");
+  timeValue = "";
+  onchange("");
 }
 
 function formatDisplay(v: string): string {
-	const { date, time } = parseDueDate(v);
-	if (!date) return "";
-	const todayStr = new Date().toISOString().slice(0, 10);
-	const tomorrowStr = new Date(Date.now() + 86400000)
-		.toISOString()
-		.slice(0, 10);
-	let label: string;
-	if (date === todayStr) label = "Today";
-	else if (date === tomorrowStr) label = "Tomorrow";
-	else {
-		const d = new Date(date + "T00:00:00");
-		label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-	}
-	if (time) {
-		const [h, m] = time.split(":");
-		const hour = parseInt(h);
-		const suffix = hour >= 12 ? "pm" : "am";
-		const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-		label += ` ${h12}:${m}${suffix}`;
-	}
-	return label;
+  const { date, time } = parseDueDate(v);
+  if (!date) return "";
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const tomorrowStr = new Date(Date.now() + 86400000)
+    .toISOString()
+    .slice(0, 10);
+  let label: string;
+  if (date === todayStr) label = "Today";
+  else if (date === tomorrowStr) label = "Tomorrow";
+  else {
+    const d = new Date(date + "T00:00:00");
+    label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+  if (time) {
+    const [h, m] = time.split(":");
+    const hour = parseInt(h);
+    const suffix = hour >= 12 ? "pm" : "am";
+    const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    label += ` ${h12}:${m}${suffix}`;
+  }
+  return label;
 }
 </script>
 

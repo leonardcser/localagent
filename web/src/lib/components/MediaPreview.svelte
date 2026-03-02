@@ -4,8 +4,8 @@ import { Icon } from "svelte-icons-pack";
 import { FiFile, FiX } from "svelte-icons-pack/fi";
 
 let {
-	media,
-	onRemove,
+  media,
+  onRemove,
 }: { media: string[]; onRemove: (index: number) => void } = $props();
 </script>
 

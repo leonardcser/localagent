@@ -10,36 +10,36 @@ let textarea = $state<HTMLTextAreaElement>();
 let fileInput = $state<HTMLInputElement>();
 
 function handleKeydown(e: KeyboardEvent) {
-	if (e.key === "Enter" && !e.shiftKey) {
-		e.preventDefault();
-		chat.send();
-	}
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    chat.send();
+  }
 }
 
 function autoGrow() {
-	if (!textarea) return;
-	textarea.style.height = "auto";
-	textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+  if (!textarea) return;
+  textarea.style.height = "auto";
+  textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
 }
 
 function handleAttach() {
-	fileInput?.click();
+  fileInput?.click();
 }
 
 function handleFileChange(e: Event) {
-	const target = e.target as HTMLInputElement;
-	if (target.files) {
-		chat.attachFiles(target.files);
-		target.value = "";
-	}
+  const target = e.target as HTMLInputElement;
+  if (target.files) {
+    chat.attachFiles(target.files);
+    target.value = "";
+  }
 }
 
 $effect(() => {
-	chat.input;
-	if (textarea) {
-		textarea.style.height = "auto";
-		textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
-	}
+  chat.input;
+  if (textarea) {
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+  }
 });
 </script>
 
