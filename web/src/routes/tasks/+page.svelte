@@ -2,6 +2,7 @@
 import { onMount } from "svelte";
 import { taskStore, type SmartList } from "$lib/stores/task.svelte";
 import type { Task } from "$lib/api";
+import { Select } from "bits-ui";
 import { Icon } from "svelte-icons-pack";
 import {
 	FiSearch,
@@ -19,7 +20,10 @@ import {
 	FiChevronRight,
 	FiChevronDown,
 	FiCornerDownRight,
+	FiAlertCircle,
 } from "svelte-icons-pack/fi";
+import TaskContextMenu from "$lib/components/TaskContextMenu.svelte";
+import DatePicker from "$lib/components/DatePicker.svelte";
 
 let panelOpen = $state(false);
 let panelMode = $state<"add" | "edit">("add");
@@ -66,6 +70,7 @@ const smartLists: { key: SmartList; label: string; icon: typeof FiSun }[] = [
 	{ key: "today", label: "Today", icon: FiSun },
 	{ key: "tomorrow", label: "Tomorrow", icon: FiCalendar },
 	{ key: "next7", label: "Next 7 Days", icon: FiCalendar },
+	{ key: "overdue", label: "Overdue", icon: FiAlertCircle },
 	{ key: "inbox", label: "Inbox", icon: FiInbox },
 	{ key: "done", label: "Completed", icon: FiCheck },
 ];
@@ -184,7 +189,20 @@ function parseTags(raw: string): string[] | undefined {
 	return tags.length > 0 ? tags : undefined;
 }
 
-async function handleSubmit(e: SubmitEvent) {
+// Auto-save: update the task immediately when a field changes
+async function autoSave(patch: Partial<Task>) {
+	if (panelMode !== "edit" || !taskStore.selectedId) return;
+	await taskStore.update(taskStore.selectedId, patch);
+}
+
+// Debounced auto-save for text fields
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+function debouncedAutoSave(patch: Partial<Task>) {
+	if (saveTimer) clearTimeout(saveTimer);
+	saveTimer = setTimeout(() => autoSave(patch), 400);
+}
+
+async function handleAddSubmit(e: SubmitEvent) {
 	e.preventDefault();
 	if (!panelTitle.trim()) return;
 
@@ -198,11 +216,7 @@ async function handleSubmit(e: SubmitEvent) {
 		parentId: panelParentId || undefined,
 	};
 
-	if (panelMode === "add") {
-		await taskStore.add(data);
-	} else {
-		await taskStore.update(taskStore.selectedId, data);
-	}
+	await taskStore.add(data);
 	closePanel();
 }
 
@@ -230,30 +244,41 @@ async function handleDelete() {
 }
 
 function priorityColor(p?: string): string {
-	if (p === "high") return "text-error";
-	if (p === "medium") return "text-warning";
-	return "text-text-muted";
-}
-
-function priorityLabel(p?: string): string {
-	if (p === "high") return "!";
-	if (p === "medium") return "!!";
-	if (p === "low") return "!!!";
+	if (p === "high") return "bg-error";
+	if (p === "medium") return "bg-warning";
+	if (p === "low") return "bg-text-muted";
 	return "";
 }
 
 function isOverdue(due?: string): boolean {
 	if (!due) return false;
-	return due < new Date().toISOString().slice(0, 10);
+	const datePart = due.includes("T") ? due.split("T")[0] : due;
+	return datePart < new Date().toISOString().slice(0, 10);
 }
 
 function formatDate(due: string): string {
+	const datePart = due.includes("T") ? due.split("T")[0] : due;
+	const timePart = due.includes("T") ? due.split("T")[1] : "";
 	const today = new Date().toISOString().slice(0, 10);
 	const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-	if (due === today) return "Today";
-	if (due === tomorrow) return "Tomorrow";
-	const d = new Date(due + "T00:00:00");
-	return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+	let label: string;
+	if (datePart === today) label = "Today";
+	else if (datePart === tomorrow) label = "Tomorrow";
+	else {
+		const d = new Date(datePart + "T00:00:00");
+		label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+	}
+
+	if (timePart) {
+		const [h, m] = timePart.split(":");
+		const hour = parseInt(h);
+		const suffix = hour >= 12 ? "pm" : "am";
+		const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+		label += ` ${h12}:${m}${suffix}`;
+	}
+
+	return label;
 }
 
 async function handleDrop(e: DragEvent, status: string) {
@@ -279,7 +304,7 @@ function handleDragStart(e: DragEvent, id: string) {
 	ghost.style.top = "-9999px";
 	ghost.style.left = "-9999px";
 	ghost.style.width = `${rect.width}px`;
-	ghost.style.transform = "rotate(-3deg) scale(1.04)";
+	ghost.style.transform = "scale(1.02)";
 	ghost.style.opacity = "0.92";
 	ghost.style.pointerEvents = "none";
 	ghost.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
@@ -379,14 +404,303 @@ function handleKeydown(e: KeyboardEvent) {
 		lastKeyD = now;
 	}
 }
+
+const statusOptions = [
+	{ value: "todo", label: "To Do" },
+	{ value: "doing", label: "In Progress" },
+	{ value: "done", label: "Done" },
+];
+
+const priorityOptions = [
+	{ value: "", label: "None" },
+	{ value: "low", label: "Low" },
+	{ value: "medium", label: "Medium" },
+	{ value: "high", label: "High" },
+];
 </script>
+
+{#snippet selectIndicator(selected: boolean)}
+	<span
+		class="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border-light {selected ? 'bg-accent border-accent' : ''}"
+	>
+		{#if selected}
+			<Icon src={FiCheck} size="8" className="text-white" />
+		{/if}
+	</span>
+{/snippet}
+
+{#snippet detailPanel(mobile: boolean)}
+	{@const sz = mobile ? "text-[14px]" : "text-[12px]"}
+	{@const szLabel = mobile ? "text-[14px]" : "text-[12px]"}
+	{@const gap = mobile ? "gap-3" : "gap-2"}
+	{@const iconSz = mobile ? "16" : "13"}
+	{@const py = mobile ? "py-3" : "py-2.5"}
+
+	<div class="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+		<input
+			type="text"
+			bind:value={panelTitle}
+			placeholder="Task title"
+			class="bg-transparent {mobile ? 'text-[17px] font-semibold' : 'text-[15px] font-medium'} text-text-primary placeholder:text-text-muted outline-none"
+			onblur={() => {
+				if (panelTitle.trim()) debouncedAutoSave({ title: panelTitle.trim() });
+			}}
+		/>
+
+		<textarea
+			bind:value={panelDescription}
+			placeholder="Add notes..."
+			rows={mobile ? 4 : 3}
+			class="resize-none bg-transparent {mobile ? 'text-[14px]' : 'text-[13px]'} text-text-secondary placeholder:text-text-muted outline-none"
+			onblur={() => debouncedAutoSave({ description: panelDescription.trim() || undefined })}
+		></textarea>
+
+		<div class="flex flex-col gap-0 border-t border-border pt-2">
+			<!-- Status -->
+			<div class="flex items-center justify-between {py} border-b border-border/50">
+				<span class="flex items-center {gap} {szLabel} text-text-secondary">
+					<Icon src={FiList} size={iconSz} className="text-text-muted" />
+					Status
+				</span>
+				<Select.Root
+					type="single"
+					value={panelStatus}
+					onValueChange={(v) => {
+						panelStatus = v;
+						if (v === "done") {
+							taskStore.complete(taskStore.selectedId);
+						} else {
+							autoSave({ status: v });
+						}
+					}}
+				>
+					<Select.Trigger
+						class="flex items-center gap-1.5 rounded-lg border border-border bg-bg-tertiary px-2 py-1 {sz} text-text-primary outline-none hover:border-border-light focus:border-accent"
+					>
+						{statusOptions.find((s) => s.value === panelStatus)?.label ?? "To Do"}
+						<Icon src={FiChevronDown} size="11" className="text-text-muted" />
+					</Select.Trigger>
+					<Select.Portal>
+						<Select.Content
+							class="z-50 min-w-32 rounded-lg border border-border bg-bg-secondary p-1 shadow-elevated"
+							sideOffset={4}
+						>
+							<Select.Viewport>
+								{#each statusOptions as opt}
+									<Select.Item
+										value={opt.value}
+										label={opt.label}
+										class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 {sz} text-text-secondary outline-none data-[highlighted]:bg-overlay-light data-[highlighted]:text-text-primary"
+									>
+										{#snippet children({ selected })}
+											{@render selectIndicator(selected)}
+											{opt.label}
+										{/snippet}
+									</Select.Item>
+								{/each}
+							</Select.Viewport>
+						</Select.Content>
+					</Select.Portal>
+				</Select.Root>
+			</div>
+
+			<!-- Priority -->
+			<div class="flex items-center justify-between {py} border-b border-border/50">
+				<span class="flex items-center {gap} {szLabel} text-text-secondary">
+					<svg width={iconSz} height={iconSz} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-text-muted">
+						<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+						<line x1="4" y1="22" x2="4" y2="15" />
+					</svg>
+					Priority
+				</span>
+				<Select.Root
+					type="single"
+					value={panelPriority}
+					onValueChange={(v) => {
+						panelPriority = v;
+						autoSave({ priority: v || undefined } as Partial<Task>);
+					}}
+				>
+					<Select.Trigger
+						class="flex items-center gap-1.5 rounded-lg border border-border bg-bg-tertiary px-2 py-1 {sz} text-text-primary outline-none hover:border-border-light focus:border-accent"
+					>
+						<span class="flex items-center gap-1.5">
+							{#if panelPriority}
+								<span class="h-2 w-2 rounded-full {priorityColor(panelPriority)}"></span>
+							{/if}
+							{priorityOptions.find((p) => p.value === panelPriority)?.label ?? "None"}
+						</span>
+						<Icon src={FiChevronDown} size="11" className="text-text-muted" />
+					</Select.Trigger>
+					<Select.Portal>
+						<Select.Content
+							class="z-50 min-w-32 rounded-lg border border-border bg-bg-secondary p-1 shadow-elevated"
+							sideOffset={4}
+						>
+							<Select.Viewport>
+								{#each priorityOptions as opt}
+									<Select.Item
+										value={opt.value}
+										label={opt.label}
+										class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 {sz} text-text-secondary outline-none data-[highlighted]:bg-overlay-light data-[highlighted]:text-text-primary"
+									>
+										{#snippet children({ selected })}
+											{@render selectIndicator(selected)}
+											<span class="flex items-center gap-1.5">
+												{#if opt.value}
+													<span class="h-2 w-2 rounded-full {priorityColor(opt.value)}"></span>
+												{/if}
+												{opt.label}
+											</span>
+										{/snippet}
+									</Select.Item>
+								{/each}
+							</Select.Viewport>
+						</Select.Content>
+					</Select.Portal>
+				</Select.Root>
+			</div>
+
+			<!-- Due Date -->
+			<div class="flex items-center justify-between {py} border-b border-border/50">
+				<span class="flex items-center {gap} {szLabel} text-text-secondary">
+					<Icon src={FiCalendar} size={iconSz} className="text-text-muted" />
+					Due Date
+				</span>
+				<DatePicker
+					value={panelDue}
+					onchange={(v) => {
+						panelDue = v;
+						autoSave({ due: v || undefined } as Partial<Task>);
+					}}
+				/>
+			</div>
+
+			<!-- Tags -->
+			<div class="flex items-center justify-between {py} border-b border-border/50">
+				<span class="flex items-center {gap} {szLabel} text-text-secondary">
+					<Icon src={FiTag} size={iconSz} className="text-text-muted" />
+					Tags
+				</span>
+				<input
+					type="text"
+					bind:value={panelTags}
+					placeholder="work, personal"
+					class="{mobile ? 'w-40' : 'w-36'} rounded-lg border border-border bg-bg-tertiary px-2 py-1 {sz} text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
+					onblur={() => {
+						const tags = parseTags(panelTags);
+						autoSave({ tags: tags ?? [] } as Partial<Task>);
+					}}
+				/>
+			</div>
+
+			<!-- Parent -->
+			<div class="flex items-center justify-between {py}">
+				<span class="flex items-center {gap} {szLabel} text-text-secondary">
+					<Icon src={FiCornerDownRight} size={iconSz} className="text-text-muted" />
+					Parent
+				</span>
+				<Select.Root
+					type="single"
+					value={panelParentId}
+					onValueChange={(v) => {
+						panelParentId = v;
+						autoSave({ parentId: v || undefined } as Partial<Task>);
+					}}
+				>
+					<Select.Trigger
+						class="{mobile ? 'w-40' : 'w-36'} flex items-center gap-1.5 truncate rounded-lg border border-border bg-bg-tertiary px-2 py-1 {sz} text-text-primary outline-none hover:border-border-light focus:border-accent"
+					>
+						<span class="flex-1 truncate text-left">
+							{#if panelParentId}
+								{taskStore.tasks.find((t) => t.id === panelParentId)?.title ?? "None"}
+							{:else}
+								None
+							{/if}
+						</span>
+						<Icon src={FiChevronDown} size="11" className="shrink-0 text-text-muted" />
+					</Select.Trigger>
+					<Select.Portal>
+						<Select.Content
+							class="z-50 max-h-48 min-w-40 rounded-lg border border-border bg-bg-secondary p-1 shadow-elevated"
+							sideOffset={4}
+						>
+							<Select.Viewport class="max-h-44 overflow-y-auto">
+								<Select.Item
+									value=""
+									label="None"
+									class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 {sz} text-text-secondary outline-none data-[highlighted]:bg-overlay-light data-[highlighted]:text-text-primary"
+								>
+									{#snippet children({ selected })}
+										{@render selectIndicator(selected)}
+										None
+									{/snippet}
+								</Select.Item>
+								{#each taskStore.tasks.filter((t) => t.id !== taskStore.selectedId && !t.parentId) as t}
+									<Select.Item
+										value={t.id}
+										label={t.title}
+										class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 {sz} text-text-secondary outline-none data-[highlighted]:bg-overlay-light data-[highlighted]:text-text-primary"
+									>
+										{#snippet children({ selected })}
+											{@render selectIndicator(selected)}
+											<span class="truncate">{t.title}</span>
+										{/snippet}
+									</Select.Item>
+								{/each}
+							</Select.Viewport>
+						</Select.Content>
+					</Select.Portal>
+				</Select.Root>
+			</div>
+		</div>
+
+		<!-- Subtasks section (edit mode only) -->
+		{#if panelMode === "edit" && taskStore.selectedId}
+			{@const panelSubtasks = taskStore.subtasksOf(taskStore.selectedId)}
+			{#if panelSubtasks.length > 0}
+				<div class="flex flex-col gap-1 border-t border-border pt-3">
+					<span class="text-[11px] font-semibold uppercase tracking-widest text-text-muted">Subtasks</span>
+					{#each panelSubtasks as sub}
+						<button
+							onclick={() => openDetail(sub)}
+							class="flex items-center {gap} rounded-lg px-2 {mobile ? 'py-2' : 'py-1.5'} text-left transition-colors hover:bg-overlay-light"
+						>
+							<span
+								role="checkbox"
+								tabindex="-1"
+								aria-checked={sub.status === "done"}
+								onclick={(e) => { e.stopPropagation(); sub.status === "done" ? taskStore.update(sub.id, { status: "todo" }) : taskStore.complete(sub.id); }}
+								onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); sub.status === "done" ? taskStore.update(sub.id, { status: "todo" }) : taskStore.complete(sub.id); } }}
+								class="flex {mobile ? 'h-5 w-5' : 'h-4 w-4'} shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors
+									{sub.status === 'done' ? 'border-success bg-success text-white' : 'border-border-light text-transparent hover:border-text-muted'}"
+							>
+								<Icon src={FiCheck} size={mobile ? "10" : "9"} />
+							</span>
+							<span class="truncate {mobile ? 'text-[14px]' : 'text-[12px]'} {sub.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}">
+								{sub.title}
+							</span>
+						</button>
+					{/each}
+				</div>
+			{/if}
+			<button
+				type="button"
+				onclick={() => openAdd(taskStore.selectedId)}
+				class="flex items-center {mobile ? 'gap-2 text-[14px]' : 'gap-1.5 text-[12px]'} text-text-muted hover:text-accent transition-colors"
+			>
+				<Icon src={FiPlus} size={mobile ? "14" : "12"} />
+				Add subtask
+			</button>
+		{/if}
+	</div>
+{/snippet}
 
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="flex h-full">
-	<!-- Desktop sidebar: smart lists -->
+	<!-- Desktop sidebar -->
 	<div class="hidden w-52 shrink-0 flex-col border-r border-border bg-bg md:flex">
-		<!-- Search toggle -->
 		<div class="px-3 pt-3 pb-1">
 			{#if showSearch}
 				<div class="relative">
@@ -422,7 +736,6 @@ function handleKeydown(e: KeyboardEvent) {
 			{/if}
 		</div>
 
-		<!-- Smart lists -->
 		<div class="flex flex-col px-1.5 py-2">
 			<span class="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-text-muted">Smart Lists</span>
 			{#each smartLists as item}
@@ -444,7 +757,6 @@ function handleKeydown(e: KeyboardEvent) {
 			{/each}
 		</div>
 
-		<!-- Tags -->
 		{#if taskStore.allTags.length > 0}
 			<div class="flex flex-col px-1.5 py-2 border-t border-border">
 				<span class="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-text-muted">Tags</span>
@@ -463,7 +775,6 @@ function handleKeydown(e: KeyboardEvent) {
 				{/each}
 			</div>
 		{/if}
-
 	</div>
 
 	<!-- Main area -->
@@ -604,98 +915,96 @@ function handleKeydown(e: KeyboardEvent) {
 										</div>
 									{/if}
 
-									<button
-										class="relative flex w-full items-center gap-3 bg-bg px-4 py-2.5 text-left transition-colors duration-75 md:px-5
-											{panelOpen && taskStore.selectedId === task.id ? 'bg-accent/5' : 'hover:bg-overlay-subtle'}"
-										style={swipeTaskId === task.id && swipeX !== 0 ? `transform: translateX(${swipeX}px)` : ""}
-										onclick={() => openDetail(task)}
-										ontouchstart={(e) => handleTouchStart(e, task.id)}
-										ontouchmove={handleTouchMove}
-										ontouchend={handleTouchEnd}
-									>
-										{#if hasChildren}
+									<TaskContextMenu {task} onOpenDetail={openDetail} onAddSubtask={openAdd}>
+										<button
+											class="relative flex w-full items-center gap-3 bg-bg px-4 py-2.5 text-left transition-colors duration-75 md:px-5
+												{panelOpen && taskStore.selectedId === task.id ? 'bg-accent/5' : 'hover:bg-overlay-subtle'}"
+											style={swipeTaskId === task.id && swipeX !== 0 ? `transform: translateX(${swipeX}px)` : ""}
+											onclick={() => openDetail(task)}
+											ontouchstart={(e) => handleTouchStart(e, task.id)}
+											ontouchmove={handleTouchMove}
+											ontouchend={handleTouchEnd}
+										>
 											<span
-												role="button"
+												role="checkbox"
 												tabindex="-1"
-												onclick={(e) => { e.stopPropagation(); toggleExpand(task.id); }}
-												onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); toggleExpand(task.id); } }}
-												class="flex h-5 w-5 shrink-0 items-center justify-center rounded text-text-muted hover:text-text-secondary transition-transform {isExpanded ? '' : '-rotate-90'}"
-											>
-												<Icon src={FiChevronDown} size="13" />
-											</span>
-										{:else}
-											<span class="w-5 shrink-0"></span>
-										{/if}
-										<span
-											role="checkbox"
-											tabindex="-1"
-											aria-checked={task.status === "done"}
-											onclick={(e) => {
-												e.stopPropagation();
-												task.status === "done"
-													? taskStore.update(task.id, { status: "todo" })
-													: taskStore.complete(task.id);
-											}}
-											onkeydown={(e) => {
-												if (e.key === "Enter" || e.key === " ") {
-													e.preventDefault();
+												aria-checked={task.status === "done"}
+												onclick={(e) => {
 													e.stopPropagation();
 													task.status === "done"
 														? taskStore.update(task.id, { status: "todo" })
 														: taskStore.complete(task.id);
-												}
-											}}
-											class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
-												{task.status === 'done' ? 'border-success bg-success text-white' : 'border-border-light text-transparent hover:border-text-muted hover:text-text-muted/50'}"
-										>
-											<Icon src={FiCheck} size="11" />
-										</span>
-
-										<span class="flex min-w-0 flex-1 flex-col gap-0.5">
-											<span class="flex items-center gap-2">
-												<span
-													class="truncate text-[13px] {task.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}"
-												>
-													{task.title}
-												</span>
-												{#if task.status === "doing"}
-													<span class="shrink-0 rounded-full bg-accent/12 px-1.5 py-0.5 text-[10px] font-medium text-accent">
-														In Progress
-													</span>
-												{/if}
-												{#if hasChildren}
-													<span class="shrink-0 text-[10px] text-text-muted tabular-nums">
-														{subtasks.filter((s) => s.status === "done").length}/{subtasks.length}
-													</span>
-												{/if}
+												}}
+												onkeydown={(e) => {
+													if (e.key === "Enter" || e.key === " ") {
+														e.preventDefault();
+														e.stopPropagation();
+														task.status === "done"
+															? taskStore.update(task.id, { status: "todo" })
+															: taskStore.complete(task.id);
+													}
+												}}
+												class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
+													{task.status === 'done' ? 'border-success bg-success text-white' : 'border-border-light text-transparent hover:border-text-muted hover:text-text-muted/50'}"
+											>
+												<Icon src={FiCheck} size="11" />
 											</span>
-											{#if task.description}
-												<span class="truncate text-[12px] text-text-muted">{task.description}</span>
-											{/if}
-											<span class="flex items-center gap-2 mt-0.5">
-												{#if task.due}
-													<span class="flex items-center gap-1 text-[11px] {isOverdue(task.due) && task.status !== 'done' ? 'text-error' : 'text-text-muted'}">
-														<Icon src={FiCalendar} size="10" />
-														{formatDate(task.due)}
+
+											<span class="flex min-w-0 flex-1 flex-col gap-0.5">
+												<span class="flex items-center gap-1.5">
+													{#if task.priority && task.status !== "done"}
+														<span class="h-2 w-2 shrink-0 rounded-full {priorityColor(task.priority)}" title="{task.priority} priority"></span>
+													{/if}
+													<span
+														class="truncate text-[13px] {task.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}"
+													>
+														{task.title}
 													</span>
-												{/if}
-												{#if task.tags && task.tags.length > 0}
-													{#each task.tags as tag}
-														<span class="flex items-center gap-0.5 text-[11px] text-text-muted">
-															<Icon src={FiTag} size="9" />
-															{tag}
+													{#if task.status === "doing"}
+														<span class="shrink-0 rounded-full bg-accent/12 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+															In Progress
 														</span>
-													{/each}
+													{/if}
+												</span>
+												{#if task.description}
+													<span class="truncate text-[12px] text-text-muted">{task.description}</span>
 												{/if}
+												<span class="flex items-center gap-2 mt-0.5">
+													{#if task.due}
+														<span class="flex items-center gap-1 text-[11px] {isOverdue(task.due) && task.status !== 'done' ? 'text-error' : 'text-text-muted'}">
+															<Icon src={FiCalendar} size="10" />
+															{formatDate(task.due)}
+														</span>
+													{/if}
+													{#if task.tags && task.tags.length > 0}
+														{#each task.tags as tag}
+															<span class="flex items-center gap-0.5 text-[11px] text-text-muted">
+																<Icon src={FiTag} size="9" />
+																{tag}
+															</span>
+														{/each}
+													{/if}
+												</span>
 											</span>
-										</span>
 
-										{#if task.priority && task.status !== "done"}
-											<span class="shrink-0 text-[11px] font-bold {priorityColor(task.priority)}" title="{task.priority} priority">
-												{priorityLabel(task.priority)}
-											</span>
-										{/if}
-									</button>
+											{#if hasChildren}
+												<span
+													role="button"
+													tabindex="-1"
+													onclick={(e) => { e.stopPropagation(); toggleExpand(task.id); }}
+													onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); toggleExpand(task.id); } }}
+													class="flex h-5 w-5 shrink-0 items-center justify-center rounded text-text-muted hover:text-text-secondary transition-transform {isExpanded ? '' : '-rotate-90'}"
+												>
+													<span class="flex items-center gap-1">
+														<span class="text-[10px] text-text-muted tabular-nums">
+															{subtasks.filter((s) => s.status === "done").length}/{subtasks.length}
+														</span>
+														<Icon src={FiChevronDown} size="12" />
+													</span>
+												</span>
+											{/if}
+										</button>
+									</TaskContextMenu>
 									<div class="mx-4 border-b border-border/50 md:mx-5"></div>
 								</div>
 
@@ -716,70 +1025,69 @@ function handleKeydown(e: KeyboardEvent) {
 												</div>
 											{/if}
 
-											<button
-												class="relative flex w-full items-center gap-3 bg-bg pl-10 pr-4 py-2 text-left transition-colors duration-75 md:pl-12 md:pr-5
-													{panelOpen && taskStore.selectedId === sub.id ? 'bg-accent/5' : 'hover:bg-overlay-subtle'}"
-												style={swipeTaskId === sub.id && swipeX !== 0 ? `transform: translateX(${swipeX}px)` : ""}
-												onclick={() => openDetail(sub)}
-												ontouchstart={(e) => handleTouchStart(e, sub.id)}
-												ontouchmove={handleTouchMove}
-												ontouchend={handleTouchEnd}
-											>
-												<Icon src={FiCornerDownRight} size="11" className="shrink-0 text-text-muted/40" />
-												<span
-													role="checkbox"
-													tabindex="-1"
-													aria-checked={sub.status === "done"}
-													onclick={(e) => {
-														e.stopPropagation();
-														sub.status === "done"
-															? taskStore.update(sub.id, { status: "todo" })
-															: taskStore.complete(sub.id);
-													}}
-													onkeydown={(e) => {
-														if (e.key === "Enter" || e.key === " ") {
-															e.preventDefault();
+											<TaskContextMenu task={sub} onOpenDetail={openDetail}>
+												<button
+													class="relative flex w-full items-center gap-3 bg-bg pl-10 pr-4 py-2 text-left transition-colors duration-75 md:pl-12 md:pr-5
+														{panelOpen && taskStore.selectedId === sub.id ? 'bg-accent/5' : 'hover:bg-overlay-subtle'}"
+													style={swipeTaskId === sub.id && swipeX !== 0 ? `transform: translateX(${swipeX}px)` : ""}
+													onclick={() => openDetail(sub)}
+													ontouchstart={(e) => handleTouchStart(e, sub.id)}
+													ontouchmove={handleTouchMove}
+													ontouchend={handleTouchEnd}
+												>
+													<Icon src={FiCornerDownRight} size="11" className="shrink-0 text-text-muted/40" />
+													<span
+														role="checkbox"
+														tabindex="-1"
+														aria-checked={sub.status === "done"}
+														onclick={(e) => {
 															e.stopPropagation();
 															sub.status === "done"
 																? taskStore.update(sub.id, { status: "todo" })
 																: taskStore.complete(sub.id);
-														}
-													}}
-													class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
-														{sub.status === 'done' ? 'border-success bg-success text-white' : 'border-border-light text-transparent hover:border-text-muted hover:text-text-muted/50'}"
-												>
-													<Icon src={FiCheck} size="9" />
-												</span>
+														}}
+														onkeydown={(e) => {
+															if (e.key === "Enter" || e.key === " ") {
+																e.preventDefault();
+																e.stopPropagation();
+																sub.status === "done"
+																	? taskStore.update(sub.id, { status: "todo" })
+																	: taskStore.complete(sub.id);
+															}
+														}}
+														class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
+															{sub.status === 'done' ? 'border-success bg-success text-white' : 'border-border-light text-transparent hover:border-text-muted hover:text-text-muted/50'}"
+													>
+														<Icon src={FiCheck} size="9" />
+													</span>
 
-												<span class="flex min-w-0 flex-1 flex-col gap-0.5">
-													<span class="flex items-center gap-2">
-														<span
-															class="truncate text-[12px] {sub.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}"
-														>
-															{sub.title}
+													<span class="flex min-w-0 flex-1 flex-col gap-0.5">
+														<span class="flex items-center gap-1.5">
+															{#if sub.priority && sub.status !== "done"}
+																<span class="h-1.5 w-1.5 shrink-0 rounded-full {priorityColor(sub.priority)}"></span>
+															{/if}
+															<span
+																class="truncate text-[12px] {sub.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}"
+															>
+																{sub.title}
+															</span>
+															{#if sub.status === "doing"}
+																<span class="shrink-0 rounded-full bg-accent/12 px-1 py-0.5 text-[9px] font-medium text-accent">
+																	In Progress
+																</span>
+															{/if}
 														</span>
-														{#if sub.status === "doing"}
-															<span class="shrink-0 rounded-full bg-accent/12 px-1 py-0.5 text-[9px] font-medium text-accent">
-																In Progress
-															</span>
-														{/if}
+														<span class="flex items-center gap-2">
+															{#if sub.due}
+																<span class="flex items-center gap-0.5 text-[10px] {isOverdue(sub.due) && sub.status !== 'done' ? 'text-error' : 'text-text-muted'}">
+																	<Icon src={FiCalendar} size="9" />
+																	{formatDate(sub.due)}
+																</span>
+															{/if}
+														</span>
 													</span>
-													<span class="flex items-center gap-2">
-														{#if sub.due}
-															<span class="flex items-center gap-0.5 text-[10px] {isOverdue(sub.due) && sub.status !== 'done' ? 'text-error' : 'text-text-muted'}">
-																<Icon src={FiCalendar} size="9" />
-																{formatDate(sub.due)}
-															</span>
-														{/if}
-													</span>
-												</span>
-
-												{#if sub.priority && sub.status !== "done"}
-													<span class="shrink-0 text-[10px] font-bold {priorityColor(sub.priority)}">
-														{priorityLabel(sub.priority)}
-													</span>
-												{/if}
-											</button>
+												</button>
+											</TaskContextMenu>
 											<div class="ml-10 mr-4 border-b border-border/30 md:ml-12 md:mr-5"></div>
 										</div>
 									{/each}
@@ -824,41 +1132,41 @@ function handleKeydown(e: KeyboardEvent) {
 
 							<div class="flex flex-1 flex-col gap-1.5 overflow-y-auto p-1.5">
 								{#each taskStore.kanbanColumns[col.key as keyof typeof taskStore.kanbanColumns] as task (task.id)}
-									<div
-										draggable="true"
-										role="button"
-										tabindex="0"
-										ondragstart={(e) => handleDragStart(e, task.id)}
-										ondragend={handleDragEnd}
-										onclick={() => openDetail(task)}
-										onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(task); } }}
-										class="group flex cursor-pointer flex-col gap-1 rounded-lg border bg-bg p-2.5 outline-none transition-all duration-150 {draggingId === task.id ? 'border-border scale-[0.97] cursor-grabbing opacity-40' : panelOpen && taskStore.selectedId === task.id ? 'border-accent shadow-sm' : 'border-border hover:border-border-light hover:shadow-sm'}"
-									>
-										<div class="flex items-start justify-between gap-1.5">
-											<span class="text-[12px] leading-snug text-text-primary {task.status === 'done' ? 'line-through text-text-muted' : ''}">{task.title}</span>
-											{#if task.priority}
-												<span class="shrink-0 text-[11px] font-bold {priorityColor(task.priority)}" title="{task.priority} priority">
-													{priorityLabel(task.priority)}
-												</span>
+									<TaskContextMenu {task} onOpenDetail={openDetail} onAddSubtask={openAdd}>
+										<div
+											draggable="true"
+											role="button"
+											tabindex="0"
+											ondragstart={(e) => handleDragStart(e, task.id)}
+											ondragend={handleDragEnd}
+											onclick={() => openDetail(task)}
+											onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(task); } }}
+											class="group flex cursor-pointer flex-col gap-1.5 rounded-lg border bg-bg p-2.5 outline-none transition-all duration-150 {draggingId === task.id ? 'border-border scale-[0.97] cursor-grabbing opacity-40' : panelOpen && taskStore.selectedId === task.id ? 'border-accent shadow-sm' : 'border-border hover:border-border-light hover:shadow-sm'}"
+										>
+											<div class="flex items-start justify-between gap-1.5">
+												<span class="text-[12px] leading-snug text-text-primary {task.status === 'done' ? 'line-through text-text-muted' : ''}">{task.title}</span>
+												{#if task.priority}
+													<span class="mt-0.5 h-2 w-2 shrink-0 rounded-full {priorityColor(task.priority)}" title="{task.priority} priority"></span>
+												{/if}
+											</div>
+											{#if task.description}
+												<p class="text-[11px] leading-snug text-text-muted line-clamp-2">{task.description}</p>
 											{/if}
+											<div class="flex items-center gap-1.5 mt-0.5">
+												{#if task.due}
+													<span class="flex items-center gap-0.5 text-[10px] {isOverdue(task.due) && task.status !== 'done' ? 'text-error' : 'text-text-muted'}">
+														<Icon src={FiCalendar} size="9" />
+														{formatDate(task.due)}
+													</span>
+												{/if}
+												{#if task.tags && task.tags.length > 0}
+													{#each task.tags as tag}
+														<span class="rounded-full bg-overlay-light px-1.5 py-0.5 text-[10px] text-text-muted">{tag}</span>
+													{/each}
+												{/if}
+											</div>
 										</div>
-										{#if task.description}
-											<p class="text-[11px] leading-snug text-text-muted line-clamp-2">{task.description}</p>
-										{/if}
-										<div class="flex items-center gap-1.5 mt-0.5">
-											{#if task.due}
-												<span class="flex items-center gap-0.5 text-[10px] {isOverdue(task.due) && task.status !== 'done' ? 'text-error' : 'text-text-muted'}">
-													<Icon src={FiCalendar} size="9" />
-													{formatDate(task.due)}
-												</span>
-											{/if}
-											{#if task.tags && task.tags.length > 0}
-												{#each task.tags as tag}
-													<span class="rounded-full bg-overlay-light px-1.5 py-0.5 text-[10px] text-text-muted">{tag}</span>
-												{/each}
-											{/if}
-										</div>
-									</div>
+									</TaskContextMenu>
 								{/each}
 								{#if taskStore.kanbanColumns[col.key as keyof typeof taskStore.kanbanColumns].length === 0}
 									<div class="flex items-center justify-center py-8 text-[12px] text-text-muted">
@@ -874,22 +1182,10 @@ function handleKeydown(e: KeyboardEvent) {
 			<!-- Desktop detail panel -->
 			{#if panelOpen}
 				<div class="hidden w-80 shrink-0 flex-col border-l border-border bg-bg md:flex">
-					<form onsubmit={handleSubmit} class="flex flex-1 flex-col overflow-hidden">
-						<div class="flex items-center justify-between border-b border-border px-4 py-3">
-							<h2 class="text-[14px] font-semibold text-text-primary">
-								{panelMode === "add" ? "New Task" : "Edit Task"}
-							</h2>
-							<div class="flex items-center gap-1">
-								{#if panelMode === "edit"}
-									<button
-										type="button"
-										onclick={handleDelete}
-										class="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-overlay-light hover:text-danger"
-										title="Delete task"
-									>
-										<Icon src={FiTrash2} size="14" />
-									</button>
-								{/if}
+					{#if panelMode === "add"}
+						<form onsubmit={handleAddSubmit} class="flex flex-1 flex-col overflow-hidden">
+							<div class="flex items-center justify-between border-b border-border px-4 py-3">
+								<h2 class="text-[14px] font-semibold text-text-primary">New Task</h2>
 								<button
 									type="button"
 									onclick={closePanel}
@@ -898,147 +1194,42 @@ function handleKeydown(e: KeyboardEvent) {
 									<Icon src={FiX} size="14" />
 								</button>
 							</div>
-						</div>
-
-						<div class="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-							<input
-								type="text"
-								bind:value={panelTitle}
-								placeholder="Task title"
-								class="bg-transparent text-[15px] font-medium text-text-primary placeholder:text-text-muted outline-none"
-							/>
-
-							<textarea
-								bind:value={panelDescription}
-								placeholder="Add notes..."
-								rows="3"
-								class="resize-none bg-transparent text-[13px] text-text-secondary placeholder:text-text-muted outline-none"
-							></textarea>
-
-							<div class="flex flex-col gap-3 border-t border-border pt-4">
-								<div class="flex items-center justify-between">
-									<span class="flex items-center gap-2 text-[12px] text-text-muted">
-										<Icon src={FiList} size="13" />
-										Status
-									</span>
-									<select
-										bind:value={panelStatus}
-										class="rounded-lg border border-border bg-bg-tertiary px-2 py-1 text-[12px] text-text-primary outline-none focus:border-accent"
+							{@render detailPanel(false)}
+							<div class="border-t border-border px-4 py-3">
+								<button
+									type="submit"
+									disabled={!panelTitle.trim()}
+									class="w-full rounded-lg bg-accent py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+								>
+									Add Task
+								</button>
+							</div>
+						</form>
+					{:else}
+						<div class="flex flex-1 flex-col overflow-hidden">
+							<div class="flex items-center justify-between border-b border-border px-4 py-3">
+								<h2 class="text-[14px] font-semibold text-text-primary">Edit Task</h2>
+								<div class="flex items-center gap-1">
+									<button
+										type="button"
+										onclick={handleDelete}
+										class="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-overlay-light hover:text-danger"
+										title="Delete task"
 									>
-										<option value="todo">To Do</option>
-										<option value="doing">In Progress</option>
-										<option value="done">Done</option>
-									</select>
-								</div>
-
-								<div class="flex items-center justify-between">
-									<span class="flex items-center gap-2 text-[12px] text-text-muted">
-										<span class="text-[14px] font-bold">!</span>
-										Priority
-									</span>
-									<select
-										bind:value={panelPriority}
-										class="rounded-lg border border-border bg-bg-tertiary px-2 py-1 text-[12px] text-text-primary outline-none focus:border-accent"
+										<Icon src={FiTrash2} size="14" />
+									</button>
+									<button
+										type="button"
+										onclick={closePanel}
+										class="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-overlay-light hover:text-text-secondary"
 									>
-										<option value="">None</option>
-										<option value="low">Low</option>
-										<option value="medium">Medium</option>
-										<option value="high">High</option>
-									</select>
-								</div>
-
-								<div class="flex items-center justify-between">
-									<span class="flex items-center gap-2 text-[12px] text-text-muted">
-										<Icon src={FiCalendar} size="13" />
-										Due Date
-									</span>
-									<input
-										type="date"
-										bind:value={panelDue}
-										class="rounded-lg border border-border bg-bg-tertiary px-2 py-1 text-[12px] text-text-primary outline-none focus:border-accent"
-									/>
-								</div>
-
-								<div class="flex items-center justify-between">
-									<span class="flex items-center gap-2 text-[12px] text-text-muted">
-										<Icon src={FiTag} size="13" />
-										Tags
-									</span>
-									<input
-										type="text"
-										bind:value={panelTags}
-										placeholder="work, personal"
-										class="w-36 rounded-lg border border-border bg-bg-tertiary px-2 py-1 text-[12px] text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
-									/>
-								</div>
-
-								<div class="flex items-center justify-between">
-									<span class="flex items-center gap-2 text-[12px] text-text-muted">
-										<Icon src={FiCornerDownRight} size="13" />
-										Parent
-									</span>
-									<select
-										bind:value={panelParentId}
-										class="w-36 truncate rounded-lg border border-border bg-bg-tertiary px-2 py-1 text-[12px] text-text-primary outline-none focus:border-accent"
-									>
-										<option value="">None</option>
-										{#each taskStore.tasks.filter((t) => t.id !== taskStore.selectedId && !t.parentId) as t}
-											<option value={t.id}>{t.title}</option>
-										{/each}
-									</select>
+										<Icon src={FiX} size="14" />
+									</button>
 								</div>
 							</div>
-
-							<!-- Subtasks section (edit mode only) -->
-							{#if panelMode === "edit" && taskStore.selectedId}
-								{@const panelSubtasks = taskStore.subtasksOf(taskStore.selectedId)}
-								{#if panelSubtasks.length > 0}
-									<div class="flex flex-col gap-1 border-t border-border pt-3">
-										<span class="text-[11px] font-semibold uppercase tracking-widest text-text-muted">Subtasks</span>
-										{#each panelSubtasks as sub}
-											<button
-												onclick={() => openDetail(sub)}
-												class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-overlay-light"
-											>
-												<span
-													role="checkbox"
-													tabindex="-1"
-													aria-checked={sub.status === "done"}
-													onclick={(e) => { e.stopPropagation(); sub.status === "done" ? taskStore.update(sub.id, { status: "todo" }) : taskStore.complete(sub.id); }}
-													onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); sub.status === "done" ? taskStore.update(sub.id, { status: "todo" }) : taskStore.complete(sub.id); } }}
-													class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors
-														{sub.status === 'done' ? 'border-success bg-success text-white' : 'border-border-light text-transparent hover:border-text-muted'}"
-												>
-													<Icon src={FiCheck} size="9" />
-												</span>
-												<span class="truncate text-[12px] {sub.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}">
-													{sub.title}
-												</span>
-											</button>
-										{/each}
-									</div>
-								{/if}
-								<button
-									type="button"
-									onclick={() => openAdd(taskStore.selectedId)}
-									class="flex items-center gap-1.5 text-[12px] text-text-muted hover:text-accent transition-colors"
-								>
-									<Icon src={FiPlus} size="12" />
-									Add subtask
-								</button>
-							{/if}
+							{@render detailPanel(false)}
 						</div>
-
-						<div class="border-t border-border px-4 py-3">
-							<button
-								type="submit"
-								disabled={!panelTitle.trim()}
-								class="w-full rounded-lg bg-accent py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-							>
-								{panelMode === "add" ? "Add Task" : "Save Changes"}
-							</button>
-						</div>
-					</form>
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -1109,20 +1300,44 @@ function handleKeydown(e: KeyboardEvent) {
 <!-- Mobile detail panel -->
 {#if panelOpen}
 	<div class="fixed inset-0 z-40 flex flex-col bg-bg md:hidden">
-		<form onsubmit={handleSubmit} class="flex flex-1 flex-col overflow-hidden">
-			<div
-				class="flex items-center gap-2 border-b border-border px-3 py-2"
-				style="padding-top: max(env(safe-area-inset-top, 0px), 10px)"
-			>
-				<button
-					type="button"
-					onclick={closePanel}
-					class="flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary hover:bg-overlay-light"
+		{#if panelMode === "add"}
+			<form onsubmit={handleAddSubmit} class="flex flex-1 flex-col overflow-hidden">
+				<div
+					class="flex items-center gap-2 border-b border-border px-3 py-2"
+					style="padding-top: max(env(safe-area-inset-top, 0px), 10px)"
 				>
-					<Icon src={FiArrowLeft} size="18" />
-				</button>
-				<span class="flex-1"></span>
-				{#if panelMode === "edit"}
+					<button
+						type="button"
+						onclick={closePanel}
+						class="flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary hover:bg-overlay-light"
+					>
+						<Icon src={FiArrowLeft} size="18" />
+					</button>
+					<span class="flex-1"></span>
+					<button
+						type="submit"
+						disabled={!panelTitle.trim()}
+						class="flex h-9 items-center rounded-lg bg-accent px-4 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+					>
+						Add
+					</button>
+				</div>
+				{@render detailPanel(true)}
+			</form>
+		{:else}
+			<div class="flex flex-1 flex-col overflow-hidden">
+				<div
+					class="flex items-center gap-2 border-b border-border px-3 py-2"
+					style="padding-top: max(env(safe-area-inset-top, 0px), 10px)"
+				>
+					<button
+						type="button"
+						onclick={closePanel}
+						class="flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary hover:bg-overlay-light"
+					>
+						<Icon src={FiArrowLeft} size="18" />
+					</button>
+					<span class="flex-1"></span>
 					<button
 						type="button"
 						onclick={handleDelete}
@@ -1130,146 +1345,9 @@ function handleKeydown(e: KeyboardEvent) {
 					>
 						<Icon src={FiTrash2} size="17" />
 					</button>
-				{/if}
-				<button
-					type="submit"
-					disabled={!panelTitle.trim()}
-					class="flex h-9 items-center rounded-lg bg-accent px-4 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-				>
-					{panelMode === "add" ? "Add" : "Save"}
-				</button>
-			</div>
-
-			<div class="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-				<!-- svelte-ignore a11y_autofocus -->
-				<input
-					type="text"
-					bind:value={panelTitle}
-					placeholder="Task title"
-					class="bg-transparent text-[17px] font-semibold text-text-primary placeholder:text-text-muted outline-none"
-					autofocus={panelMode === "add"}
-				/>
-
-				<textarea
-					bind:value={panelDescription}
-					placeholder="Add notes..."
-					rows="4"
-					class="resize-none bg-transparent text-[14px] text-text-secondary placeholder:text-text-muted outline-none"
-				></textarea>
-
-				<div class="flex flex-col gap-0 border-t border-border pt-2">
-					<div class="flex items-center justify-between py-3 border-b border-border/50">
-						<span class="flex items-center gap-3 text-[14px] text-text-secondary">
-							<Icon src={FiList} size="16" className="text-text-muted" />
-							Status
-						</span>
-						<select
-							bind:value={panelStatus}
-							class="rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[13px] text-text-primary outline-none"
-						>
-							<option value="todo">To Do</option>
-							<option value="doing">In Progress</option>
-							<option value="done">Done</option>
-						</select>
-					</div>
-
-					<div class="flex items-center justify-between py-3 border-b border-border/50">
-						<span class="flex items-center gap-3 text-[14px] text-text-secondary">
-							<span class="flex h-4 w-4 items-center justify-center text-[15px] font-bold text-text-muted">!</span>
-							Priority
-						</span>
-						<select
-							bind:value={panelPriority}
-							class="rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[13px] text-text-primary outline-none"
-						>
-							<option value="">None</option>
-							<option value="low">Low</option>
-							<option value="medium">Medium</option>
-							<option value="high">High</option>
-						</select>
-					</div>
-
-					<div class="flex items-center justify-between py-3 border-b border-border/50">
-						<span class="flex items-center gap-3 text-[14px] text-text-secondary">
-							<Icon src={FiCalendar} size="16" className="text-text-muted" />
-							Due Date
-						</span>
-						<input
-							type="date"
-							bind:value={panelDue}
-							class="rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[13px] text-text-primary outline-none"
-						/>
-					</div>
-
-					<div class="flex items-center justify-between py-3 border-b border-border/50">
-						<span class="flex items-center gap-3 text-[14px] text-text-secondary">
-							<Icon src={FiTag} size="16" className="text-text-muted" />
-							Tags
-						</span>
-						<input
-							type="text"
-							bind:value={panelTags}
-							placeholder="work, personal"
-							class="w-40 rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none"
-						/>
-					</div>
-
-					<div class="flex items-center justify-between py-3">
-						<span class="flex items-center gap-3 text-[14px] text-text-secondary">
-							<Icon src={FiCornerDownRight} size="16" className="text-text-muted" />
-							Parent
-						</span>
-						<select
-							bind:value={panelParentId}
-							class="w-40 truncate rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[13px] text-text-primary outline-none"
-						>
-							<option value="">None</option>
-							{#each taskStore.tasks.filter((t) => t.id !== taskStore.selectedId && !t.parentId) as t}
-								<option value={t.id}>{t.title}</option>
-							{/each}
-						</select>
-					</div>
 				</div>
-
-				<!-- Subtasks section (edit mode, mobile) -->
-				{#if panelMode === "edit" && taskStore.selectedId}
-					{@const mobileSubtasks = taskStore.subtasksOf(taskStore.selectedId)}
-					{#if mobileSubtasks.length > 0}
-						<div class="flex flex-col gap-1 border-t border-border pt-3">
-							<span class="text-[11px] font-semibold uppercase tracking-widest text-text-muted">Subtasks</span>
-							{#each mobileSubtasks as sub}
-								<button
-									onclick={() => openDetail(sub)}
-									class="flex items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-overlay-light"
-								>
-									<span
-										role="checkbox"
-										tabindex="-1"
-										aria-checked={sub.status === "done"}
-										onclick={(e) => { e.stopPropagation(); sub.status === "done" ? taskStore.update(sub.id, { status: "todo" }) : taskStore.complete(sub.id); }}
-										onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); sub.status === "done" ? taskStore.update(sub.id, { status: "todo" }) : taskStore.complete(sub.id); } }}
-										class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors
-											{sub.status === 'done' ? 'border-success bg-success text-white' : 'border-border-light text-transparent hover:border-text-muted'}"
-									>
-										<Icon src={FiCheck} size="10" />
-									</span>
-									<span class="truncate text-[14px] {sub.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}">
-										{sub.title}
-									</span>
-								</button>
-							{/each}
-						</div>
-					{/if}
-					<button
-						type="button"
-						onclick={() => openAdd(taskStore.selectedId)}
-						class="flex items-center gap-2 text-[14px] text-text-muted hover:text-accent transition-colors"
-					>
-						<Icon src={FiPlus} size="14" />
-						Add subtask
-					</button>
-				{/if}
+				{@render detailPanel(true)}
 			</div>
-		</form>
+		{/if}
 	</div>
 {/if}

@@ -363,6 +363,7 @@ export interface Task {
 	recurrence?: string;
 	tags?: string[];
 	parentId?: string;
+	order: number;
 	createdAtMs: number;
 	updatedAtMs: number;
 	doneAtMs?: number;
@@ -377,6 +378,7 @@ const mockTasks: Task[] = [
 		priority: "high",
 		due: "2026-02-21",
 		tags: ["work", "code"],
+		order: 1,
 		createdAtMs: Date.now() - 86400000,
 		updatedAtMs: Date.now() - 86400000,
 	},
@@ -386,6 +388,7 @@ const mockTasks: Task[] = [
 		status: "doing",
 		priority: "medium",
 		tags: ["work"],
+		order: 2,
 		createdAtMs: Date.now() - 172800000,
 		updatedAtMs: Date.now() - 3600000,
 	},
@@ -396,6 +399,7 @@ const mockTasks: Task[] = [
 		priority: "low",
 		due: "2026-02-20",
 		tags: ["personal"],
+		order: 3,
 		createdAtMs: Date.now() - 259200000,
 		updatedAtMs: Date.now() - 259200000,
 	},
@@ -405,6 +409,7 @@ const mockTasks: Task[] = [
 		status: "done",
 		priority: "high",
 		tags: ["work", "code"],
+		order: 4,
 		createdAtMs: Date.now() - 345600000,
 		updatedAtMs: Date.now() - 172800000,
 		doneAtMs: Date.now() - 172800000,
@@ -441,6 +446,7 @@ export async function createTask(task: Partial<Task>): Promise<Task | null> {
 			priority: task.priority,
 			due: task.due,
 			tags: task.tags,
+			order: task.order ?? Date.now(),
 			createdAtMs: Date.now(),
 			updatedAtMs: Date.now(),
 		};
@@ -711,6 +717,7 @@ export function connectSSE(
 	onStatus: (processing: boolean) => void,
 	onClientId?: (id: string) => void,
 	onReconnect?: () => void,
+	onTask?: (action: string, task: Task) => void,
 ): EventSource {
 	if (DEV) return mockSSE(onMessage, onActivity);
 
@@ -730,6 +737,8 @@ export function connectSSE(
 				if (data.client_id && onClientId) {
 					onClientId(data.client_id);
 				}
+			} else if (data.type === "task" && data.action && data.task && onTask) {
+				onTask(data.action, data.task);
 			} else if (data.type === "activity" && data.event) {
 				onActivity(data.event);
 			} else if (data.role && data.content) {

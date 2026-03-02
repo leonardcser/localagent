@@ -9,6 +9,7 @@ import {
 	sendMessage,
 	uploadFile,
 } from "$lib/api";
+import { taskStore } from "$lib/stores/task.svelte";
 import { nowTimestamp } from "$lib/utils";
 
 export type TimelineItem =
@@ -116,6 +117,9 @@ function createChat() {
 			() => {
 				sync();
 			},
+			(action, task) => {
+				taskStore.applyEvent(action, task);
+			},
 		);
 	}
 
@@ -160,6 +164,7 @@ function createChat() {
 			stopRecording();
 			return;
 		}
+		recording = true;
 		try {
 			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 			mediaStream = stream;
@@ -187,9 +192,8 @@ function createChat() {
 				}
 			};
 			mediaRecorder.start();
-			recording = true;
 		} catch {
-			// mic access denied
+			recording = false;
 		}
 	}
 

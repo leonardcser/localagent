@@ -23,6 +23,8 @@ type OutgoingEvent struct {
 	Event      *ActivityData `json:"event,omitempty"`
 	Processing *bool         `json:"processing,omitempty"`
 	ClientID   string        `json:"client_id,omitempty"`
+	Action     string        `json:"action,omitempty"`
+	TaskData   *todo.Task    `json:"task,omitempty"`
 }
 
 type ActivityData struct {
@@ -139,6 +141,14 @@ func (ch *WebChatChannel) Emit(evt activity.Event) {
 		},
 	}
 	ch.broadcast(event)
+}
+
+func (ch *WebChatChannel) BroadcastTaskEvent(evt todo.TaskEvent) {
+	ch.broadcast(OutgoingEvent{
+		Type:     "task",
+		Action:   evt.Action,
+		TaskData: &evt.Task,
+	})
 }
 
 func (ch *WebChatChannel) IsAllowed(senderID string) bool {

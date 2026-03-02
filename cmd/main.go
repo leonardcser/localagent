@@ -273,6 +273,7 @@ func gatewayCmd() {
 	webCh := webchat.NewWebChatChannel(&cfg.WebChat, msgBus, cfg.DataDir(), cfg.Tools.STT, cfg.Tools.Image)
 	webCh.SetSessionManager(agentLoop.GetSessionManager())
 	webCh.SetTodoService(agentLoop.GetTodoService())
+	agentLoop.GetTodoService().SetListener(webCh.BroadcastTaskEvent)
 	channelManager.RegisterChannel("web", webCh)
 	agentLoop.SetActivityEmitter(webCh)
 

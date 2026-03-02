@@ -22,6 +22,7 @@ type Task struct {
 	Recurrence  string   `json:"recurrence,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
 	ParentID    string   `json:"parentId,omitempty"`
+	Order       float64  `json:"order"`
 	CreatedAtMS int64    `json:"createdAtMs"`
 	UpdatedAtMS int64    `json:"updatedAtMs"`
 	DoneAtMS    *int64   `json:"doneAtMs,omitempty"`
@@ -32,15 +33,31 @@ type TaskStore struct {
 	Tasks   []Task `json:"tasks"`
 }
 
+type TaskEvent struct {
+	Action string `json:"action"` // "created", "updated", "deleted"
+	Task   Task   `json:"task"`
+}
+
 type TodoService struct {
 	storePath string
 	store     *TaskStore
 	mu        sync.RWMutex
+	listener  func(TaskEvent)
 }
 
 func NewTodoService(storePath string) *TodoService {
 	return &TodoService{
 		storePath: storePath,
+	}
+}
+
+func (s *TodoService) SetListener(fn func(TaskEvent)) {
+	s.listener = fn
+}
+
+func (s *TodoService) notify(evt TaskEvent) {
+	if s.listener != nil {
+		s.listener(evt)
 	}
 }
 
@@ -112,13 +129,24 @@ func (s *TodoService) AddTask(task Task) (*Task, error) {
 	}
 	task.CreatedAtMS = now
 	task.UpdatedAtMS = now
+	if task.Order == 0 {
+		maxOrder := 0.0
+		for _, t := range s.store.Tasks {
+			if t.Order > maxOrder {
+				maxOrder = t.Order
+			}
+		}
+		task.Order = maxOrder + 1
+	}
 
 	s.store.Tasks = append(s.store.Tasks, task)
 	if err := s.saveStoreUnsafe(); err != nil {
 		return nil, err
 	}
 
-	return &s.store.Tasks[len(s.store.Tasks)-1], nil
+	created := s.store.Tasks[len(s.store.Tasks)-1]
+	s.notify(TaskEvent{Action: "created", Task: created})
+	return &created, nil
 }
 
 func (s *TodoService) UpdateTask(taskID string, patch map[string]any) (*Task, error) {
@@ -160,12 +188,16 @@ func (s *TodoService) UpdateTask(taskID string, patch map[string]any) (*Task, er
 	if parentID, ok := patch["parentId"].(string); ok {
 		task.ParentID = parentID
 	}
+	if order, ok := patch["order"].(float64); ok {
+		task.Order = order
+	}
 
 	task.UpdatedAtMS = time.Now().UnixMilli()
 	if err := s.saveStoreUnsafe(); err != nil {
 		return nil, err
 	}
 
+	s.notify(TaskEvent{Action: "updated", Task: *task})
 	return task, nil
 }
 
@@ -189,6 +221,7 @@ func (s *TodoService) CompleteTask(taskID string) (*Task, error) {
 	task.DoneAtMS = &now
 	task.UpdatedAtMS = now
 
+	var recurTask *Task
 	if task.Recurrence != "" && task.Due != "" {
 		nextDue := computeNextDue(task.Due, task.Recurrence)
 		if nextDue != "" {
@@ -205,6 +238,7 @@ func (s *TodoService) CompleteTask(taskID string) (*Task, error) {
 				UpdatedAtMS: now,
 			}
 			s.store.Tasks = append(s.store.Tasks, newTask)
+			recurTask = &s.store.Tasks[len(s.store.Tasks)-1]
 		}
 	}
 
@@ -212,6 +246,10 @@ func (s *TodoService) CompleteTask(taskID string) (*Task, error) {
 		return nil, err
 	}
 
+	s.notify(TaskEvent{Action: "updated", Task: *task})
+	if recurTask != nil {
+		s.notify(TaskEvent{Action: "created", Task: *recurTask})
+	}
 	return task, nil
 }
 
@@ -231,6 +269,7 @@ func (s *TodoService) RemoveTask(taskID string) bool {
 
 	if removed {
 		_ = s.saveStoreUnsafe()
+		s.notify(TaskEvent{Action: "deleted", Task: Task{ID: taskID}})
 	}
 
 	return removed

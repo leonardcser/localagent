@@ -14,6 +14,7 @@ export type SmartList =
 	| "today"
 	| "tomorrow"
 	| "next7"
+	| "overdue"
 	| "inbox"
 	| "done";
 
@@ -53,6 +54,10 @@ function savePrefs(prefs: TaskPrefs) {
 	} catch {
 		// ignore
 	}
+}
+
+function dueDatePart(due: string): string {
+	return due.includes("T") ? due.split("T")[0] : due;
 }
 
 function todayStr(): string {
@@ -97,6 +102,7 @@ function createTaskStore() {
 		let todayCount = 0;
 		let tomorrowCount = 0;
 		let next7Count = 0;
+		let overdue = 0;
 		let inbox = 0;
 		let done = 0;
 		for (const t of tasks) {
@@ -106,9 +112,11 @@ function createTaskStore() {
 			}
 			all++;
 			if (t.due) {
-				if (t.due <= today) todayCount++;
-				if (t.due === tomorrow) tomorrowCount++;
-				if (t.due <= next7) next7Count++;
+				const dp = dueDatePart(t.due);
+				if (dp < today) overdue++;
+				if (dp <= today) todayCount++;
+				if (dp === tomorrow) tomorrowCount++;
+				if (dp <= next7) next7Count++;
 			} else {
 				inbox++;
 			}
@@ -118,6 +126,7 @@ function createTaskStore() {
 			today: todayCount,
 			tomorrow: tomorrowCount,
 			next7: next7Count,
+			overdue,
 			inbox,
 			done,
 		};
@@ -140,21 +149,29 @@ function createTaskStore() {
 			case "today": {
 				const today = todayStr();
 				result = result.filter(
-					(t) => t.status !== "done" && t.due && t.due <= today,
+					(t) => t.status !== "done" && t.due && dueDatePart(t.due) <= today,
 				);
 				break;
 			}
 			case "tomorrow": {
 				const tomorrow = tomorrowStr();
 				result = result.filter(
-					(t) => t.status !== "done" && t.due === tomorrow,
+					(t) =>
+						t.status !== "done" && t.due && dueDatePart(t.due) === tomorrow,
 				);
 				break;
 			}
 			case "next7": {
 				const next7 = next7Str();
 				result = result.filter(
-					(t) => t.status !== "done" && t.due && t.due <= next7,
+					(t) => t.status !== "done" && t.due && dueDatePart(t.due) <= next7,
+				);
+				break;
+			}
+			case "overdue": {
+				const today = todayStr();
+				result = result.filter(
+					(t) => t.status !== "done" && t.due && dueDatePart(t.due) < today,
 				);
 				break;
 			}
@@ -173,7 +190,7 @@ function createTaskStore() {
 			result = result.filter((t) => t.tags?.includes(filterTag));
 		}
 
-		return result;
+		return [...result].sort((a, b) => (a.order || 0) - (b.order || 0));
 	});
 
 	let kanbanColumns = $derived.by(() => {
@@ -247,6 +264,26 @@ function createTaskStore() {
 		return ok;
 	}
 
+	function applyEvent(action: string, task: Task) {
+		switch (action) {
+			case "created":
+				if (!tasks.some((t) => t.id === task.id)) {
+					tasks = [...tasks, task];
+				}
+				break;
+			case "updated":
+				tasks = tasks.map((t) => (t.id === task.id ? task : t));
+				break;
+			case "deleted":
+				tasks = tasks.filter((t) => t.id !== task.id && t.parentId !== task.id);
+				break;
+		}
+	}
+
+	async function reorder(id: string, newOrder: number) {
+		return update(id, { order: newOrder } as Partial<Task>);
+	}
+
 	async function moveStatus(id: string, status: string) {
 		if (status === "done") {
 			return complete(id);
@@ -318,6 +355,8 @@ function createTaskStore() {
 		complete,
 		remove,
 		moveStatus,
+		reorder,
+		applyEvent,
 	};
 }
 
