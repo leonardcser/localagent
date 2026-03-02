@@ -140,6 +140,10 @@ function handleBlur() {
 }
 
 onMount(() => {
+	chat.onSend = () => {
+		isAtBottom = true;
+		requestAnimationFrame(() => snapToBottom());
+	};
 	chat.init();
 	document.addEventListener("visibilitychange", handleVisibility);
 	window.addEventListener("focus", handleFocus);
@@ -151,6 +155,7 @@ onMount(() => {
 });
 
 onDestroy(() => {
+	chat.onSend = null;
 	chat.destroy();
 	if (typeof document !== "undefined") {
 		document.removeEventListener("visibilitychange", handleVisibility);

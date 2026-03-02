@@ -40,6 +40,7 @@ function createChat() {
 	let eventSource: EventSource | null = null;
 	let mediaRecorder: MediaRecorder | null = null;
 	let mediaStream = $state<MediaStream | null>(null);
+	let onSend: (() => void) | null = null;
 
 	function addMessage(msg: HistoryMessage) {
 		if (!msg.content && (!msg.media || msg.media.length === 0)) return;
@@ -135,6 +136,7 @@ function createChat() {
 		input = "";
 		pendingMedia = [];
 		loading = true;
+		onSend?.();
 
 		try {
 			await sendMessage(content, media);
@@ -293,6 +295,9 @@ function createChat() {
 		},
 		set dragging(v: boolean) {
 			dragging = v;
+		},
+		set onSend(cb: (() => void) | null) {
+			onSend = cb;
 		},
 		init,
 		reportVisibility,
