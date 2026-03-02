@@ -504,6 +504,81 @@ export async function deleteTask(id: string): Promise<boolean> {
   }
 }
 
+// --- Slot API ---
+
+export interface Slot {
+  id: string;
+  taskId: string;
+  startAtMs: number;
+  endAtMs: number;
+  note?: string;
+  createdAtMs: number;
+}
+
+export async function getSlots(params?: {
+  taskId?: string;
+  start?: number;
+  end?: number;
+}): Promise<Slot[]> {
+  if (DEV) return [];
+  try {
+    const qs = new URLSearchParams();
+    if (params?.taskId) qs.set("taskId", params.taskId);
+    if (params?.start) qs.set("start", String(params.start));
+    if (params?.end) qs.set("end", String(params.end));
+    const q = qs.toString();
+    const res = await fetch(`/api/slots${q ? `?${q}` : ""}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.slots || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function createSlot(slot: Partial<Slot>): Promise<Slot | null> {
+  if (DEV) return null;
+  try {
+    const res = await fetch("/api/slots", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(slot),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function updateSlot(
+  id: string,
+  patch: Partial<Slot>,
+): Promise<Slot | null> {
+  if (DEV) return null;
+  try {
+    const res = await fetch(`/api/slots/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteSlot(id: string): Promise<boolean> {
+  if (DEV) return true;
+  try {
+    const res = await fetch(`/api/slots/${id}`, { method: "DELETE" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 // --- Image API ---
 
 export interface ImageJob {
@@ -718,6 +793,7 @@ export function connectSSE(
   onClientId?: (id: string) => void,
   onReconnect?: () => void,
   onTask?: (action: string, task: Task) => void,
+  onSlot?: (action: string, slot: Slot) => void,
 ): EventSource {
   if (DEV) return mockSSE(onMessage, onActivity);
 
@@ -739,6 +815,8 @@ export function connectSSE(
         }
       } else if (data.type === "task" && data.action && data.task && onTask) {
         onTask(data.action, data.task);
+      } else if (data.type === "slot" && data.action && data.slot && onSlot) {
+        onSlot(data.action, data.slot);
       } else if (data.type === "activity" && data.event) {
         onActivity(data.event);
       } else if (data.role && data.content) {

@@ -25,6 +25,7 @@ type OutgoingEvent struct {
 	ClientID   string        `json:"client_id,omitempty"`
 	Action     string        `json:"action,omitempty"`
 	TaskData   *todo.Task    `json:"task,omitempty"`
+	SlotData   *todo.Slot    `json:"slot,omitempty"`
 }
 
 type ActivityData struct {
@@ -148,6 +149,14 @@ func (ch *WebChatChannel) BroadcastTaskEvent(evt todo.TaskEvent) {
 		Type:     "task",
 		Action:   evt.Action,
 		TaskData: &evt.Task,
+	})
+}
+
+func (ch *WebChatChannel) BroadcastSlotEvent(evt todo.SlotEvent) {
+	ch.broadcast(OutgoingEvent{
+		Type:     "slot",
+		Action:   evt.Action,
+		SlotData: &evt.Slot,
 	})
 }
 

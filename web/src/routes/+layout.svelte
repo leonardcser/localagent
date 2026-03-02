@@ -7,6 +7,7 @@ import {
   FiMessageCircle,
   FiCheckSquare,
   FiImage,
+  FiCalendar,
   FiMenu,
   FiBell,
   FiBellOff,
@@ -39,6 +40,7 @@ onMount(() => {
 const navItems = [
   { href: "/", icon: FiMessageCircle, label: "Chat" },
   { href: "/tasks", icon: FiCheckSquare, label: "Tasks" },
+  { href: "/calendar", icon: FiCalendar, label: "Calendar" },
   { href: "/images", icon: FiImage, label: "Images" },
 ];
 

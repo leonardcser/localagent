@@ -1,15 +1,18 @@
 package todo
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"slices"
-	"sync"
+	"strings"
 	"time"
 
+	"localagent/pkg/db/dbq"
 	"localagent/pkg/utils"
+
+	"github.com/teambition/rrule-go"
 )
 
 type Task struct {
@@ -28,97 +31,60 @@ type Task struct {
 	DoneAtMS    *int64   `json:"doneAtMs,omitempty"`
 }
 
-type TaskStore struct {
-	Version int    `json:"version"`
-	Tasks   []Task `json:"tasks"`
-}
-
 type TaskEvent struct {
-	Action string `json:"action"` // "created", "updated", "deleted"
+	Action string `json:"action"`
 	Task   Task   `json:"task"`
 }
 
 type TodoService struct {
-	storePath string
-	store     *TaskStore
-	mu        sync.RWMutex
-	listener  func(TaskEvent)
+	db           *sql.DB
+	q            *dbq.Queries
+	listener     func(TaskEvent)
+	slotListener func(SlotEvent)
 }
 
-func NewTodoService(storePath string) *TodoService {
+func NewTodoService(database *sql.DB) *TodoService {
 	return &TodoService{
-		storePath: storePath,
+		db: database,
+		q:  dbq.New(database),
 	}
 }
 
-func (s *TodoService) SetListener(fn func(TaskEvent)) {
-	s.listener = fn
-}
+func (s *TodoService) SetListener(fn func(TaskEvent))     { s.listener = fn }
+func (s *TodoService) SetSlotListener(fn func(SlotEvent))  { s.slotListener = fn }
+func (s *TodoService) notify(evt TaskEvent)                { if s.listener != nil { s.listener(evt) } }
+func (s *TodoService) notifySlot(evt SlotEvent)            { if s.slotListener != nil { s.slotListener(evt) } }
 
-func (s *TodoService) notify(evt TaskEvent) {
-	if s.listener != nil {
-		s.listener(evt)
-	}
-}
-
-func (s *TodoService) Load() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.loadStore()
-}
-
-func (s *TodoService) loadStore() error {
-	s.store = &TaskStore{
-		Version: 1,
-		Tasks:   []Task{},
-	}
-
-	data, err := os.ReadFile(s.storePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-
-	return json.Unmarshal(data, s.store)
-}
-
-func (s *TodoService) saveStoreUnsafe() error {
-	dir := filepath.Dir(s.storePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-
-	data, err := json.MarshalIndent(s.store, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(s.storePath, data, 0644)
-}
+// Load is a no-op for SQLite (kept for backward compat).
+func (s *TodoService) Load() error { return nil }
 
 func (s *TodoService) ListTasks(status string, tag string) []Task {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	ctx := context.Background()
+	var rows []dbq.Task
+	var err error
 
-	var result []Task
-	for _, t := range s.store.Tasks {
-		if status != "" && t.Status != status {
-			continue
-		}
-		if tag != "" && !hasTag(t.Tags, tag) {
-			continue
-		}
-		result = append(result, t)
+	if status != "" {
+		rows, err = s.q.ListTasksByStatus(ctx, status)
+	} else {
+		rows, err = s.q.ListTasks(ctx)
 	}
-	return result
+	if err != nil {
+		return nil
+	}
+
+	var tasks []Task
+	for _, r := range rows {
+		t := dbTaskToTask(r)
+		if tag != "" && !slices.Contains(t.Tags, tag) {
+			continue
+		}
+		tasks = append(tasks, t)
+	}
+	return tasks
 }
 
 func (s *TodoService) AddTask(task Task) (*Task, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	ctx := context.Background()
 	now := time.Now().UnixMilli()
 
 	if task.ID == "" {
@@ -129,99 +95,111 @@ func (s *TodoService) AddTask(task Task) (*Task, error) {
 	}
 	task.CreatedAtMS = now
 	task.UpdatedAtMS = now
+
 	if task.Order == 0 {
-		maxOrder := 0.0
-		for _, t := range s.store.Tasks {
-			if t.Order > maxOrder {
-				maxOrder = t.Order
-			}
+		maxOrder, err := s.q.MaxTaskOrder(ctx)
+		if err == nil {
+			task.Order = maxOrder + 1
+		} else {
+			task.Order = 1
 		}
-		task.Order = maxOrder + 1
 	}
 
-	s.store.Tasks = append(s.store.Tasks, task)
-	if err := s.saveStoreUnsafe(); err != nil {
+	var doneAt sql.NullInt64
+	if task.DoneAtMS != nil {
+		doneAt = sql.NullInt64{Int64: *task.DoneAtMS, Valid: true}
+	}
+
+	err := s.q.InsertTask(ctx, dbq.InsertTaskParams{
+		ID:          task.ID,
+		Title:       task.Title,
+		Description: task.Description,
+		Status:      task.Status,
+		Priority:    task.Priority,
+		Due:         task.Due,
+		Recurrence:  task.Recurrence,
+		Tags:        marshalTags(task.Tags),
+		ParentID:    task.ParentID,
+		SortOrder:   task.Order,
+		CreatedAtMs: task.CreatedAtMS,
+		UpdatedAtMs: task.UpdatedAtMS,
+		DoneAtMs:    doneAt,
+	})
+	if err != nil {
 		return nil, err
 	}
 
-	created := s.store.Tasks[len(s.store.Tasks)-1]
-	s.notify(TaskEvent{Action: "created", Task: created})
-	return &created, nil
+	s.notify(TaskEvent{Action: "created", Task: task})
+	return &task, nil
 }
 
 func (s *TodoService) UpdateTask(taskID string, patch map[string]any) (*Task, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	var sets []string
+	var args []any
 
-	var task *Task
-	for i := range s.store.Tasks {
-		if s.store.Tasks[i].ID == taskID {
-			task = &s.store.Tasks[i]
-			break
+	for key, val := range patch {
+		col := patchKeyToColumn(key)
+		if col == "" {
+			continue
 		}
+		if key == "tags" {
+			tags := toStringSlice(val)
+			args = append(args, marshalTags(tags))
+		} else {
+			args = append(args, val)
+		}
+		sets = append(sets, col+" = ?")
 	}
-	if task == nil {
+
+	if len(sets) == 0 {
+		return nil, fmt.Errorf("no fields to update")
+	}
+
+	now := time.Now().UnixMilli()
+	sets = append(sets, "updated_at_ms = ?")
+	args = append(args, now)
+	args = append(args, taskID)
+
+	query := fmt.Sprintf("UPDATE tasks SET %s WHERE id = ?", strings.Join(sets, ", "))
+	res, err := s.db.Exec(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
 		return nil, fmt.Errorf("task not found: %s", taskID)
 	}
 
-	if title, ok := patch["title"].(string); ok {
-		task.Title = title
+	task := s.getTask(taskID)
+	if task != nil {
+		s.notify(TaskEvent{Action: "updated", Task: *task})
 	}
-	if desc, ok := patch["description"].(string); ok {
-		task.Description = desc
-	}
-	if status, ok := patch["status"].(string); ok {
-		task.Status = status
-	}
-	if priority, ok := patch["priority"].(string); ok {
-		task.Priority = priority
-	}
-	if due, ok := patch["due"].(string); ok {
-		task.Due = due
-	}
-	if recurrence, ok := patch["recurrence"].(string); ok {
-		task.Recurrence = recurrence
-	}
-	if tags, ok := patch["tags"]; ok {
-		task.Tags = toStringSlice(tags)
-	}
-	if parentID, ok := patch["parentId"].(string); ok {
-		task.ParentID = parentID
-	}
-	if order, ok := patch["order"].(float64); ok {
-		task.Order = order
-	}
-
-	task.UpdatedAtMS = time.Now().UnixMilli()
-	if err := s.saveStoreUnsafe(); err != nil {
-		return nil, err
-	}
-
-	s.notify(TaskEvent{Action: "updated", Task: *task})
 	return task, nil
 }
 
 func (s *TodoService) CompleteTask(taskID string) (*Task, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	ctx := context.Background()
 
-	var task *Task
-	for i := range s.store.Tasks {
-		if s.store.Tasks[i].ID == taskID {
-			task = &s.store.Tasks[i]
-			break
-		}
-	}
+	task := s.getTask(taskID)
 	if task == nil {
 		return nil, fmt.Errorf("task not found: %s", taskID)
 	}
 
 	now := time.Now().UnixMilli()
+	err := s.q.CompleteTask(ctx, dbq.CompleteTaskParams{
+		DoneAtMs:    sql.NullInt64{Int64: now, Valid: true},
+		UpdatedAtMs: now,
+		ID:          taskID,
+	})
+	if err != nil {
+		return nil, err
+	}
 	task.Status = "done"
 	task.DoneAtMS = &now
 	task.UpdatedAtMS = now
 
-	var recurTask *Task
+	s.notify(TaskEvent{Action: "updated", Task: *task})
+
 	if task.Recurrence != "" && task.Due != "" {
 		nextDue := computeNextDue(task.Due, task.Recurrence)
 		if nextDue != "" {
@@ -237,64 +215,263 @@ func (s *TodoService) CompleteTask(taskID string) (*Task, error) {
 				CreatedAtMS: now,
 				UpdatedAtMS: now,
 			}
-			s.store.Tasks = append(s.store.Tasks, newTask)
-			recurTask = &s.store.Tasks[len(s.store.Tasks)-1]
+			s.AddTask(newTask)
 		}
 	}
 
-	if err := s.saveStoreUnsafe(); err != nil {
-		return nil, err
-	}
-
-	s.notify(TaskEvent{Action: "updated", Task: *task})
-	if recurTask != nil {
-		s.notify(TaskEvent{Action: "created", Task: *recurTask})
-	}
 	return task, nil
 }
 
 func (s *TodoService) RemoveTask(taskID string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	before := len(s.store.Tasks)
-	var tasks []Task
-	for _, t := range s.store.Tasks {
-		if t.ID != taskID && t.ParentID != taskID {
-			tasks = append(tasks, t)
-		}
+	ctx := context.Background()
+	s.q.DeleteTaskChildren(ctx, taskID)
+	res, err := s.q.DeleteTask(ctx, taskID)
+	if err != nil {
+		return false
 	}
-	s.store.Tasks = tasks
-	removed := len(s.store.Tasks) < before
-
-	if removed {
-		_ = s.saveStoreUnsafe()
+	n, _ := res.RowsAffected()
+	if n > 0 {
 		s.notify(TaskEvent{Action: "deleted", Task: Task{ID: taskID}})
+		return true
 	}
-
-	return removed
+	return false
 }
 
-func computeNextDue(due string, recurrence string) string {
-	t, err := time.Parse("2006-01-02", due)
-	if err != nil {
-		return ""
+// --- Slot methods ---
+
+func (s *TodoService) ListSlots(taskID string, startAfter, endBefore int64) []Slot {
+	ctx := context.Background()
+	var rows []dbq.Slot
+	var err error
+
+	hasTask := taskID != ""
+	hasRange := startAfter > 0 && endBefore > 0
+
+	switch {
+	case hasTask && hasRange:
+		rows, err = s.q.ListSlotsByTaskAndRange(ctx, dbq.ListSlotsByTaskAndRangeParams{
+			TaskID:    taskID,
+			EndAtMs:   startAfter,
+			StartAtMs: endBefore,
+		})
+	case hasTask:
+		rows, err = s.q.ListSlotsByTask(ctx, taskID)
+	case hasRange:
+		rows, err = s.q.ListSlotsByRange(ctx, dbq.ListSlotsByRangeParams{
+			EndAtMs:   startAfter,
+			StartAtMs: endBefore,
+		})
+	default:
+		rows, err = s.q.ListSlots(ctx)
 	}
 
-	switch recurrence {
-	case "daily":
-		return t.AddDate(0, 0, 1).Format("2006-01-02")
-	case "weekly":
-		return t.AddDate(0, 0, 7).Format("2006-01-02")
-	case "monthly":
-		return t.AddDate(0, 1, 0).Format("2006-01-02")
+	if err != nil {
+		return nil
+	}
+
+	slots := make([]Slot, len(rows))
+	for i, r := range rows {
+		slots[i] = Slot{
+			ID:          r.ID,
+			TaskID:      r.TaskID,
+			StartAtMS:   r.StartAtMs,
+			EndAtMS:     r.EndAtMs,
+			Note:        r.Note,
+			CreatedAtMS: r.CreatedAtMs,
+		}
+	}
+	return slots
+}
+
+func (s *TodoService) AddSlot(slot Slot) (*Slot, error) {
+	ctx := context.Background()
+	if slot.ID == "" {
+		slot.ID = utils.RandHex(8)
+	}
+	slot.CreatedAtMS = time.Now().UnixMilli()
+
+	err := s.q.InsertSlot(ctx, dbq.InsertSlotParams{
+		ID:          slot.ID,
+		TaskID:      slot.TaskID,
+		StartAtMs:   slot.StartAtMS,
+		EndAtMs:     slot.EndAtMS,
+		Note:        slot.Note,
+		CreatedAtMs: slot.CreatedAtMS,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	s.notifySlot(SlotEvent{Action: "created", Slot: slot})
+	return &slot, nil
+}
+
+func (s *TodoService) UpdateSlot(slotID string, patch map[string]any) (*Slot, error) {
+	var sets []string
+	var args []any
+
+	if v, ok := patch["taskId"].(string); ok {
+		sets = append(sets, "task_id = ?")
+		args = append(args, v)
+	}
+	if v, ok := patch["startAtMs"].(float64); ok {
+		sets = append(sets, "start_at_ms = ?")
+		args = append(args, int64(v))
+	}
+	if v, ok := patch["endAtMs"].(float64); ok {
+		sets = append(sets, "end_at_ms = ?")
+		args = append(args, int64(v))
+	}
+	if v, ok := patch["note"].(string); ok {
+		sets = append(sets, "note = ?")
+		args = append(args, v)
+	}
+
+	if len(sets) == 0 {
+		return nil, fmt.Errorf("no fields to update")
+	}
+
+	args = append(args, slotID)
+	query := fmt.Sprintf("UPDATE slots SET %s WHERE id = ?", strings.Join(sets, ", "))
+	res, err := s.db.Exec(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return nil, fmt.Errorf("slot not found: %s", slotID)
+	}
+
+	slot := s.getSlot(slotID)
+	if slot != nil {
+		s.notifySlot(SlotEvent{Action: "updated", Slot: *slot})
+	}
+	return slot, nil
+}
+
+func (s *TodoService) RemoveSlot(slotID string) bool {
+	ctx := context.Background()
+	res, err := s.q.DeleteSlot(ctx, slotID)
+	if err != nil {
+		return false
+	}
+	n, _ := res.RowsAffected()
+	if n > 0 {
+		s.notifySlot(SlotEvent{Action: "deleted", Slot: Slot{ID: slotID}})
+		return true
+	}
+	return false
+}
+
+// --- helpers ---
+
+func (s *TodoService) getTask(id string) *Task {
+	ctx := context.Background()
+	row, err := s.q.GetTask(ctx, id)
+	if err != nil {
+		return nil
+	}
+	t := dbTaskToTask(row)
+	return &t
+}
+
+func (s *TodoService) getSlot(id string) *Slot {
+	ctx := context.Background()
+	row, err := s.q.GetSlot(ctx, id)
+	if err != nil {
+		return nil
+	}
+	return &Slot{
+		ID:          row.ID,
+		TaskID:      row.TaskID,
+		StartAtMS:   row.StartAtMs,
+		EndAtMS:     row.EndAtMs,
+		Note:        row.Note,
+		CreatedAtMS: row.CreatedAtMs,
+	}
+}
+
+func dbTaskToTask(r dbq.Task) Task {
+	t := Task{
+		ID:          r.ID,
+		Title:       r.Title,
+		Description: r.Description,
+		Status:      r.Status,
+		Priority:    r.Priority,
+		Due:         r.Due,
+		Recurrence:  r.Recurrence,
+		ParentID:    r.ParentID,
+		Order:       r.SortOrder,
+		CreatedAtMS: r.CreatedAtMs,
+		UpdatedAtMS: r.UpdatedAtMs,
+	}
+	json.Unmarshal([]byte(r.Tags), &t.Tags)
+	if r.DoneAtMs.Valid {
+		t.DoneAtMS = &r.DoneAtMs.Int64
+	}
+	return t
+}
+
+func marshalTags(tags []string) string {
+	if tags == nil {
+		return "[]"
+	}
+	data, _ := json.Marshal(tags)
+	return string(data)
+}
+
+func patchKeyToColumn(key string) string {
+	switch key {
+	case "title":
+		return "title"
+	case "description":
+		return "description"
+	case "status":
+		return "status"
+	case "priority":
+		return "priority"
+	case "due":
+		return "due"
+	case "recurrence":
+		return "recurrence"
+	case "tags":
+		return "tags"
+	case "parentId":
+		return "parent_id"
+	case "order":
+		return "sort_order"
 	default:
 		return ""
 	}
 }
 
-func hasTag(tags []string, tag string) bool {
-	return slices.Contains(tags, tag)
+func computeNextDue(due string, recurrence string) string {
+	if recurrence == "" || due == "" {
+		return ""
+	}
+
+	dueDate, err := time.Parse("2006-01-02", due)
+	if err != nil {
+		return ""
+	}
+
+	opt, err := rrule.StrToROption(recurrence)
+	if err != nil {
+		return ""
+	}
+	opt.Dtstart = dueDate
+
+	rule, err := rrule.NewRRule(*opt)
+	if err != nil {
+		return ""
+	}
+
+	after := dueDate.AddDate(0, 0, 1)
+	next := rule.After(after, true)
+	if next.IsZero() {
+		return ""
+	}
+	return next.Format("2006-01-02")
 }
 
 func toStringSlice(v any) []string {

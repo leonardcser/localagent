@@ -87,8 +87,7 @@ func (t *AddTaskTool) Parameters() map[string]any {
 			},
 			"recurrence": map[string]any{
 				"type":        "string",
-				"enum":        []string{"daily", "weekly", "monthly"},
-				"description": "Recurrence rule (requires due date).",
+				"description": "RFC 5545 RRULE string, e.g. 'FREQ=DAILY', 'FREQ=WEEKLY;BYDAY=MO,WE,FR', 'FREQ=MONTHLY;BYMONTHDAY=1'. Requires a due date.",
 			},
 			"tags": map[string]any{
 				"type":        "array",
@@ -177,8 +176,7 @@ func (t *UpdateTaskTool) Parameters() map[string]any {
 			},
 			"recurrence": map[string]any{
 				"type":        "string",
-				"enum":        []string{"daily", "weekly", "monthly"},
-				"description": "New recurrence rule.",
+				"description": "RFC 5545 RRULE string, e.g. 'FREQ=DAILY', 'FREQ=WEEKLY;BYDAY=MO,WE,FR'.",
 			},
 			"status": map[string]any{
 				"type":        "string",

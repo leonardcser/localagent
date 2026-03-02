@@ -370,6 +370,79 @@ func (s *Server) handleTaskDelete(c *echo.Context) error {
 	return c.JSON(http.StatusNotFound, map[string]string{"error": "task not found"})
 }
 
+// --- Slot handlers ---
+
+func (s *Server) handleSlotList(c *echo.Context) error {
+	if s.todoService == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "slots not available"})
+	}
+
+	taskID := c.QueryParam("taskId")
+	var startAfter, endBefore int64
+	if v := c.QueryParam("start"); v != "" {
+		fmt.Sscanf(v, "%d", &startAfter)
+	}
+	if v := c.QueryParam("end"); v != "" {
+		fmt.Sscanf(v, "%d", &endBefore)
+	}
+
+	slots := s.todoService.ListSlots(taskID, startAfter, endBefore)
+	if slots == nil {
+		slots = []todo.Slot{}
+	}
+	return c.JSON(http.StatusOK, map[string]any{"slots": slots})
+}
+
+func (s *Server) handleSlotCreate(c *echo.Context) error {
+	if s.todoService == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "slots not available"})
+	}
+
+	var slot todo.Slot
+	if err := c.Bind(&slot); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+	if slot.TaskID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "taskId is required"})
+	}
+
+	created, err := s.todoService.AddSlot(slot)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, created)
+}
+
+func (s *Server) handleSlotUpdate(c *echo.Context) error {
+	if s.todoService == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "slots not available"})
+	}
+
+	id := c.Param("id")
+	var patch map[string]any
+	if err := c.Bind(&patch); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+
+	slot, err := s.todoService.UpdateSlot(id, patch)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, slot)
+}
+
+func (s *Server) handleSlotDelete(c *echo.Context) error {
+	if s.todoService == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "slots not available"})
+	}
+
+	id := c.Param("id")
+	if s.todoService.RemoveSlot(id) {
+		return c.JSON(http.StatusOK, map[string]bool{"ok": true})
+	}
+	return c.JSON(http.StatusNotFound, map[string]string{"error": "slot not found"})
+}
+
 func (s *Server) handlePushSubscribe(c *echo.Context) error {
 	if s.pushManager == nil {
 		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "push not available"})

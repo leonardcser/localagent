@@ -1,20 +1,23 @@
 package todo
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
+
+	"localagent/pkg/db"
 )
 
-func tempStorePath(t *testing.T) string {
+func testService(t *testing.T) *TodoService {
 	t.Helper()
-	dir := t.TempDir()
-	return filepath.Join(dir, "todo", "tasks.json")
+	database, err := db.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { database.Close() })
+	return NewTodoService(database)
 }
 
 func TestAddAndList(t *testing.T) {
-	s := NewTodoService(tempStorePath(t))
-	s.Load()
+	s := testService(t)
 
 	task, err := s.AddTask(Task{Title: "Buy groceries"})
 	if err != nil {
@@ -37,8 +40,7 @@ func TestAddAndList(t *testing.T) {
 }
 
 func TestListFilterByStatus(t *testing.T) {
-	s := NewTodoService(tempStorePath(t))
-	s.Load()
+	s := testService(t)
 
 	s.AddTask(Task{Title: "A", Status: "todo"})
 	s.AddTask(Task{Title: "B", Status: "doing"})
@@ -55,8 +57,7 @@ func TestListFilterByStatus(t *testing.T) {
 }
 
 func TestListFilterByTag(t *testing.T) {
-	s := NewTodoService(tempStorePath(t))
-	s.Load()
+	s := testService(t)
 
 	s.AddTask(Task{Title: "A", Tags: []string{"work"}})
 	s.AddTask(Task{Title: "B", Tags: []string{"personal"}})
@@ -68,8 +69,7 @@ func TestListFilterByTag(t *testing.T) {
 }
 
 func TestCompleteTask(t *testing.T) {
-	s := NewTodoService(tempStorePath(t))
-	s.Load()
+	s := testService(t)
 
 	task, _ := s.AddTask(Task{Title: "Do laundry"})
 
@@ -86,13 +86,12 @@ func TestCompleteTask(t *testing.T) {
 }
 
 func TestCompleteRecurringTask(t *testing.T) {
-	s := NewTodoService(tempStorePath(t))
-	s.Load()
+	s := testService(t)
 
 	task, _ := s.AddTask(Task{
 		Title:      "Daily standup",
 		Due:        "2026-02-20",
-		Recurrence: "daily",
+		Recurrence: "FREQ=DAILY",
 	})
 
 	_, err := s.CompleteTask(task.ID)
@@ -118,19 +117,18 @@ func TestCompleteRecurringTask(t *testing.T) {
 	if newTask.Due != "2026-02-21" {
 		t.Fatalf("expected due '2026-02-21', got %q", newTask.Due)
 	}
-	if newTask.Recurrence != "daily" {
-		t.Fatalf("expected recurrence 'daily', got %q", newTask.Recurrence)
+	if newTask.Recurrence != "FREQ=DAILY" {
+		t.Fatalf("expected recurrence 'FREQ=DAILY', got %q", newTask.Recurrence)
 	}
 }
 
 func TestCompleteWeeklyRecurrence(t *testing.T) {
-	s := NewTodoService(tempStorePath(t))
-	s.Load()
+	s := testService(t)
 
 	task, _ := s.AddTask(Task{
 		Title:      "Weekly review",
 		Due:        "2026-02-20",
-		Recurrence: "weekly",
+		Recurrence: "FREQ=WEEKLY",
 	})
 
 	s.CompleteTask(task.ID)
@@ -142,13 +140,12 @@ func TestCompleteWeeklyRecurrence(t *testing.T) {
 }
 
 func TestCompleteMonthlyRecurrence(t *testing.T) {
-	s := NewTodoService(tempStorePath(t))
-	s.Load()
+	s := testService(t)
 
 	task, _ := s.AddTask(Task{
 		Title:      "Pay rent",
 		Due:        "2026-02-01",
-		Recurrence: "monthly",
+		Recurrence: "FREQ=MONTHLY",
 	})
 
 	s.CompleteTask(task.ID)
@@ -160,8 +157,7 @@ func TestCompleteMonthlyRecurrence(t *testing.T) {
 }
 
 func TestUpdateTask(t *testing.T) {
-	s := NewTodoService(tempStorePath(t))
-	s.Load()
+	s := testService(t)
 
 	task, _ := s.AddTask(Task{Title: "Original"})
 
@@ -181,8 +177,7 @@ func TestUpdateTask(t *testing.T) {
 }
 
 func TestRemoveTask(t *testing.T) {
-	s := NewTodoService(tempStorePath(t))
-	s.Load()
+	s := testService(t)
 
 	task, _ := s.AddTask(Task{Title: "To remove"})
 
@@ -200,45 +195,17 @@ func TestRemoveTask(t *testing.T) {
 	}
 }
 
-func TestPersistence(t *testing.T) {
-	storePath := tempStorePath(t)
-
-	s1 := NewTodoService(storePath)
-	s1.Load()
-	s1.AddTask(Task{Title: "Persistent task"})
-
-	s2 := NewTodoService(storePath)
-	s2.Load()
-
-	tasks := s2.ListTasks("", "")
-	if len(tasks) != 1 || tasks[0].Title != "Persistent task" {
-		t.Fatalf("expected persisted task, got %v", tasks)
-	}
-}
-
-func TestLoadMissingFile(t *testing.T) {
-	s := NewTodoService(filepath.Join(t.TempDir(), "nonexistent", "tasks.json"))
-	if err := s.Load(); err != nil {
-		t.Fatalf("Load should not error on missing file: %v", err)
-	}
-
-	tasks := s.ListTasks("", "")
-	if len(tasks) != 0 {
-		t.Fatalf("expected empty store, got %d tasks", len(tasks))
-	}
-}
-
 func TestComputeNextDue(t *testing.T) {
 	tests := []struct {
 		due        string
 		recurrence string
 		want       string
 	}{
-		{"2026-02-20", "daily", "2026-02-21"},
-		{"2026-02-20", "weekly", "2026-02-27"},
-		{"2026-01-31", "monthly", "2026-03-03"},
-		{"2026-02-20", "yearly", ""},
-		{"bad-date", "daily", ""},
+		{"2026-02-20", "FREQ=DAILY", "2026-02-21"},
+		{"2026-02-20", "FREQ=WEEKLY", "2026-02-27"},
+		{"2026-02-01", "FREQ=MONTHLY", "2026-03-01"},
+		{"2026-02-20", "", ""},
+		{"bad-date", "FREQ=DAILY", ""},
 	}
 
 	for _, tt := range tests {
@@ -249,13 +216,86 @@ func TestComputeNextDue(t *testing.T) {
 	}
 }
 
-func TestStoreFileCreated(t *testing.T) {
-	storePath := tempStorePath(t)
-	s := NewTodoService(storePath)
-	s.Load()
-	s.AddTask(Task{Title: "test"})
+// --- Slot tests ---
 
-	if _, err := os.Stat(storePath); os.IsNotExist(err) {
-		t.Fatal("expected store file to be created")
+func TestSlotCRUD(t *testing.T) {
+	s := testService(t)
+
+	task, _ := s.AddTask(Task{Title: "Task for slots"})
+
+	slot, err := s.AddSlot(Slot{
+		TaskID:    task.ID,
+		StartAtMS: 1000000,
+		EndAtMS:   2000000,
+		Note:      "Focus block",
+	})
+	if err != nil {
+		t.Fatalf("AddSlot: %v", err)
+	}
+	if slot.ID == "" {
+		t.Fatal("expected slot ID")
+	}
+
+	// List all
+	slots := s.ListSlots("", 0, 0)
+	if len(slots) != 1 {
+		t.Fatalf("expected 1 slot, got %d", len(slots))
+	}
+
+	// List by task
+	slots = s.ListSlots(task.ID, 0, 0)
+	if len(slots) != 1 {
+		t.Fatalf("expected 1 slot for task, got %d", len(slots))
+	}
+
+	// Update
+	updated, err := s.UpdateSlot(slot.ID, map[string]any{"note": "Updated note"})
+	if err != nil {
+		t.Fatalf("UpdateSlot: %v", err)
+	}
+	if updated.Note != "Updated note" {
+		t.Fatalf("expected 'Updated note', got %q", updated.Note)
+	}
+
+	// Remove
+	if !s.RemoveSlot(slot.ID) {
+		t.Fatal("expected RemoveSlot to return true")
+	}
+	slots = s.ListSlots("", 0, 0)
+	if len(slots) != 0 {
+		t.Fatalf("expected 0 slots, got %d", len(slots))
+	}
+}
+
+func TestSlotCascadeOnTaskDelete(t *testing.T) {
+	s := testService(t)
+
+	task, _ := s.AddTask(Task{Title: "Task with slots"})
+	s.AddSlot(Slot{TaskID: task.ID, StartAtMS: 1000, EndAtMS: 2000})
+	s.AddSlot(Slot{TaskID: task.ID, StartAtMS: 3000, EndAtMS: 4000})
+
+	s.RemoveTask(task.ID)
+
+	slots := s.ListSlots(task.ID, 0, 0)
+	if len(slots) != 0 {
+		t.Fatalf("expected slots to be cascade deleted, got %d", len(slots))
+	}
+}
+
+func TestSlotTimeRangeQuery(t *testing.T) {
+	s := testService(t)
+
+	task, _ := s.AddTask(Task{Title: "Task"})
+	s.AddSlot(Slot{TaskID: task.ID, StartAtMS: 1000, EndAtMS: 2000})
+	s.AddSlot(Slot{TaskID: task.ID, StartAtMS: 3000, EndAtMS: 4000})
+	s.AddSlot(Slot{TaskID: task.ID, StartAtMS: 5000, EndAtMS: 6000})
+
+	// Should get slots that overlap with range [2500, 4500]
+	slots := s.ListSlots("", 2500, 4500)
+	if len(slots) != 1 {
+		t.Fatalf("expected 1 slot in range, got %d", len(slots))
+	}
+	if slots[0].StartAtMS != 3000 {
+		t.Fatalf("expected slot starting at 3000, got %d", slots[0].StartAtMS)
 	}
 }

@@ -12,10 +12,13 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"database/sql"
+
 	"localagent/pkg/activity"
 	"localagent/pkg/bus"
 	"localagent/pkg/config"
 	"localagent/pkg/constants"
+	"localagent/pkg/db"
 	"localagent/pkg/finance"
 	"localagent/pkg/logger"
 	"localagent/pkg/prompts"
@@ -42,6 +45,7 @@ type AgentLoop struct {
 	running        atomic.Bool
 	summarizing    sync.Map // Tracks which sessions are currently being summarized
 	stopCleanup    chan struct{}
+	database       *sql.DB
 	todoService    *todo.TodoService
 }
 
@@ -91,6 +95,11 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 	registry.Register(tools.NewCompleteTaskTool(todoService))
 	registry.Register(tools.NewRemoveTaskTool(todoService))
 
+	// Slot tools
+	registry.Register(tools.NewListSlotsTool(todoService))
+	registry.Register(tools.NewAddSlotTool(todoService))
+	registry.Register(tools.NewRemoveSlotTool(todoService))
+
 	registry.Register(tools.NewMessageTool(msgBus, sessions))
 
 	if cfg.Tools.PDF.URL != "" {
@@ -117,10 +126,19 @@ func NewAgentLoop(cfg *config.Config, msgBus *bus.MessageBus, provider providers
 	os.MkdirAll(workspace, 0755)
 	os.MkdirAll(filepath.Join(workspace, "media"), 0755)
 
-	// Create shared TodoService
-	todoStorePath := filepath.Join(workspace, "todo", "tasks.json")
-	todoService := todo.NewTodoService(todoStorePath)
-	todoService.Load()
+	// Open SQLite database and migrate
+	dbPath := filepath.Join(workspace, "localagent.db")
+	database, err := db.Open(dbPath)
+	if err != nil {
+		logger.Error("failed to open database: %v", err)
+		os.Exit(1)
+	}
+	// One-shot migration from old JSON file
+	jsonPath := filepath.Join(workspace, "todo", "tasks.json")
+	if err := db.MigrateFromJSON(database, jsonPath); err != nil {
+		logger.Warn("JSON migration: %v", err)
+	}
+	todoService := todo.NewTodoService(database)
 
 	sessionsManager := session.NewSessionManager(filepath.Join(workspace, "sessions"))
 
@@ -177,6 +195,7 @@ func NewAgentLoop(cfg *config.Config, msgBus *bus.MessageBus, provider providers
 		activity:       activity.NopEmitter{},
 		summarizing:    sync.Map{},
 		stopCleanup:    stopCleanup,
+		database:       database,
 		todoService:    todoService,
 	}
 }
@@ -238,6 +257,9 @@ func (al *AgentLoop) Stop() {
 	case <-al.stopCleanup:
 	default:
 		close(al.stopCleanup)
+	}
+	if al.database != nil {
+		al.database.Close()
 	}
 }
 

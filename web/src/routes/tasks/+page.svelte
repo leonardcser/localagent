@@ -21,9 +21,14 @@ import {
   FiChevronDown,
   FiCornerDownRight,
   FiAlertCircle,
+  FiRepeat,
+  FiClock,
 } from "svelte-icons-pack/fi";
 import TaskContextMenu from "$lib/components/TaskContextMenu.svelte";
 import DatePicker from "$lib/components/DatePicker.svelte";
+import RecurrencePicker from "$lib/components/RecurrencePicker.svelte";
+import { slotStore } from "$lib/stores/slot.svelte";
+import type { Slot } from "$lib/api";
 
 let panelOpen = $state(false);
 let panelMode = $state<"add" | "edit">("add");
@@ -33,6 +38,7 @@ let panelPriority = $state("");
 let panelDue = $state("");
 let panelTags = $state("");
 let panelStatus = $state("todo");
+let panelRecurrence = $state("");
 let panelParentId = $state("");
 
 let expandedParents = $state(new Set<string>());
@@ -137,6 +143,7 @@ function openAdd(parentId = "") {
   panelDescription = "";
   panelPriority = "";
   panelDue = "";
+  panelRecurrence = "";
   panelTags = "";
   panelStatus = "todo";
   panelParentId = parentId;
@@ -150,6 +157,7 @@ function openDetail(task: Task) {
   panelDescription = task.description ?? "";
   panelPriority = task.priority ?? "";
   panelDue = task.due ?? "";
+  panelRecurrence = task.recurrence ?? "";
   panelTags = task.tags?.join(", ") ?? "";
   panelStatus = task.status;
   panelParentId = task.parentId ?? "";
@@ -213,6 +221,7 @@ async function handleAddSubmit(e: SubmitEvent) {
     description: panelDescription.trim() || undefined,
     priority: panelPriority || undefined,
     due: panelDue || undefined,
+    recurrence: panelRecurrence || undefined,
     tags: parseTags(panelTags),
     status: panelStatus,
     parentId: panelParentId || undefined,
@@ -664,6 +673,21 @@ const priorityOptions = [
 				/>
 			</div>
 
+			<!-- Recurrence -->
+			<div class="flex items-center justify-between {py} border-b border-border/50">
+				<span class="flex items-center {gap} {szLabel} text-text-secondary">
+					<Icon src={FiRepeat} size={iconSz} className="text-text-muted" />
+					Repeat
+				</span>
+				<RecurrencePicker
+					value={panelRecurrence}
+					onchange={(v) => {
+						panelRecurrence = v;
+						autoSave({ recurrence: v || undefined } as Partial<Task>);
+					}}
+				/>
+			</div>
+
 			<!-- Tags -->
 			<div class="flex items-center justify-between {py} border-b border-border/50">
 				<span class="flex items-center {gap} {szLabel} text-text-secondary">
@@ -742,6 +766,30 @@ const priorityOptions = [
 				</Select.Root>
 			</div>
 		</div>
+
+		<!-- Time Blocks (edit mode only) -->
+		{#if panelMode === "edit" && taskStore.selectedId}
+			{@const taskSlots = slotStore.forTask(taskStore.selectedId)}
+			<div class="flex flex-col gap-1 border-t border-border pt-3">
+				<span class="text-[11px] font-semibold uppercase tracking-widest text-text-muted">Time Blocks</span>
+				{#each taskSlots as slot}
+					<div class="flex items-center justify-between rounded-lg px-2 {mobile ? 'py-2' : 'py-1.5'} hover:bg-overlay-light">
+						<span class="{mobile ? 'text-[13px]' : 'text-[11px]'} text-text-secondary">
+							<Icon src={FiClock} size="11" className="inline-block text-text-muted mr-1" />
+							{new Date(slot.startAtMs).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+							{new Date(slot.startAtMs).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}
+							– {new Date(slot.endAtMs).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}
+						</span>
+						<button
+							onclick={() => slotStore.remove(slot.id)}
+							class="text-text-muted hover:text-error transition-colors"
+						>
+							<Icon src={FiX} size="12" />
+						</button>
+					</div>
+				{/each}
+			</div>
+		{/if}
 
 		<!-- Subtasks section (edit mode only) -->
 		{#if panelMode === "edit" && taskStore.selectedId}
