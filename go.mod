@@ -3,18 +3,28 @@ module localagent
 go 1.25.7
 
 require (
+	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/adhocore/gronx v1.19.6
+	github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608
+	github.com/emersion/go-webdav v0.7.0
 	github.com/labstack/echo/v5 v5.0.0
+	github.com/teambition/rrule-go v1.8.2
+	golang.org/x/net v0.50.0
+	modernc.org/sqlite v1.46.1
 )
 
 require (
-	github.com/SherClockHolmes/webpush-go v1.4.0 // indirect
-	github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608 // indirect
-	github.com/emersion/go-webdav v0.7.0 // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
-	github.com/mattn/go-sqlite3 v1.14.34 // indirect
-	github.com/teambition/rrule-go v1.8.2 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/ncruces/go-strftime v1.0.0 // indirect
+	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	golang.org/x/crypto v0.48.0 // indirect
-	golang.org/x/net v0.50.0 // indirect
+	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
+	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
+	modernc.org/libc v1.67.6 // indirect
+	modernc.org/mathutil v1.7.1 // indirect
+	modernc.org/memory v1.11.0 // indirect
 )
