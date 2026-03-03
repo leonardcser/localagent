@@ -46,8 +46,10 @@ let colWidth = $derived(calendarWidth / numCols);
 let top = $derived(
   start.getHours() * rowHeight + (start.getMinutes() / 60) * rowHeight,
 );
-let leftPct = $derived((100 / event.overlapCount) * event.overlapIndex);
-let widthPct = $derived(100 / event.overlapCount);
+// Position within the column, accounting for overlapping events
+let colLeftPx = $derived(colIndex * colWidth);
+let overlapWidth = $derived(colWidth / event.overlapCount);
+let leftPx = $derived(colLeftPx + overlapWidth * event.overlapIndex);
 // min height = 15 min
 let baseHeight = $derived(
   Math.max((durationMin / 60) * rowHeight, rowHeight / 4),
@@ -108,11 +110,9 @@ $effect(() => {
 	class="absolute"
 	style="
 		top: {top + yOffset}px;
-		left: {leftPct}%;
+		left: {leftPx}px;
 		height: {displayHeight}px;
-		width: {widthPct}%;
-		grid-column-start: {colIndex + 1};
-		grid-column-end: {colIndex + 2};
+		width: {overlapWidth}px;
 	"
 	role="presentation"
 	onclick={(e) => e.stopPropagation()}
@@ -125,8 +125,8 @@ $effect(() => {
 				bounds={{
 					top: -top,
 					bottom: rowHeight * 24 - top - baseHeight,
-					left: -(colIndex * colWidth),
-					right: calendarWidth - (colIndex + 1) * colWidth,
+					left: -colLeftPx,
+					right: calendarWidth - colLeftPx - overlapWidth,
 				}}
 				grid={[colWidth, rowHeight / 4]}
 				disabled={!event.draggable || resizing}
