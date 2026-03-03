@@ -3,11 +3,23 @@ import { onMount } from "svelte";
 import { linkStore } from "$lib/stores/link.svelte";
 import type { Link } from "$lib/api";
 import { Icon } from "svelte-icons-pack";
-import { FiPlus, FiTrash2, FiSearch, FiX, FiExternalLink, FiTag } from "svelte-icons-pack/fi";
+import {
+  FiPlus,
+  FiTrash2,
+  FiSearch,
+  FiX,
+  FiExternalLink,
+  FiTag,
+  FiArrowLeft,
+  FiLink,
+  FiChevronRight,
+} from "svelte-icons-pack/fi";
 
 // --- State ---
 let searchQuery = $state("");
-let activeTag = $state<string | null>(null);
+let showSidebar = $state(false);
+let showSearch = $state(false);
+
 let panelOpen = $state(false);
 let editId = $state<string | null>(null);
 
@@ -15,167 +27,312 @@ let formUrl = $state("");
 let formTitle = $state("");
 let formDescription = $state("");
 let formTags = $state("");
-let formError = $state("");
-let formSaving = $state(false);
 
 onMount(async () => {
-	await linkStore.load();
-	const tag = new URLSearchParams(window.location.search).get("tag");
-	if (tag) activeTag = tag;
+  await linkStore.load();
 });
 
 // --- Derived ---
-let allTags = $derived(linkStore.allTags());
-
 let filteredLinks = $derived.by(() => {
-	let list = linkStore.links;
-	if (activeTag) list = list.filter((l) => l.tags?.includes(activeTag!));
-	if (searchQuery.trim()) {
-		const q = searchQuery.toLowerCase();
-		list = list.filter(
-			(l) =>
-				l.title?.toLowerCase().includes(q) ||
-				l.url.toLowerCase().includes(q) ||
-				l.description?.toLowerCase().includes(q),
-		);
-	}
-	return list;
+  let list = linkStore.links;
+  if (linkStore.filterTags.length > 0) {
+    list = list.filter((l) =>
+      linkStore.filterTags.every((tag) => l.tags?.includes(tag)),
+    );
+  }
+  if (searchQuery.trim()) {
+    const q = searchQuery.toLowerCase();
+    list = list.filter(
+      (l) =>
+        l.title?.toLowerCase().includes(q) ||
+        l.url.toLowerCase().includes(q) ||
+        l.description?.toLowerCase().includes(q),
+    );
+  }
+  return list;
 });
 
 // --- Helpers ---
 function hostname(url: string): string {
-	try {
-		return new URL(url).hostname.replace(/^www\./, "");
-	} catch {
-		return url;
-	}
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
 }
 
 function faviconUrl(url: string): string {
-	try {
-		const host = new URL(url).hostname;
-		return `https://www.google.com/s2/favicons?domain=${host}&sz=32`;
-	} catch {
-		return "";
-	}
+  try {
+    const host = new URL(url).hostname;
+    return `https://www.google.com/s2/favicons?domain=${host}&sz=32`;
+  } catch {
+    return "";
+  }
 }
 
 function relativeDate(ms: number): string {
-	const diff = Date.now() - ms;
-	const mins = Math.floor(diff / 60000);
-	if (mins < 1) return "just now";
-	if (mins < 60) return `${mins}m ago`;
-	const hours = Math.floor(mins / 60);
-	if (hours < 24) return `${hours}h ago`;
-	const days = Math.floor(hours / 24);
-	if (days < 30) return `${days}d ago`;
-	return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function setTag(tag: string | null) {
-	activeTag = tag;
-	const url = new URL(window.location.href);
-	if (tag) url.searchParams.set("tag", tag);
-	else url.searchParams.delete("tag");
-	history.replaceState({}, "", url.toString());
+  const diff = Date.now() - ms;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(ms).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 // --- Panel ---
 function openAdd() {
-	editId = null;
-	formUrl = "";
-	formTitle = "";
-	formDescription = "";
-	formTags = "";
-	formError = "";
-	panelOpen = true;
+  editId = null;
+  formUrl = "";
+  formTitle = "";
+  formDescription = "";
+  formTags = "";
+  panelOpen = true;
 }
 
 function openEdit(link: Link) {
-	editId = link.id;
-	formUrl = link.url;
-	formTitle = link.title ?? "";
-	formDescription = link.description ?? "";
-	formTags = (link.tags ?? []).join(", ");
-	formError = "";
-	panelOpen = true;
+  editId = link.id;
+  formUrl = link.url;
+  formTitle = link.title ?? "";
+  formDescription = link.description ?? "";
+  formTags = (link.tags ?? []).join(", ");
+  panelOpen = true;
 }
 
 function closePanel() {
-	panelOpen = false;
-	editId = null;
+  panelOpen = false;
+  editId = null;
 }
 
-async function submitForm() {
-	if (!formUrl.trim()) {
-		formError = "URL is required";
-		return;
-	}
-	formSaving = true;
-	formError = "";
-	const tags = formTags
-		.split(",")
-		.map((t) => t.trim())
-		.filter(Boolean);
-
-	if (editId) {
-		await linkStore.update(editId, {
-			url: formUrl.trim(),
-			title: formTitle.trim(),
-			description: formDescription.trim(),
-			tags,
-		});
-	} else {
-		await linkStore.add({
-			url: formUrl.trim(),
-			title: formTitle.trim() || undefined,
-			description: formDescription.trim() || undefined,
-			tags: tags.length ? tags : undefined,
-		});
-	}
-	formSaving = false;
-	closePanel();
+function parseTags(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
 }
 
-async function removeLink(id: string, e: MouseEvent) {
-	e.stopPropagation();
-	await linkStore.remove(id);
+// Auto-save for edit mode
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+function autoSave(patch: Partial<Link>) {
+  if (!editId) return;
+  const id = editId;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    linkStore.update(id, patch);
+  }, 400);
+}
+
+// Add mode submit
+async function handleAddSubmit(e: SubmitEvent) {
+  e.preventDefault();
+  if (!formUrl.trim()) return;
+  const tags = parseTags(formTags);
+  await linkStore.add({
+    url: formUrl.trim(),
+    title: formTitle.trim() || undefined,
+    description: formDescription.trim() || undefined,
+    tags: tags.length ? tags : undefined,
+  });
+  closePanel();
+}
+
+async function removeLink(id: string, e?: MouseEvent) {
+  e?.stopPropagation();
+  await linkStore.remove(id);
+  if (panelOpen && editId === id) closePanel();
 }
 </script>
 
 <div class="flex h-full overflow-hidden">
-	<!-- Sidebar: tag filter -->
-	<aside class="hidden w-44 shrink-0 flex-col border-r border-border bg-bg-secondary md:flex">
-		<div class="p-3 pb-2">
-			<span class="text-[11px] font-semibold uppercase tracking-wider text-text-muted">Tags</span>
-		</div>
-		<div class="flex flex-col gap-0.5 overflow-y-auto px-2 pb-4">
-			<button
-				onclick={() => setTag(null)}
-				class="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors
-					{activeTag === null ? 'bg-accent text-white' : 'text-text-secondary hover:bg-overlay-light'}"
+	<!-- Desktop sidebar -->
+	<aside class="hidden w-52 shrink-0 flex-col border-r border-border bg-bg md:flex">
+		<div class="flex flex-col px-1.5 py-2">
+			<span
+				class="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-text-muted"
+				>Filter</span
 			>
-				All links
-			</button>
-			{#each allTags as tag}
-				<button
-					onclick={() => setTag(tag)}
-					class="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] transition-colors
-						{activeTag === tag ? 'bg-accent text-white' : 'text-text-secondary hover:bg-overlay-light'}"
+			<button
+				onclick={() => (linkStore.filterTags = [])}
+				class="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors
+					{linkStore.filterTags.length === 0
+					? 'bg-accent/10 text-accent'
+					: 'text-text-secondary hover:bg-overlay-light hover:text-text-primary'}"
+			>
+				<Icon
+					src={FiLink}
+					size="13"
+					className="shrink-0 {linkStore.filterTags.length === 0 ? 'text-accent' : 'text-text-muted'}"
+				/>
+				<span class="flex-1 text-left">All links</span>
+				<span
+					class="min-w-5 text-right text-[11px] tabular-nums {linkStore.filterTags.length === 0 ? 'text-accent/70' : 'text-text-muted'}"
+					>{linkStore.links.length}</span
 				>
-					<Icon src={FiTag} size="11" />
-					<span class="truncate">{tag}</span>
-				</button>
-			{/each}
+			</button>
 		</div>
+
+		{#if linkStore.allTags.length > 0}
+			<div class="flex flex-col border-t border-border px-1.5 py-2">
+				<span
+					class="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-text-muted"
+					>Tags</span
+				>
+				{#each linkStore.allTags as tag}
+					<button
+						onclick={() => linkStore.toggleTag(tag)}
+						class="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors
+							{linkStore.filterTags.includes(tag)
+							? 'bg-accent/10 text-accent'
+							: 'text-text-secondary hover:bg-overlay-light hover:text-text-primary'}"
+					>
+						<Icon
+							src={FiTag}
+							size="13"
+							className="shrink-0 {linkStore.filterTags.includes(tag) ? 'text-accent' : 'text-text-muted'}"
+						/>
+						<span>{tag}</span>
+					</button>
+				{/each}
+			</div>
+		{/if}
 	</aside>
+
+	<!-- Mobile sidebar overlay -->
+	{#if showSidebar}
+		<div
+			class="fixed inset-0 z-30 bg-black/20 backdrop-blur-[1px] md:hidden"
+			role="presentation"
+			onclick={() => (showSidebar = false)}
+			onkeydown={() => {}}
+		></div>
+		<aside
+			class="fixed left-0 top-0 z-40 flex h-full w-64 flex-col border-r border-border bg-bg-secondary shadow-elevated md:hidden"
+			style="padding-top: max(env(safe-area-inset-top, 0px), 10px)"
+		>
+			<div class="flex items-center justify-between border-b border-border px-3 py-2">
+				<span class="text-[14px] font-semibold text-text-primary"
+					>Filter</span
+				>
+				<button
+					onclick={() => (showSidebar = false)}
+					class="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-overlay-light"
+				>
+					<Icon src={FiX} size="16" />
+				</button>
+			</div>
+			<div class="flex flex-col gap-0.5 overflow-y-auto px-2 py-2">
+				<button
+					onclick={() => {
+						linkStore.filterTags = [];
+						showSidebar = false;
+					}}
+					class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[14px] transition-colors
+						{linkStore.filterTags.length === 0
+						? 'bg-accent/10 text-accent'
+						: 'text-text-secondary hover:bg-overlay-light'}"
+				>
+					<Icon src={FiLink} size="14" />
+					All links
+				</button>
+				{#each linkStore.allTags as tag}
+					<button
+						onclick={() => linkStore.toggleTag(tag)}
+						class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[14px] transition-colors
+							{linkStore.filterTags.includes(tag)
+							? 'bg-accent/10 text-accent'
+							: 'text-text-secondary hover:bg-overlay-light'}"
+					>
+						<Icon
+							src={FiTag}
+							size="14"
+							className={linkStore.filterTags.includes(tag) ? "text-accent" : "text-text-muted"}
+						/>
+						{tag}
+					</button>
+				{/each}
+			</div>
+		</aside>
+	{/if}
 
 	<!-- Main area -->
 	<div class="flex flex-1 flex-col overflow-hidden">
-		<!-- Top bar -->
-		<div class="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
+		<!-- Mobile header -->
+		<div
+			class="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 md:hidden"
+		>
+			<button
+				onclick={() => (showSidebar = !showSidebar)}
+				class="flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-text-primary hover:bg-overlay-light"
+			>
+				{linkStore.filterTags.length > 0
+					? `${linkStore.filterTags.length} tag${linkStore.filterTags.length > 1 ? "s" : ""}`
+					: "All links"}
+				<Icon
+					src={FiChevronRight}
+					size="14"
+					className="text-text-muted rotate-90"
+				/>
+			</button>
+			<div class="ml-auto flex items-center gap-1">
+				<button
+					onclick={() => (showSearch = !showSearch)}
+					class="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-overlay-light hover:text-text-secondary"
+				>
+					<Icon src={FiSearch} size="15" />
+				</button>
+				<button
+					onclick={openAdd}
+					class="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white hover:opacity-90"
+				>
+					<Icon src={FiPlus} size="15" />
+				</button>
+			</div>
+		</div>
+
+		{#if showSearch}
+			<div
+				class="flex items-center gap-2 border-b border-border px-3 py-2 md:hidden"
+			>
+				<div class="relative flex-1">
+					<Icon
+						src={FiSearch}
+						size="14"
+						className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none"
+					/>
+					<input
+						type="text"
+						placeholder="Search links…"
+						bind:value={searchQuery}
+						class="h-8 w-full rounded-lg border border-border bg-bg-tertiary pl-8 pr-2 text-[13px] text-text-primary outline-none focus:border-accent"
+					/>
+				</div>
+				<button
+					onclick={() => {
+						showSearch = false;
+						searchQuery = "";
+					}}
+					class="text-text-muted hover:text-text-secondary"
+				>
+					<Icon src={FiX} size="16" />
+				</button>
+			</div>
+		{/if}
+
+		<!-- Desktop header -->
+		<div
+			class="hidden shrink-0 items-center gap-2 border-b border-border px-3 py-2 md:flex"
+		>
 			<div class="relative flex-1">
-				<Icon src={FiSearch} size="14" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+				<Icon
+					src={FiSearch}
+					size="14"
+					className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none"
+				/>
 				<input
 					type="text"
 					placeholder="Search links…"
@@ -192,82 +349,91 @@ async function removeLink(id: string, e: MouseEvent) {
 			</button>
 		</div>
 
-		<!-- Link grid -->
+		<!-- Link list -->
 		<div class="flex-1 overflow-y-auto p-3">
 			{#if linkStore.loading}
-				<div class="flex h-32 items-center justify-center text-[12px] text-text-muted">Loading…</div>
+				<div
+					class="flex h-32 items-center justify-center text-[12px] text-text-muted"
+				>
+					Loading…
+				</div>
 			{:else if filteredLinks.length === 0}
-				<div class="flex h-32 flex-col items-center justify-center gap-2 text-text-muted">
+				<div
+					class="flex h-32 flex-col items-center justify-center gap-2 text-text-muted"
+				>
 					<Icon src={FiExternalLink} size="24" />
 					<span class="text-[12px]">No links yet</span>
 				</div>
 			{:else}
-				<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+				<div class="flex flex-col gap-0.5">
 					{#each filteredLinks as link (link.id)}
 						<!-- svelte-ignore a11y_click_events_have_key_events -->
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<div
-							class="group relative flex flex-col gap-2 rounded-lg border border-border bg-bg-secondary p-3 transition-colors hover:border-border/80 hover:bg-bg-tertiary cursor-pointer"
+							class="group flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-overlay-light
+								{panelOpen && editId === link.id ? 'bg-overlay-light' : ''}"
 							onclick={() => openEdit(link)}
 						>
-							<!-- Delete button -->
+							<img
+								src={faviconUrl(link.url)}
+								alt=""
+								class="h-4 w-4 shrink-0 rounded-sm"
+								onerror={(e) => {
+									(e.currentTarget as HTMLImageElement).style.display =
+										"none";
+								}}
+							/>
+							<div class="flex min-w-0 flex-1 flex-col gap-0.5">
+								<div class="flex items-center gap-2">
+									<span
+										class="truncate text-[13px] font-medium text-text-primary"
+										>{link.title || hostname(link.url)}</span
+									>
+									<span class="shrink-0 text-[10px] text-text-muted"
+										>{hostname(link.url)}</span
+									>
+								</div>
+								{#if link.description}
+									<span
+										class="truncate text-[11px] text-text-secondary"
+										>{link.description}</span
+									>
+								{/if}
+								{#if (link.tags ?? []).length > 0}
+									<div class="flex items-center gap-1 mt-0.5">
+										{#each link.tags ?? [] as tag}
+											<span
+												class="rounded-sm bg-overlay-light px-1.5 py-0.5 text-[10px] font-medium text-text-secondary"
+												>{tag}</span
+											>
+										{/each}
+										<span class="ml-1 text-[10px] text-text-muted"
+											>{relativeDate(link.createdAtMs)}</span
+										>
+									</div>
+								{:else}
+									<span class="text-[10px] text-text-muted mt-0.5"
+										>{relativeDate(link.createdAtMs)}</span
+									>
+								{/if}
+							</div>
+							<a
+								href={link.url}
+								target="_blank"
+								rel="noopener noreferrer"
+								onclick={(e) => e.stopPropagation()}
+								class="shrink-0 text-text-muted hover:text-accent"
+								title="Open link"
+							>
+								<Icon src={FiExternalLink} size="13" />
+							</a>
 							<button
 								onclick={(e) => removeLink(link.id, e)}
-								class="absolute right-2 top-2 hidden h-6 w-6 items-center justify-center rounded-md text-text-muted hover:bg-error/10 hover:text-error group-hover:flex"
+								class="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-error/10 hover:text-error group-hover:flex"
 								title="Delete"
 							>
 								<Icon src={FiTrash2} size="12" />
 							</button>
-
-							<!-- Header: favicon + title + external link -->
-							<div class="flex items-start gap-2 pr-6">
-								<img
-									src={faviconUrl(link.url)}
-									alt=""
-									class="mt-0.5 h-4 w-4 shrink-0 rounded-sm"
-									onerror={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-								/>
-								<a
-									href={link.url}
-									target="_blank"
-									rel="noopener noreferrer"
-									onclick={(e) => e.stopPropagation()}
-									class="flex-1 truncate text-[12px] font-semibold text-text-primary hover:text-accent"
-								>
-									{link.title || hostname(link.url)}
-								</a>
-								<a
-									href={link.url}
-									target="_blank"
-									rel="noopener noreferrer"
-									onclick={(e) => e.stopPropagation()}
-									class="ml-auto shrink-0 text-text-muted hover:text-accent"
-									title="Open link"
-								>
-									<Icon src={FiExternalLink} size="11" />
-								</a>
-							</div>
-
-							<!-- Description -->
-							{#if link.description}
-								<p class="line-clamp-2 text-[11px] text-text-secondary">{link.description}</p>
-							{/if}
-
-							<!-- Footer: domain + date + tags -->
-							<div class="flex flex-wrap items-center gap-1 mt-auto">
-								<span class="text-[10px] text-text-muted">{hostname(link.url)}</span>
-								<span class="text-text-muted">·</span>
-								<span class="text-[10px] text-text-muted">{relativeDate(link.createdAtMs)}</span>
-								{#each link.tags ?? [] as tag}
-									<button
-										onclick={(e) => { e.stopPropagation(); setTag(tag); }}
-										class="rounded-sm px-1.5 py-0.5 text-[10px] font-medium transition-colors
-											{activeTag === tag ? 'bg-accent text-white' : 'bg-overlay-light text-text-secondary hover:bg-accent hover:text-white'}"
-									>
-										{tag}
-									</button>
-								{/each}
-							</div>
 						</div>
 					{/each}
 				</div>
@@ -275,85 +441,378 @@ async function removeLink(id: string, e: MouseEvent) {
 		</div>
 	</div>
 
-	<!-- Add/Edit panel -->
+	<!-- Detail panel (desktop) -->
 	{#if panelOpen}
-		<!-- Backdrop -->
-		<!-- svelte-ignore a11y_click_events_have_key_events -->
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
-			class="fixed inset-0 z-30 bg-black/20 backdrop-blur-[1px]"
-			onclick={closePanel}
-			role="presentation"
-		></div>
-		<!-- Panel -->
-		<div class="fixed right-0 top-0 z-40 flex h-full w-80 flex-col border-l border-border bg-bg-secondary shadow-elevated">
-			<div class="flex h-11 shrink-0 items-center justify-between border-b border-border px-4">
-				<span class="text-[13px] font-semibold text-text-primary">{editId ? "Edit link" : "Add link"}</span>
-				<button onclick={closePanel} class="text-text-muted hover:text-text-secondary">
-					<Icon src={FiX} size="16" />
-				</button>
-			</div>
-
-			<div class="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
-				<div>
-					<label class="mb-1 block text-[11px] font-medium text-text-muted" for="link-url">URL *</label>
-					<input
-						id="link-url"
-						type="url"
-						bind:value={formUrl}
-						placeholder="https://example.com"
-						class="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
-					/>
-				</div>
-
-				<div>
-					<label class="mb-1 block text-[11px] font-medium text-text-muted" for="link-title">Title</label>
-					<input
-						id="link-title"
-						type="text"
-						bind:value={formTitle}
-						placeholder="Optional title"
-						class="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
-					/>
-				</div>
-
-				<div>
-					<label class="mb-1 block text-[11px] font-medium text-text-muted" for="link-desc">Description</label>
-					<textarea
-						id="link-desc"
-						bind:value={formDescription}
-						placeholder="Optional description"
-						rows="3"
-						class="w-full resize-none rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
-					></textarea>
-				</div>
-
-				<div>
-					<label class="mb-1 block text-[11px] font-medium text-text-muted" for="link-tags">Tags</label>
-					<input
-						id="link-tags"
-						type="text"
-						bind:value={formTags}
-						placeholder="tag1, tag2, tag3"
-						class="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
-					/>
-					<p class="mt-1 text-[10px] text-text-muted">Comma-separated</p>
-				</div>
-
-				{#if formError}
-					<p class="text-[11px] text-error">{formError}</p>
-				{/if}
-			</div>
-
-			<div class="shrink-0 border-t border-border p-4">
-				<button
-					onclick={submitForm}
-					disabled={formSaving}
-					class="w-full rounded-lg bg-accent py-2 text-[12px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+			class="hidden w-80 shrink-0 flex-col border-l border-border bg-bg md:flex"
+		>
+			{#if editId}
+				<!-- Edit mode: auto-save -->
+				<div
+					class="flex items-center justify-between border-b border-border px-4 py-3"
 				>
-					{formSaving ? "Saving…" : editId ? "Save changes" : "Add link"}
-				</button>
-			</div>
+					<h2 class="text-[14px] font-semibold text-text-primary">
+						Edit link
+					</h2>
+					<div class="flex items-center gap-1">
+						<button
+							onclick={() => editId && removeLink(editId)}
+							class="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-overlay-light hover:text-error"
+							title="Delete link"
+						>
+							<Icon src={FiTrash2} size="14" />
+						</button>
+						<button
+							onclick={closePanel}
+							class="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-overlay-light hover:text-text-secondary"
+						>
+							<Icon src={FiX} size="14" />
+						</button>
+					</div>
+				</div>
+				<div class="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+					<div>
+						<label
+							class="mb-1 block text-[11px] font-medium text-text-muted"
+							for="link-url">URL</label
+						>
+						<input
+							id="link-url"
+							type="url"
+							bind:value={formUrl}
+							placeholder="https://example.com"
+							class="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
+							onblur={() =>
+								autoSave({ url: formUrl.trim() })}
+						/>
+					</div>
+					<div>
+						<label
+							class="mb-1 block text-[11px] font-medium text-text-muted"
+							for="link-title">Title</label
+						>
+						<input
+							id="link-title"
+							type="text"
+							bind:value={formTitle}
+							placeholder="Optional title"
+							class="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
+							onblur={() =>
+								autoSave({
+									title: formTitle.trim(),
+								})}
+						/>
+					</div>
+					<div>
+						<label
+							class="mb-1 block text-[11px] font-medium text-text-muted"
+							for="link-desc">Description</label
+						>
+						<textarea
+							id="link-desc"
+							bind:value={formDescription}
+							placeholder="Optional description"
+							rows="3"
+							class="w-full resize-none rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
+							onblur={() =>
+								autoSave({
+									description: formDescription.trim(),
+								})}
+						></textarea>
+					</div>
+					<div>
+						<label
+							class="mb-1 block text-[11px] font-medium text-text-muted"
+							for="link-tags">Tags</label
+						>
+						<input
+							id="link-tags"
+							type="text"
+							bind:value={formTags}
+							placeholder="tag1, tag2, tag3"
+							class="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
+							onblur={() =>
+								autoSave({
+									tags: parseTags(formTags),
+								})}
+						/>
+						<p class="mt-1 text-[10px] text-text-muted">
+							Comma-separated
+						</p>
+					</div>
+				</div>
+			{:else}
+				<!-- Add mode: form with submit -->
+				<form
+					onsubmit={handleAddSubmit}
+					class="flex flex-1 flex-col overflow-hidden"
+				>
+					<div
+						class="flex items-center justify-between border-b border-border px-4 py-3"
+					>
+						<h2
+							class="text-[14px] font-semibold text-text-primary"
+						>
+							Add link
+						</h2>
+						<button
+							type="button"
+							onclick={closePanel}
+							class="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-overlay-light hover:text-text-secondary"
+						>
+							<Icon src={FiX} size="14" />
+						</button>
+					</div>
+					<div
+						class="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
+					>
+						<div>
+							<label
+								class="mb-1 block text-[11px] font-medium text-text-muted"
+								for="link-url-add">URL *</label
+							>
+							<input
+								id="link-url-add"
+								type="url"
+								bind:value={formUrl}
+								placeholder="https://example.com"
+								class="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
+							/>
+						</div>
+						<div>
+							<label
+								class="mb-1 block text-[11px] font-medium text-text-muted"
+								for="link-title-add">Title</label
+							>
+							<input
+								id="link-title-add"
+								type="text"
+								bind:value={formTitle}
+								placeholder="Optional title"
+								class="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
+							/>
+						</div>
+						<div>
+							<label
+								class="mb-1 block text-[11px] font-medium text-text-muted"
+								for="link-desc-add">Description</label
+							>
+							<textarea
+								id="link-desc-add"
+								bind:value={formDescription}
+								placeholder="Optional description"
+								rows="3"
+								class="w-full resize-none rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
+							></textarea>
+						</div>
+						<div>
+							<label
+								class="mb-1 block text-[11px] font-medium text-text-muted"
+								for="link-tags-add">Tags</label
+							>
+							<input
+								id="link-tags-add"
+								type="text"
+								bind:value={formTags}
+								placeholder="tag1, tag2, tag3"
+								class="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
+							/>
+							<p class="mt-1 text-[10px] text-text-muted">
+								Comma-separated
+							</p>
+						</div>
+					</div>
+					<div class="border-t border-border px-4 py-3">
+						<button
+							type="submit"
+							disabled={!formUrl.trim()}
+							class="w-full rounded-lg bg-accent py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+						>
+							Add Link
+						</button>
+					</div>
+				</form>
+			{/if}
+		</div>
+
+		<!-- Mobile full-screen panel -->
+		<div class="fixed inset-0 z-40 flex flex-col bg-bg md:hidden">
+			{#if editId}
+				<div
+					class="flex items-center gap-2 border-b border-border px-3 py-2"
+					style="padding-top: max(env(safe-area-inset-top, 0px), 10px)"
+				>
+					<button
+						onclick={closePanel}
+						class="flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary hover:bg-overlay-light"
+					>
+						<Icon src={FiArrowLeft} size="18" />
+					</button>
+					<span class="flex-1"></span>
+					<button
+						onclick={() => editId && removeLink(editId)}
+						class="flex h-9 w-9 items-center justify-center rounded-lg text-text-muted hover:bg-overlay-light hover:text-error"
+					>
+						<Icon src={FiTrash2} size="17" />
+					</button>
+				</div>
+				<div class="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+					<div>
+						<label
+							class="mb-1 block text-[12px] font-medium text-text-muted"
+							for="m-link-url">URL</label
+						>
+						<input
+							id="m-link-url"
+							type="url"
+							bind:value={formUrl}
+							placeholder="https://example.com"
+							class="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-[14px] text-text-primary outline-none focus:border-accent"
+							onblur={() =>
+								autoSave({ url: formUrl.trim() })}
+						/>
+					</div>
+					<div>
+						<label
+							class="mb-1 block text-[12px] font-medium text-text-muted"
+							for="m-link-title">Title</label
+						>
+						<input
+							id="m-link-title"
+							type="text"
+							bind:value={formTitle}
+							placeholder="Optional title"
+							class="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-[14px] text-text-primary outline-none focus:border-accent"
+							onblur={() =>
+								autoSave({
+									title: formTitle.trim(),
+								})}
+						/>
+					</div>
+					<div>
+						<label
+							class="mb-1 block text-[12px] font-medium text-text-muted"
+							for="m-link-desc">Description</label
+						>
+						<textarea
+							id="m-link-desc"
+							bind:value={formDescription}
+							placeholder="Optional description"
+							rows="4"
+							class="w-full resize-none rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-[14px] text-text-primary outline-none focus:border-accent"
+							onblur={() =>
+								autoSave({
+									description: formDescription.trim(),
+								})}
+						></textarea>
+					</div>
+					<div>
+						<label
+							class="mb-1 block text-[12px] font-medium text-text-muted"
+							for="m-link-tags">Tags</label
+						>
+						<input
+							id="m-link-tags"
+							type="text"
+							bind:value={formTags}
+							placeholder="tag1, tag2, tag3"
+							class="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-[14px] text-text-primary outline-none focus:border-accent"
+							onblur={() =>
+								autoSave({
+									tags: parseTags(formTags),
+								})}
+						/>
+						<p class="mt-1 text-[11px] text-text-muted">
+							Comma-separated
+						</p>
+					</div>
+				</div>
+			{:else}
+				<form
+					onsubmit={handleAddSubmit}
+					class="flex flex-1 flex-col overflow-hidden"
+				>
+					<div
+						class="flex items-center gap-2 border-b border-border px-3 py-2"
+						style="padding-top: max(env(safe-area-inset-top, 0px), 10px)"
+					>
+						<button
+							type="button"
+							onclick={closePanel}
+							class="flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary hover:bg-overlay-light"
+						>
+							<Icon src={FiArrowLeft} size="18" />
+						</button>
+						<span class="flex-1"></span>
+						<button
+							type="submit"
+							disabled={!formUrl.trim()}
+							class="flex h-9 items-center rounded-lg bg-accent px-4 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+						>
+							Add
+						</button>
+					</div>
+					<div
+						class="flex flex-1 flex-col gap-4 overflow-y-auto p-4"
+					>
+						<div>
+							<label
+								class="mb-1 block text-[12px] font-medium text-text-muted"
+								for="m-link-url-add">URL *</label
+							>
+							<input
+								id="m-link-url-add"
+								type="url"
+								bind:value={formUrl}
+								placeholder="https://example.com"
+								class="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-[14px] text-text-primary outline-none focus:border-accent"
+							/>
+						</div>
+						<div>
+							<label
+								class="mb-1 block text-[12px] font-medium text-text-muted"
+								for="m-link-title-add">Title</label
+							>
+							<input
+								id="m-link-title-add"
+								type="text"
+								bind:value={formTitle}
+								placeholder="Optional title"
+								class="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-[14px] text-text-primary outline-none focus:border-accent"
+							/>
+						</div>
+						<div>
+							<label
+								class="mb-1 block text-[12px] font-medium text-text-muted"
+								for="m-link-desc-add">Description</label
+							>
+							<textarea
+								id="m-link-desc-add"
+								bind:value={formDescription}
+								placeholder="Optional description"
+								rows="4"
+								class="w-full resize-none rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-[14px] text-text-primary outline-none focus:border-accent"
+							></textarea>
+						</div>
+						<div>
+							<label
+								class="mb-1 block text-[12px] font-medium text-text-muted"
+								for="m-link-tags-add">Tags</label
+							>
+							<input
+								id="m-link-tags-add"
+								type="text"
+								bind:value={formTags}
+								placeholder="tag1, tag2, tag3"
+								class="w-full rounded-lg border border-border bg-bg-tertiary px-3 py-2 text-[14px] text-text-primary outline-none focus:border-accent"
+							/>
+							<p class="mt-1 text-[11px] text-text-muted">
+								Comma-separated
+							</p>
+						</div>
+					</div>
+				</form>
+			{/if}
 		</div>
 	{/if}
 </div>
