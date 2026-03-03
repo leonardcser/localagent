@@ -53,10 +53,15 @@ func (s *Server) handleSPA(c *echo.Context) error {
 	}
 
 	staticSub, _ := fs.Sub(staticFiles, "static")
-	f, err := staticSub.Open(strings.TrimPrefix(path, "/"))
-	if err == nil {
-		f.Close()
-		return echo.StaticDirectoryHandler(staticSub, false)(c)
+	clean := strings.TrimPrefix(path, "/")
+	if clean != "" {
+		if f, err := staticSub.Open(clean); err == nil {
+			f.Close()
+			if strings.HasPrefix(clean, "_app/immutable/") {
+				c.Response().Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			}
+			return echo.StaticDirectoryHandler(staticSub, false)(c)
+		}
 	}
 
 	index, err := fs.ReadFile(staticSub, "index.html")
@@ -64,6 +69,7 @@ func (s *Server) handleSPA(c *echo.Context) error {
 		return echo.ErrNotFound
 	}
 
+	c.Response().Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	return c.HTML(http.StatusOK, string(index))
 }
 
