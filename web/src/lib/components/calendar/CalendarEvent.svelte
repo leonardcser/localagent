@@ -131,6 +131,7 @@ $effect(() => {
 				grid={[colWidth, rowHeight / 4]}
 				disabled={!event.draggable || resizing}
 				onDragEnd={onDragEnd ?? null}
+				onclick={onViewTask ? () => onViewTask(event.taskId) : null}
 			>
 				<div
 					class="h-full rounded-sm border-l-2 px-1.5 pt-0.5 pb-1 text-[11px] backdrop-blur-sm select-none overflow-hidden"
