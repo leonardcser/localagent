@@ -102,9 +102,38 @@ let draggableRef = $state<{ reset: () => void }>();
 $effect(() => {
   if (draggableRef && event.draggable) draggableRef.reset();
 });
+
+// --- Click-to-view (bypasses ContextMenu.Trigger event interception) ---
+const CLICK_THRESHOLD = 4;
+let clickPending = $state(false);
+let clickMovement = 0;
+
+function handleEventMouseDown(e: MouseEvent) {
+  if (e.button !== 0) return;
+  clickPending = true;
+  clickMovement = 0;
+}
+
+function handleEventMouseMove(e: MouseEvent) {
+  if (!clickPending) return;
+  clickMovement += Math.abs(e.movementX) + Math.abs(e.movementY);
+  if (clickMovement >= CLICK_THRESHOLD) {
+    clickPending = false;
+  }
+}
+
+function handleEventMouseUp() {
+  if (clickPending) {
+    clickPending = false;
+    onViewTask?.(event.taskId);
+  }
+}
 </script>
 
-<svelte:window onmousemove={handleResizeMove} onmouseup={handleResizeUp} />
+<svelte:window
+  onmousemove={(e) => { handleResizeMove(e); handleEventMouseMove(e); }}
+  onmouseup={() => { handleResizeUp(); handleEventMouseUp(); }}
+/>
 
 <div
 	class="absolute"
@@ -116,6 +145,7 @@ $effect(() => {
 	"
 	role="presentation"
 	onclick={(e) => e.stopPropagation()}
+	onmousedown={handleEventMouseDown}
 >
 	<ContextMenu.Root>
 		<ContextMenu.Trigger class="block h-full w-full">
@@ -131,7 +161,7 @@ $effect(() => {
 				grid={[colWidth, rowHeight / 4]}
 				disabled={!event.draggable || resizing}
 				onDragEnd={onDragEnd ?? null}
-				onclick={onViewTask ? () => onViewTask(event.taskId) : null}
+				onclick={null}
 			>
 				<div
 					class="h-full rounded-sm border-l-2 px-1.5 pt-0.5 pb-1 text-[11px] backdrop-blur-sm select-none overflow-hidden"

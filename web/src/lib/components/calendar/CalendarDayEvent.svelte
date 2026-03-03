@@ -13,24 +13,46 @@ interface Props {
 
 let { event, colWidth, onMove, onViewTask }: Props = $props();
 
+const DRAG_THRESHOLD = 4;
+
 let dragging = $state(false);
+let pending = $state(false);
 let deltaX = $state(0);
 let startX = 0;
+let totalMovement = 0;
 
-function startDrag(e: MouseEvent) {
-  if (!onMove || e.button !== 0) return;
+function handleMouseDown(e: MouseEvent) {
+  if (e.button !== 0) return;
   e.preventDefault();
-  dragging = true;
+  pending = true;
   startX = e.clientX;
   deltaX = 0;
+  totalMovement = 0;
 }
 
 function handleMove(e: MouseEvent) {
-  if (!dragging) return;
+  if (!pending && !dragging) return;
+
+  if (pending) {
+    totalMovement += Math.abs(e.movementX) + Math.abs(e.movementY);
+    if (totalMovement >= DRAG_THRESHOLD && onMove) {
+      pending = false;
+      dragging = true;
+    } else if (totalMovement >= DRAG_THRESHOLD) {
+      pending = false;
+    }
+    return;
+  }
+
   deltaX = e.clientX - startX;
 }
 
 function handleUp() {
+  if (pending) {
+    pending = false;
+    onViewTask?.(event.taskId);
+    return;
+  }
   if (!dragging) return;
   dragging = false;
   const colDelta = Math.round(deltaX / colWidth);
@@ -46,7 +68,7 @@ function handleUp() {
 		<div
 			class="truncate rounded-sm border-l-2 px-1.5 py-0.5 text-[11px] font-semibold select-none transition-opacity"
 			class:cursor-grabbing={dragging}
-			class:cursor-grab={!dragging && !!onMove}
+			class:cursor-pointer={!dragging}
 			class:opacity-60={dragging}
 			style="
 				background-color: color-mix(in srgb, {event.color} 15%, transparent);
@@ -58,7 +80,7 @@ function handleUp() {
 			"
 			role="button"
 			tabindex="0"
-			onmousedown={startDrag}
+			onmousedown={handleMouseDown}
 			onkeydown={() => {}}
 		>
 			{event.title}
