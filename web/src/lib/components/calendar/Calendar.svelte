@@ -12,6 +12,8 @@ import {
 } from "$lib/calendar";
 import CalendarHeader from "./CalendarHeader.svelte";
 import CalendarBody from "./CalendarBody.svelte";
+import TaskDetailPanel from "$lib/components/TaskDetailPanel.svelte";
+import type { Task } from "$lib/api";
 
 interface Props {
 	indexColWidth?: number;
@@ -22,6 +24,35 @@ let { indexColWidth = 52, rowHeight = 48 }: Props = $props();
 
 let view = $state<CalendarView>("week");
 let currentDate = $state(new Date());
+
+// Task detail panel
+let detailTask = $state<Task | null>(null);
+let detailPanelMode = $state<"add" | "edit">("edit");
+let detailPanelOpen = $state(false);
+let addParentId = $state("");
+
+function openTaskDetail(taskId: string) {
+	const task = taskStore.tasks.find((t) => t.id === taskId);
+	if (task) {
+		taskStore.selectedId = taskId;
+		detailTask = task;
+		detailPanelMode = "edit";
+		detailPanelOpen = true;
+	}
+}
+
+function openAddTask(parentId = "") {
+	taskStore.selectedId = "";
+	detailTask = null;
+	detailPanelMode = "add";
+	addParentId = parentId;
+	detailPanelOpen = true;
+}
+
+function closeDetail() {
+	detailPanelOpen = false;
+	detailTask = null;
+}
 
 let numCols = $derived(view === "day" ? 1 : view === "3day" ? 3 : 7);
 
@@ -84,11 +115,23 @@ let events = $derived.by(() => {
 		{goToToday}
 		setView={(v) => (view = v)}
 	/>
-	<CalendarBody
-		{events}
-		{indexColWidth}
-		{rowHeight}
-		{viewStart}
-		{numCols}
-	/>
+	<div class="flex flex-1 overflow-hidden">
+		<CalendarBody
+			{events}
+			{indexColWidth}
+			{rowHeight}
+			{viewStart}
+			{numCols}
+			onViewTask={openTaskDetail}
+		/>
+		{#if detailPanelOpen}
+			<TaskDetailPanel
+				task={detailPanelMode === "edit" ? detailTask : null}
+				parentId={addParentId}
+				onClose={closeDetail}
+				onSelectTask={(t) => openTaskDetail(t.id)}
+				onAddSubtask={openAddTask}
+			/>
+		{/if}
+	</div>
 </div>

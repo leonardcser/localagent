@@ -155,13 +155,15 @@ $effect(() => {
 			<ContextMenu.Content
 				class="z-50 min-w-[140px] rounded-lg border border-border bg-bg-secondary p-1 shadow-elevated"
 			>
-				<ContextMenu.Item
-					class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary outline-none hover:bg-overlay-light hover:text-text-primary"
-					onSelect={() => onViewTask?.(event.taskId)}
-				>
-					<Icon src={FiExternalLink} size="12" className="text-text-muted" />
-					View task
-				</ContextMenu.Item>
+				{#if onViewTask}
+					<ContextMenu.Item
+						class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary outline-none hover:bg-overlay-light hover:text-text-primary"
+						onSelect={() => onViewTask(event.taskId)}
+					>
+						<Icon src={FiExternalLink} size="12" className="text-text-muted" />
+						Edit task
+					</ContextMenu.Item>
+				{/if}
 
 				{#if event.blockId && onDelete}
 					<ContextMenu.Separator class="my-1 border-t border-border" />

@@ -8,7 +8,6 @@ import {
 } from "$lib/calendar";
 import { blockStore } from "$lib/stores/block.svelte";
 import { taskStore } from "$lib/stores/task.svelte";
-import { goto } from "$app/navigation";
 import { onMount } from "svelte";
 import { Icon } from "svelte-icons-pack";
 import { FiX } from "svelte-icons-pack/fi";
@@ -22,9 +21,10 @@ interface Props {
 	rowHeight: number;
 	viewStart: Date;
 	numCols: number;
+	onViewTask?: (taskId: string) => void;
 }
 
-let { events, indexColWidth, rowHeight, viewStart, numCols }: Props = $props();
+let { events, indexColWidth, rowHeight, viewStart, numCols, onViewTask }: Props = $props();
 
 let timedEvents = $derived(events.filter((e) => !e.isAllDay));
 let dayEvents = $derived(events.filter((e) => e.isAllDay));
@@ -179,7 +179,7 @@ let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
 						event={evt}
 						{colWidth}
 						onMove={(delta) => handleAllDayMove(evt, colI, delta)}
-						onViewTask={(taskId) => goto(`/tasks?select=${taskId}`)}
+						onViewTask={onViewTask}
 					/>
 				{/each}
 			</div>
@@ -227,7 +227,7 @@ let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
 				onDragEnd={(d) => handleDragEnd(event, d)}
 				onResize={(newEnd) => handleResize(event, newEnd)}
 				onDelete={event.blockId ? () => blockStore.remove(event.blockId!) : undefined}
-				onViewTask={(taskId) => goto(`/tasks?select=${taskId}`)}
+				onViewTask={onViewTask}
 			/>
 		{/each}
 
