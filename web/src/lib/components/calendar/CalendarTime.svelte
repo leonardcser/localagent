@@ -1,44 +1,42 @@
 <script lang="ts">
 import { onMount } from "svelte";
-import { dayToIndex, isSameDay, addDays } from "$lib/calendar";
+import { isSameDay, addDays } from "$lib/calendar";
 
 interface Props {
-  rowHeight: number;
-  yOffset: number;
-  weekStart: Date;
+	rowHeight: number;
+	yOffset: number;
+	viewStart: Date;
+	numCols: number;
 }
 
-let { rowHeight, yOffset, weekStart }: Props = $props();
+let { rowHeight, yOffset, viewStart, numCols }: Props = $props();
 
 let now = $state(new Date());
 
 let top = $derived(
-  yOffset +
-    rowHeight * now.getHours() +
-    (rowHeight / 60) * now.getMinutes() +
-    1,
+	yOffset + rowHeight * now.getHours() + (rowHeight / 60) * now.getMinutes() + 1,
 );
 
 let dayIndex = $derived.by(() => {
-  for (let i = 0; i < 7; i++) {
-    if (isSameDay(now, addDays(weekStart, i))) return i;
-  }
-  return -1;
+	for (let i = 0; i < numCols; i++) {
+		if (isSameDay(now, addDays(viewStart, i))) return i;
+	}
+	return -1;
 });
 
 onMount(() => {
-  const interval = setInterval(() => {
-    now = new Date();
-  }, 60000);
-  return () => clearInterval(interval);
+	const interval = setInterval(() => {
+		now = new Date();
+	}, 60000);
+	return () => clearInterval(interval);
 });
 
 function formatTime(d: Date): string {
-  return d.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+	return d.toLocaleTimeString(undefined, {
+		hour: "2-digit",
+		minute: "2-digit",
+		hour12: false,
+	});
 }
 </script>
 
@@ -49,7 +47,7 @@ function formatTime(d: Date): string {
 	>
 		<div
 			class="absolute rounded-full"
-			style="left: calc(({dayIndex} * 100% / 7) - 4px); width: 8px; height: 8px; background: var(--color-error)"
+			style="left: calc({dayIndex} * 100% / {numCols} - 4px); width: 8px; height: 8px; background: var(--color-error)"
 		></div>
 		<div
 			class="absolute rounded-sm px-1 text-[10px] font-medium backdrop-blur-sm"

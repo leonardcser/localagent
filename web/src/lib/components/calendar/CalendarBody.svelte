@@ -1,10 +1,10 @@
 <script lang="ts">
 import {
-  computeCalendarEventsOverlaps,
-  calculateNewEventTime,
-  addDays,
-  isSameDay,
-  type CalendarEvent as CalendarEventType,
+	computeCalendarEventsOverlaps,
+	calculateNewEventTime,
+	addDays,
+	isSameDay,
+	type CalendarEvent as CalendarEventType,
 } from "$lib/calendar";
 import { blockStore } from "$lib/stores/block.svelte";
 import { taskStore } from "$lib/stores/task.svelte";
@@ -17,13 +17,14 @@ import CalendarEventComp from "./CalendarEvent.svelte";
 import CalendarDayEvent from "./CalendarDayEvent.svelte";
 
 interface Props {
-  events: CalendarEventType[];
-  indexColWidth: number;
-  rowHeight: number;
-  weekStart: Date;
+	events: CalendarEventType[];
+	indexColWidth: number;
+	rowHeight: number;
+	viewStart: Date;
+	numCols: number;
 }
 
-let { events, indexColWidth, rowHeight, weekStart }: Props = $props();
+let { events, indexColWidth, rowHeight, viewStart, numCols }: Props = $props();
 
 let timedEvents = $derived(events.filter((e) => !e.isAllDay));
 let dayEvents = $derived(events.filter((e) => e.isAllDay));
@@ -31,17 +32,17 @@ let dayEvents = $derived(events.filter((e) => e.isAllDay));
 let eventsWithOverlap = $derived(computeCalendarEventsOverlaps(timedEvents));
 
 let dayEventsByCol = $derived.by(() => {
-  const byCol: CalendarEventType[][] = Array.from({ length: 7 }, () => []);
-  for (const evt of dayEvents) {
-    const d = new Date(evt.startMs);
-    for (let i = 0; i < 7; i++) {
-      if (isSameDay(d, addDays(weekStart, i))) {
-        byCol[i].push(evt);
-        break;
-      }
-    }
-  }
-  return byCol;
+	const byCol: CalendarEventType[][] = Array.from({ length: numCols }, () => []);
+	for (const evt of dayEvents) {
+		const d = new Date(evt.startMs);
+		for (let i = 0; i < numCols; i++) {
+			if (isSameDay(d, addDays(viewStart, i))) {
+				byCol[i].push(evt);
+				break;
+			}
+		}
+	}
+	return byCol;
 });
 
 let scrollableRef = $state<HTMLDivElement>();
@@ -49,113 +50,137 @@ let calendarBodyRef = $state<HTMLDivElement>();
 let calendarWidth = $state(0);
 
 onMount(() => {
-  if (scrollableRef) {
-    const saved = localStorage.getItem("calendarScrollY");
-    if (saved) {
-      scrollableRef.scrollTo(0, parseInt(saved));
-    } else {
-      scrollableRef.scrollTo(0, new Date().getHours() * rowHeight);
-    }
-  }
+	if (scrollableRef) {
+		const saved = localStorage.getItem("calendarScrollY");
+		if (saved) {
+			scrollableRef.scrollTo(0, parseInt(saved));
+		} else {
+			scrollableRef.scrollTo(0, new Date().getHours() * rowHeight);
+		}
+	}
 
-  if (calendarBodyRef) {
-    calendarWidth = calendarBodyRef.clientWidth;
-    const ro = new ResizeObserver(() => {
-      if (calendarBodyRef) calendarWidth = calendarBodyRef.clientWidth;
-    });
-    ro.observe(calendarBodyRef);
-    return () => ro.disconnect();
-  }
+	if (calendarBodyRef) {
+		calendarWidth = calendarBodyRef.clientWidth;
+		const ro = new ResizeObserver(() => {
+			if (calendarBodyRef) calendarWidth = calendarBodyRef.clientWidth;
+		});
+		ro.observe(calendarBodyRef);
+		return () => ro.disconnect();
+	}
 });
 
 function handleScroll() {
-  if (scrollableRef) {
-    localStorage.setItem("calendarScrollY", String(scrollableRef.scrollTop));
-  }
+	if (scrollableRef) {
+		localStorage.setItem("calendarScrollY", String(scrollableRef.scrollTop));
+	}
 }
 
+// --- Timed event drag ---
 function handleDragEnd(
-  event: CalendarEventType & { overlapIndex: number; overlapCount: number },
-  delta: { x: number; y: number },
+	event: CalendarEventType & { overlapIndex: number; overlapCount: number },
+	delta: { x: number; y: number },
 ) {
-  if (!event.blockId) return;
-  const newTime = calculateNewEventTime(event, delta, calendarWidth, rowHeight);
-  blockStore.update(event.blockId, {
-    startAtMs: newTime.startMs,
-    endAtMs: newTime.endMs,
-  });
+	if (!event.blockId) return;
+	const newTime = calculateNewEventTime(
+		event,
+		delta,
+		calendarWidth,
+		rowHeight,
+		numCols,
+		viewStart,
+	);
+	blockStore.update(event.blockId, {
+		startAtMs: newTime.startMs,
+		endAtMs: newTime.endMs,
+	});
+}
+
+// --- Timed event resize ---
+function handleResize(event: CalendarEventType, newEndMs: number) {
+	if (!event.blockId) return;
+	blockStore.update(event.blockId, { endAtMs: newEndMs });
+}
+
+// --- All-day event drag (task due date change) ---
+function handleAllDayMove(event: CalendarEventType, colI: number, colDelta: number) {
+	const newCol = Math.max(0, Math.min(numCols - 1, colI + colDelta));
+	const newDate = addDays(viewStart, newCol);
+	const dateStr = newDate.toISOString().slice(0, 10);
+	taskStore.update(event.taskId, { due: dateStr });
 }
 
 function formatHour(hour: number): string {
-  return `${hour.toString().padStart(2, "0")}:00`;
+	return `${hour.toString().padStart(2, "0")}:00`;
 }
 
 let rowStartOffset = $derived(rowHeight / 2);
+let colWidth = $derived(calendarWidth / numCols);
 
 // --- Click-to-create ---
 
 interface CreateState {
-  startMs: number;
-  endMs: number;
-  taskId: string;
-  note: string;
+	startMs: number;
+	endMs: number;
+	taskId: string;
+	note: string;
 }
 
 let createState = $state<CreateState | null>(null);
 
 function msToTimeStr(ms: number): string {
-  const d = new Date(ms);
-  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+	const d = new Date(ms);
+	return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
 function handleGridClick(e: MouseEvent) {
-  if (!calendarBodyRef || !calendarWidth) return;
-  // Ignore clicks that originated on event blocks
-  const target = e.target as HTMLElement;
-  if (target.closest("[data-calendar-event]")) return;
+	if (!calendarBodyRef || !calendarWidth) return;
+	const rect = calendarBodyRef.getBoundingClientRect();
+	const x = e.clientX - rect.left;
+	const y = e.clientY - rect.top - rowStartOffset;
+	if (y < 0) return;
 
-  const rect = calendarBodyRef.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top - rowStartOffset;
-  if (y < 0) return;
+	const col = Math.max(0, Math.min(numCols - 1, Math.floor((x / calendarWidth) * numCols)));
+	const totalMinutes = Math.floor(((y / rowHeight) * 60) / 15) * 15;
+	const hours = Math.floor(totalMinutes / 60);
+	const minutes = totalMinutes % 60;
 
-  const colIndex = Math.floor((x / calendarWidth) * 7);
-  const totalMinutes = Math.floor(((y / rowHeight) * 60) / 15) * 15;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
+	const day = addDays(viewStart, col);
+	day.setHours(hours, minutes, 0, 0);
+	const startMs = day.getTime();
+	const endMs = startMs + 3600000;
 
-  const day = addDays(weekStart, colIndex);
-  day.setHours(hours, minutes, 0, 0);
-  const startMs = day.getTime();
-  const endMs = startMs + 60 * 60 * 1000; // default 1h
-
-  createState = { startMs, endMs, taskId: "", note: "" };
+	createState = { startMs, endMs, taskId: "", note: "" };
 }
 
 async function submitCreate() {
-  if (!createState || !createState.taskId) return;
-  await blockStore.add({
-    taskId: createState.taskId,
-    startAtMs: createState.startMs,
-    endAtMs: createState.endMs,
-    note: createState.note || undefined,
-  });
-  createState = null;
+	if (!createState || !createState.taskId) return;
+	await blockStore.add({
+		taskId: createState.taskId,
+		startAtMs: createState.startMs,
+		endAtMs: createState.endMs,
+		note: createState.note || undefined,
+	});
+	createState = null;
 }
 
 let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
 </script>
 
-<!-- All-day events -->
+<!-- All-day events row -->
 {#if dayEvents.length > 0}
 	<div
-		class="grid auto-rows-min grid-cols-7 border-b border-border"
-		style="padding-left: {indexColWidth}px"
+		class="grid auto-rows-min border-b border-border"
+		style="padding-left: {indexColWidth}px; grid-template-columns: repeat({numCols}, 1fr)"
 	>
-		{#each dayEventsByCol as col}
+		{#each dayEventsByCol as col, colI}
 			<div class="min-h-[28px] border-r border-border/50 px-0.5 py-0.5">
 				{#each col as evt}
-					<CalendarDayEvent event={evt} />
+					<CalendarDayEvent
+						event={evt}
+						{colWidth}
+						onMove={(delta) => handleAllDayMove(evt, colI, delta)}
+						onViewTask={(taskId) => goto(`/tasks?select=${taskId}`)}
+					/>
 				{/each}
 			</div>
 		{/each}
@@ -168,7 +193,8 @@ let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
 	bind:this={scrollableRef}
 	onscroll={handleScroll}
 >
-	<div style="width: {indexColWidth}px">
+	<!-- Hour labels -->
+	<div class="shrink-0" style="width: {indexColWidth}px">
 		{#each Array.from({ length: 25 }) as _, hour}
 			<div
 				class="flex items-center justify-center text-[10px] text-text-muted"
@@ -178,14 +204,17 @@ let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
 			</div>
 		{/each}
 	</div>
+
+	<!-- Grid -->
 	<div
-		class="relative grid flex-1 grid-cols-7 cursor-crosshair"
+		class="relative grid flex-1 cursor-crosshair"
 		role="presentation"
+		style="grid-template-columns: repeat({numCols}, 1fr)"
 		bind:this={calendarBodyRef}
 		onclick={handleGridClick}
 		onkeydown={() => {}}
 	>
-		<CalendarTime {rowHeight} yOffset={rowStartOffset} {weekStart} />
+		<CalendarTime {rowHeight} yOffset={rowStartOffset} {viewStart} {numCols} />
 
 		{#each eventsWithOverlap as event}
 			<CalendarEventComp
@@ -193,15 +222,17 @@ let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
 				{calendarWidth}
 				{rowHeight}
 				yOffset={rowStartOffset}
-				{weekStart}
+				{viewStart}
+				{numCols}
 				onDragEnd={(d) => handleDragEnd(event, d)}
+				onResize={(newEnd) => handleResize(event, newEnd)}
 				onDelete={event.blockId ? () => blockStore.remove(event.blockId!) : undefined}
 				onViewTask={(taskId) => goto(`/tasks?select=${taskId}`)}
 			/>
 		{/each}
 
-		<!-- Start padding -->
-		{#each Array.from({ length: 7 }) as _}
+		<!-- Half-row top padding -->
+		{#each Array.from({ length: numCols }) as _}
 			<div
 				class="border-b border-r border-border/50"
 				style="height: {rowStartOffset}px"
@@ -209,12 +240,9 @@ let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
 		{/each}
 
 		<!-- Hour cells -->
-		{#each Array.from({ length: 24 }) as _, hour}
-			{#each Array.from({ length: 7 }) as _}
-				<div
-					class="border-b border-r border-border/50"
-					style="height: {rowHeight}px"
-				></div>
+		{#each Array.from({ length: 24 }) as _}
+			{#each Array.from({ length: numCols }) as _}
+				<div class="border-b border-r border-border/50" style="height: {rowHeight}px"></div>
 			{/each}
 		{/each}
 	</div>
@@ -239,7 +267,11 @@ let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
 		</div>
 
 		<div class="mb-3 rounded-lg bg-bg-tertiary px-3 py-2 text-[12px] text-text-secondary">
-			{new Date(createState.startMs).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+			{new Date(createState.startMs).toLocaleDateString(undefined, {
+				weekday: "short",
+				month: "short",
+				day: "numeric",
+			})}
 			<span class="mx-1 text-text-muted">·</span>
 			<input
 				type="time"
@@ -285,7 +317,9 @@ let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
 		</div>
 
 		<div class="mb-4">
-			<label for="create-block-note" class="mb-1 block text-[11px] text-text-muted">Note (optional)</label>
+			<label for="create-block-note" class="mb-1 block text-[11px] text-text-muted"
+				>Note (optional)</label
+			>
 			<input
 				id="create-block-note"
 				type="text"

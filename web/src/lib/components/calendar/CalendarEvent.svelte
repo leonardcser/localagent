@@ -7,64 +7,107 @@ import { FiExternalLink, FiTrash2 } from "svelte-icons-pack/fi";
 import Draggable from "./Draggable.svelte";
 
 interface Props {
-  event: EventWithOverlap;
-  calendarWidth: number;
-  rowHeight: number;
-  yOffset: number;
-  weekStart: Date;
-  onDragEnd?: (delta: { x: number; y: number }) => void;
-  onDelete?: () => void;
-  onViewTask?: (taskId: string) => void;
+	event: EventWithOverlap;
+	calendarWidth: number;
+	rowHeight: number;
+	yOffset: number;
+	viewStart: Date;
+	numCols: number;
+	onDragEnd?: (delta: { x: number; y: number }) => void;
+	onResize?: (newEndMs: number) => void;
+	onDelete?: () => void;
+	onViewTask?: (taskId: string) => void;
 }
 
 let {
-  event,
-  calendarWidth,
-  rowHeight,
-  yOffset,
-  weekStart,
-  onDragEnd,
-  onDelete,
-  onViewTask,
+	event,
+	calendarWidth,
+	rowHeight,
+	yOffset,
+	viewStart,
+	numCols,
+	onDragEnd,
+	onResize,
+	onDelete,
+	onViewTask,
 }: Props = $props();
 
 let start = $derived(new Date(event.startMs));
 let durationMin = $derived((event.endMs - event.startMs) / 60000);
 
 let colIndex = $derived.by(() => {
-  for (let i = 0; i < 7; i++) {
-    if (isSameDay(start, addDays(weekStart, i))) return i;
-  }
-  return 0;
+	for (let i = 0; i < numCols; i++) {
+		if (isSameDay(start, addDays(viewStart, i))) return i;
+	}
+	return 0;
 });
 
-let top = $derived(
-  start.getHours() * rowHeight + (start.getMinutes() / 60) * rowHeight,
-);
-let left = $derived((100 / event.overlapCount) * event.overlapIndex);
-let height = $derived((durationMin / 60) * rowHeight);
-let width = $derived(100 / event.overlapCount);
+let colWidth = $derived(calendarWidth / numCols);
+let top = $derived(start.getHours() * rowHeight + (start.getMinutes() / 60) * rowHeight);
+let leftPct = $derived((100 / event.overlapCount) * event.overlapIndex);
+let widthPct = $derived(100 / event.overlapCount);
+// min height = 15 min
+let baseHeight = $derived(Math.max((durationMin / 60) * rowHeight, rowHeight / 4));
+
+// --- Resize ---
+let resizing = $state(false);
+let resizeDeltaY = $state(0);
+let resizeStartY = 0;
+
+function startResize(e: MouseEvent) {
+	e.stopPropagation();
+	e.preventDefault();
+	resizing = true;
+	resizeStartY = e.clientY;
+	resizeDeltaY = 0;
+}
+
+function handleResizeMove(e: MouseEvent) {
+	if (!resizing) return;
+	resizeDeltaY = e.clientY - resizeStartY;
+}
+
+function handleResizeUp() {
+	if (!resizing) return;
+	resizing = false;
+	// Snap to 15-min grid
+	const step = rowHeight / 4;
+	const snapped = Math.round(resizeDeltaY / step) * step;
+	const deltaMs = (snapped / rowHeight) * 3600000;
+	const newEndMs = Math.max(event.startMs + 15 * 60000, event.endMs + deltaMs);
+	onResize?.(newEndMs);
+	resizeDeltaY = 0;
+}
+
+let displayHeight = $derived(Math.max(baseHeight + resizeDeltaY, rowHeight / 4));
 
 function formatTime(d: Date): string {
-  return d.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+	return d.toLocaleTimeString(undefined, {
+		hour: "2-digit",
+		minute: "2-digit",
+		hour12: false,
+	});
 }
 
 let draggableRef = $state<{ reset: () => void }>();
 
 $effect(() => {
-  if (draggableRef && event.draggable) {
-    draggableRef.reset();
-  }
+	if (draggableRef && event.draggable) draggableRef.reset();
 });
 </script>
 
+<svelte:window onmousemove={handleResizeMove} onmouseup={handleResizeUp} />
+
 <div
 	class="absolute"
-	style="top: {top + yOffset}px; left: {left}%; height: {height}px; width: {width}%; grid-column-start: {colIndex + 1}; grid-column-end: {colIndex + 2}"
+	style="
+		top: {top + yOffset}px;
+		left: {leftPct}%;
+		height: {displayHeight}px;
+		width: {widthPct}%;
+		grid-column-start: {colIndex + 1};
+		grid-column-end: {colIndex + 2};
+	"
 	role="presentation"
 	onclick={(e) => e.stopPropagation()}
 >
@@ -75,16 +118,16 @@ $effect(() => {
 				class="relative h-full w-full"
 				bounds={{
 					top: -top,
-					bottom: rowHeight * 24 - top - (durationMin / 60) * rowHeight,
-					left: -(colIndex * calendarWidth) / 7,
-					right: calendarWidth - ((colIndex + 1) * calendarWidth) / 7,
+					bottom: rowHeight * 24 - top - baseHeight,
+					left: -(colIndex * colWidth),
+					right: calendarWidth - (colIndex + 1) * colWidth,
 				}}
-				grid={[calendarWidth / 7, rowHeight / 4]}
-				disabled={!event.draggable}
+				grid={[colWidth, rowHeight / 4]}
+				disabled={!event.draggable || resizing}
 				onDragEnd={onDragEnd ?? null}
 			>
 				<div
-					class="h-full rounded-sm border-l-2 px-1.5 py-0.5 text-[11px] backdrop-blur-sm"
+					class="h-full rounded-sm border-l-2 px-1.5 pt-0.5 pb-1 text-[11px] backdrop-blur-sm select-none overflow-hidden"
 					style="background-color: color-mix(in srgb, {event.color} 15%, transparent); border-color: {event.color}; color: {event.color}"
 				>
 					{#if durationMin >= 60}
@@ -93,6 +136,16 @@ $effect(() => {
 					<div class="truncate font-semibold">{event.title}</div>
 					{#if event.note && durationMin >= 45}
 						<div class="truncate opacity-70">{event.note}</div>
+					{/if}
+
+					<!-- Resize handle -->
+					{#if event.draggable && onResize}
+						<div
+							class="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize"
+							style="background: linear-gradient(to bottom, transparent, color-mix(in srgb, {event.color} 40%, transparent))"
+							role="presentation"
+							onmousedown={startResize}
+						></div>
 					{/if}
 				</div>
 			</Draggable>
