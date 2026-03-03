@@ -504,9 +504,9 @@ export async function deleteTask(id: string): Promise<boolean> {
   }
 }
 
-// --- Slot API ---
+// --- Block API ---
 
-export interface Slot {
+export interface Block {
   id: string;
   taskId: string;
   startAtMs: number;
@@ -515,11 +515,11 @@ export interface Slot {
   createdAtMs: number;
 }
 
-export async function getSlots(params?: {
+export async function getBlocks(params?: {
   taskId?: string;
   start?: number;
   end?: number;
-}): Promise<Slot[]> {
+}): Promise<Block[]> {
   if (DEV) return [];
   try {
     const qs = new URLSearchParams();
@@ -527,22 +527,24 @@ export async function getSlots(params?: {
     if (params?.start) qs.set("start", String(params.start));
     if (params?.end) qs.set("end", String(params.end));
     const q = qs.toString();
-    const res = await fetch(`/api/slots${q ? `?${q}` : ""}`);
+    const res = await fetch(`/api/blocks${q ? `?${q}` : ""}`);
     if (!res.ok) return [];
     const data = await res.json();
-    return data.slots || [];
+    return data.blocks || [];
   } catch {
     return [];
   }
 }
 
-export async function createSlot(slot: Partial<Slot>): Promise<Slot | null> {
+export async function createBlock(
+  block: Partial<Block>,
+): Promise<Block | null> {
   if (DEV) return null;
   try {
-    const res = await fetch("/api/slots", {
+    const res = await fetch("/api/blocks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(slot),
+      body: JSON.stringify(block),
     });
     if (!res.ok) return null;
     return res.json();
@@ -551,13 +553,13 @@ export async function createSlot(slot: Partial<Slot>): Promise<Slot | null> {
   }
 }
 
-export async function updateSlot(
+export async function updateBlock(
   id: string,
-  patch: Partial<Slot>,
-): Promise<Slot | null> {
+  patch: Partial<Block>,
+): Promise<Block | null> {
   if (DEV) return null;
   try {
-    const res = await fetch(`/api/slots/${id}`, {
+    const res = await fetch(`/api/blocks/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
@@ -569,10 +571,10 @@ export async function updateSlot(
   }
 }
 
-export async function deleteSlot(id: string): Promise<boolean> {
+export async function deleteBlock(id: string): Promise<boolean> {
   if (DEV) return true;
   try {
-    const res = await fetch(`/api/slots/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/blocks/${id}`, { method: "DELETE" });
     return res.ok;
   } catch {
     return false;
@@ -793,7 +795,7 @@ export function connectSSE(
   onClientId?: (id: string) => void,
   onReconnect?: () => void,
   onTask?: (action: string, task: Task) => void,
-  onSlot?: (action: string, slot: Slot) => void,
+  onBlock?: (action: string, block: Block) => void,
 ): EventSource {
   if (DEV) return mockSSE(onMessage, onActivity);
 
@@ -815,8 +817,13 @@ export function connectSSE(
         }
       } else if (data.type === "task" && data.action && data.task && onTask) {
         onTask(data.action, data.task);
-      } else if (data.type === "slot" && data.action && data.slot && onSlot) {
-        onSlot(data.action, data.slot);
+      } else if (
+        data.type === "block" &&
+        data.action &&
+        data.block &&
+        onBlock
+      ) {
+        onBlock(data.action, data.block);
       } else if (data.type === "activity" && data.event) {
         onActivity(data.event);
       } else if (data.role && data.content) {

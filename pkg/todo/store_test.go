@@ -218,80 +218,80 @@ func TestComputeNextDue(t *testing.T) {
 
 // --- Slot tests ---
 
-func TestSlotCRUD(t *testing.T) {
+func TestBlockCRUD(t *testing.T) {
 	s := testService(t)
 
-	task, _ := s.AddTask(Task{Title: "Task for slots"})
+	task, _ := s.AddTask(Task{Title: "Task for blocks"})
 
-	slot, err := s.AddSlot(Slot{
+	slot, err := s.AddBlock(Block{
 		TaskID:    task.ID,
 		StartAtMS: 1000000,
 		EndAtMS:   2000000,
 		Note:      "Focus block",
 	})
 	if err != nil {
-		t.Fatalf("AddSlot: %v", err)
+		t.Fatalf("AddBlock: %v", err)
 	}
 	if slot.ID == "" {
 		t.Fatal("expected slot ID")
 	}
 
 	// List all
-	slots := s.ListSlots("", 0, 0)
+	slots := s.ListBlocks("", 0, 0)
 	if len(slots) != 1 {
 		t.Fatalf("expected 1 slot, got %d", len(slots))
 	}
 
 	// List by task
-	slots = s.ListSlots(task.ID, 0, 0)
+	slots = s.ListBlocks(task.ID, 0, 0)
 	if len(slots) != 1 {
 		t.Fatalf("expected 1 slot for task, got %d", len(slots))
 	}
 
 	// Update
-	updated, err := s.UpdateSlot(slot.ID, map[string]any{"note": "Updated note"})
+	updated, err := s.UpdateBlock(slot.ID, map[string]any{"note": "Updated note"})
 	if err != nil {
-		t.Fatalf("UpdateSlot: %v", err)
+		t.Fatalf("UpdateBlock: %v", err)
 	}
 	if updated.Note != "Updated note" {
 		t.Fatalf("expected 'Updated note', got %q", updated.Note)
 	}
 
 	// Remove
-	if !s.RemoveSlot(slot.ID) {
-		t.Fatal("expected RemoveSlot to return true")
+	if !s.RemoveBlock(slot.ID) {
+		t.Fatal("expected RemoveBlock to return true")
 	}
-	slots = s.ListSlots("", 0, 0)
+	slots = s.ListBlocks("", 0, 0)
 	if len(slots) != 0 {
 		t.Fatalf("expected 0 slots, got %d", len(slots))
 	}
 }
 
-func TestSlotCascadeOnTaskDelete(t *testing.T) {
+func TestBlockCascadeOnTaskDelete(t *testing.T) {
 	s := testService(t)
 
 	task, _ := s.AddTask(Task{Title: "Task with slots"})
-	s.AddSlot(Slot{TaskID: task.ID, StartAtMS: 1000, EndAtMS: 2000})
-	s.AddSlot(Slot{TaskID: task.ID, StartAtMS: 3000, EndAtMS: 4000})
+	s.AddBlock(Block{TaskID: task.ID, StartAtMS: 1000, EndAtMS: 2000})
+	s.AddBlock(Block{TaskID: task.ID, StartAtMS: 3000, EndAtMS: 4000})
 
 	s.RemoveTask(task.ID)
 
-	slots := s.ListSlots(task.ID, 0, 0)
+	slots := s.ListBlocks(task.ID, 0, 0)
 	if len(slots) != 0 {
 		t.Fatalf("expected slots to be cascade deleted, got %d", len(slots))
 	}
 }
 
-func TestSlotTimeRangeQuery(t *testing.T) {
+func TestBlockTimeRangeQuery(t *testing.T) {
 	s := testService(t)
 
 	task, _ := s.AddTask(Task{Title: "Task"})
-	s.AddSlot(Slot{TaskID: task.ID, StartAtMS: 1000, EndAtMS: 2000})
-	s.AddSlot(Slot{TaskID: task.ID, StartAtMS: 3000, EndAtMS: 4000})
-	s.AddSlot(Slot{TaskID: task.ID, StartAtMS: 5000, EndAtMS: 6000})
+	s.AddBlock(Block{TaskID: task.ID, StartAtMS: 1000, EndAtMS: 2000})
+	s.AddBlock(Block{TaskID: task.ID, StartAtMS: 3000, EndAtMS: 4000})
+	s.AddBlock(Block{TaskID: task.ID, StartAtMS: 5000, EndAtMS: 6000})
 
 	// Should get slots that overlap with range [2500, 4500]
-	slots := s.ListSlots("", 2500, 4500)
+	slots := s.ListBlocks("", 2500, 4500)
 	if len(slots) != 1 {
 		t.Fatalf("expected 1 slot in range, got %d", len(slots))
 	}

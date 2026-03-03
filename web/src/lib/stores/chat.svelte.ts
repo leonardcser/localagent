@@ -10,7 +10,7 @@ import {
   uploadFile,
 } from "$lib/api";
 import { taskStore } from "$lib/stores/task.svelte";
-import { slotStore } from "$lib/stores/slot.svelte";
+import { blockStore } from "$lib/stores/block.svelte";
 import { nowTimestamp } from "$lib/utils";
 
 export type TimelineItem =
@@ -121,8 +121,8 @@ function createChat() {
       (action, task) => {
         taskStore.applyEvent(action, task);
       },
-      (action, slot) => {
-        slotStore.applyEvent(action, slot);
+      (action, block) => {
+        blockStore.applyEvent(action, block);
       },
     );
   }

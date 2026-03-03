@@ -8,7 +8,7 @@ import (
 	"database/sql"
 )
 
-type Slot struct {
+type Block struct {
 	ID          string `json:"id"`
 	TaskID      string `json:"taskId"`
 	StartAtMs   int64  `json:"startAtMs"`

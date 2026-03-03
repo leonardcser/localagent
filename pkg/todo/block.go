@@ -1,6 +1,6 @@
 package todo
 
-type Slot struct {
+type Block struct {
 	ID          string `json:"id"`
 	TaskID      string `json:"taskId"`
 	StartAtMS   int64  `json:"startAtMs"`
@@ -9,7 +9,7 @@ type Slot struct {
 	CreatedAtMS int64  `json:"createdAtMs"`
 }
 
-type SlotEvent struct {
+type BlockEvent struct {
 	Action string `json:"action"` // "created", "updated", "deleted"
-	Slot   Slot   `json:"slot"`
+	Block  Block  `json:"block"`
 }

@@ -12,7 +12,7 @@ type migration struct {
 
 var migrations = []migration{
 	{1, migrateCreateTasks},
-	{2, migrateCreateSlots},
+	{2, migrateCreateBlocks},
 }
 
 func Migrate(db *sql.DB) error {
@@ -72,8 +72,8 @@ func migrateCreateTasks(tx *sql.Tx) error {
 	return err
 }
 
-func migrateCreateSlots(tx *sql.Tx) error {
-	_, err := tx.Exec(`CREATE TABLE slots (
+func migrateCreateBlocks(tx *sql.Tx) error {
+	_, err := tx.Exec(`CREATE TABLE blocks (
 		id            TEXT PRIMARY KEY,
 		task_id       TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
 		start_at_ms   INTEGER NOT NULL,
@@ -84,9 +84,9 @@ func migrateCreateSlots(tx *sql.Tx) error {
 	if err != nil {
 		return err
 	}
-	if _, err = tx.Exec(`CREATE INDEX idx_slots_task ON slots(task_id)`); err != nil {
+	if _, err = tx.Exec(`CREATE INDEX idx_blocks_task ON blocks(task_id)`); err != nil {
 		return err
 	}
-	_, err = tx.Exec(`CREATE INDEX idx_slots_range ON slots(start_at_ms, end_at_ms)`)
+	_, err = tx.Exec(`CREATE INDEX idx_blocks_range ON blocks(start_at_ms, end_at_ms)`)
 	return err
 }

@@ -90,10 +90,10 @@ func (s *Server) setupRoutes() {
 	s.echo.POST("/api/tasks/:id/done", s.handleTaskDone)
 	s.echo.DELETE("/api/tasks/:id", s.handleTaskDelete)
 
-	s.echo.GET("/api/slots", s.handleSlotList)
-	s.echo.POST("/api/slots", s.handleSlotCreate)
-	s.echo.PUT("/api/slots/:id", s.handleSlotUpdate)
-	s.echo.DELETE("/api/slots/:id", s.handleSlotDelete)
+	s.echo.GET("/api/blocks", s.handleBlockList)
+	s.echo.POST("/api/blocks", s.handleBlockCreate)
+	s.echo.PUT("/api/blocks/:id", s.handleBlockUpdate)
+	s.echo.DELETE("/api/blocks/:id", s.handleBlockDelete)
 
 	s.echo.GET("/*", s.handleSPA)
 }

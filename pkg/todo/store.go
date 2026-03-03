@@ -40,7 +40,7 @@ type TodoService struct {
 	db           *sql.DB
 	q            *dbq.Queries
 	listener     func(TaskEvent)
-	slotListener func(SlotEvent)
+	blockListener func(BlockEvent)
 }
 
 func NewTodoService(database *sql.DB) *TodoService {
@@ -51,9 +51,9 @@ func NewTodoService(database *sql.DB) *TodoService {
 }
 
 func (s *TodoService) SetListener(fn func(TaskEvent))     { s.listener = fn }
-func (s *TodoService) SetSlotListener(fn func(SlotEvent))  { s.slotListener = fn }
-func (s *TodoService) notify(evt TaskEvent)                { if s.listener != nil { s.listener(evt) } }
-func (s *TodoService) notifySlot(evt SlotEvent)            { if s.slotListener != nil { s.slotListener(evt) } }
+func (s *TodoService) SetBlockListener(fn func(BlockEvent))  { s.blockListener = fn }
+func (s *TodoService) notify(evt TaskEvent)                  { if s.listener != nil { s.listener(evt) } }
+func (s *TodoService) notifyBlock(evt BlockEvent)            { if s.blockListener != nil { s.blockListener(evt) } }
 
 // Load is a no-op for SQLite (kept for backward compat).
 func (s *TodoService) Load() error { return nil }
@@ -237,11 +237,11 @@ func (s *TodoService) RemoveTask(taskID string) bool {
 	return false
 }
 
-// --- Slot methods ---
+// --- Block methods ---
 
-func (s *TodoService) ListSlots(taskID string, startAfter, endBefore int64) []Slot {
+func (s *TodoService) ListBlocks(taskID string, startAfter, endBefore int64) []Block {
 	ctx := context.Background()
-	var rows []dbq.Slot
+	var rows []dbq.Block
 	var err error
 
 	hasTask := taskID != ""
@@ -249,29 +249,29 @@ func (s *TodoService) ListSlots(taskID string, startAfter, endBefore int64) []Sl
 
 	switch {
 	case hasTask && hasRange:
-		rows, err = s.q.ListSlotsByTaskAndRange(ctx, dbq.ListSlotsByTaskAndRangeParams{
+		rows, err = s.q.ListBlocksByTaskAndRange(ctx, dbq.ListBlocksByTaskAndRangeParams{
 			TaskID:    taskID,
 			EndAtMs:   startAfter,
 			StartAtMs: endBefore,
 		})
 	case hasTask:
-		rows, err = s.q.ListSlotsByTask(ctx, taskID)
+		rows, err = s.q.ListBlocksByTask(ctx, taskID)
 	case hasRange:
-		rows, err = s.q.ListSlotsByRange(ctx, dbq.ListSlotsByRangeParams{
+		rows, err = s.q.ListBlocksByRange(ctx, dbq.ListBlocksByRangeParams{
 			EndAtMs:   startAfter,
 			StartAtMs: endBefore,
 		})
 	default:
-		rows, err = s.q.ListSlots(ctx)
+		rows, err = s.q.ListBlocks(ctx)
 	}
 
 	if err != nil {
 		return nil
 	}
 
-	slots := make([]Slot, len(rows))
+	blocks := make([]Block, len(rows))
 	for i, r := range rows {
-		slots[i] = Slot{
+		blocks[i] = Block{
 			ID:          r.ID,
 			TaskID:      r.TaskID,
 			StartAtMS:   r.StartAtMs,
@@ -280,33 +280,33 @@ func (s *TodoService) ListSlots(taskID string, startAfter, endBefore int64) []Sl
 			CreatedAtMS: r.CreatedAtMs,
 		}
 	}
-	return slots
+	return blocks
 }
 
-func (s *TodoService) AddSlot(slot Slot) (*Slot, error) {
+func (s *TodoService) AddBlock(block Block) (*Block, error) {
 	ctx := context.Background()
-	if slot.ID == "" {
-		slot.ID = utils.RandHex(8)
+	if block.ID == "" {
+		block.ID = utils.RandHex(8)
 	}
-	slot.CreatedAtMS = time.Now().UnixMilli()
+	block.CreatedAtMS = time.Now().UnixMilli()
 
-	err := s.q.InsertSlot(ctx, dbq.InsertSlotParams{
-		ID:          slot.ID,
-		TaskID:      slot.TaskID,
-		StartAtMs:   slot.StartAtMS,
-		EndAtMs:     slot.EndAtMS,
-		Note:        slot.Note,
-		CreatedAtMs: slot.CreatedAtMS,
+	err := s.q.InsertBlock(ctx, dbq.InsertBlockParams{
+		ID:          block.ID,
+		TaskID:      block.TaskID,
+		StartAtMs:   block.StartAtMS,
+		EndAtMs:     block.EndAtMS,
+		Note:        block.Note,
+		CreatedAtMs: block.CreatedAtMS,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	s.notifySlot(SlotEvent{Action: "created", Slot: slot})
-	return &slot, nil
+	s.notifyBlock(BlockEvent{Action: "created", Block: block})
+	return &block, nil
 }
 
-func (s *TodoService) UpdateSlot(slotID string, patch map[string]any) (*Slot, error) {
+func (s *TodoService) UpdateBlock(blockID string, patch map[string]any) (*Block, error) {
 	var sets []string
 	var args []any
 
@@ -331,33 +331,33 @@ func (s *TodoService) UpdateSlot(slotID string, patch map[string]any) (*Slot, er
 		return nil, fmt.Errorf("no fields to update")
 	}
 
-	args = append(args, slotID)
-	query := fmt.Sprintf("UPDATE slots SET %s WHERE id = ?", strings.Join(sets, ", "))
+	args = append(args, blockID)
+	query := fmt.Sprintf("UPDATE blocks SET %s WHERE id = ?", strings.Join(sets, ", "))
 	res, err := s.db.Exec(query, args...)
 	if err != nil {
 		return nil, err
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
-		return nil, fmt.Errorf("slot not found: %s", slotID)
+		return nil, fmt.Errorf("block not found: %s", blockID)
 	}
 
-	slot := s.getSlot(slotID)
-	if slot != nil {
-		s.notifySlot(SlotEvent{Action: "updated", Slot: *slot})
+	block := s.getBlock(blockID)
+	if block != nil {
+		s.notifyBlock(BlockEvent{Action: "updated", Block: *block})
 	}
-	return slot, nil
+	return block, nil
 }
 
-func (s *TodoService) RemoveSlot(slotID string) bool {
+func (s *TodoService) RemoveBlock(blockID string) bool {
 	ctx := context.Background()
-	res, err := s.q.DeleteSlot(ctx, slotID)
+	res, err := s.q.DeleteBlock(ctx, blockID)
 	if err != nil {
 		return false
 	}
 	n, _ := res.RowsAffected()
 	if n > 0 {
-		s.notifySlot(SlotEvent{Action: "deleted", Slot: Slot{ID: slotID}})
+		s.notifyBlock(BlockEvent{Action: "deleted", Block: Block{ID: blockID}})
 		return true
 	}
 	return false
@@ -375,13 +375,13 @@ func (s *TodoService) getTask(id string) *Task {
 	return &t
 }
 
-func (s *TodoService) getSlot(id string) *Slot {
+func (s *TodoService) getBlock(id string) *Block {
 	ctx := context.Background()
-	row, err := s.q.GetSlot(ctx, id)
+	row, err := s.q.GetBlock(ctx, id)
 	if err != nil {
 		return nil
 	}
-	return &Slot{
+	return &Block{
 		ID:          row.ID,
 		TaskID:      row.TaskID,
 		StartAtMS:   row.StartAtMs,

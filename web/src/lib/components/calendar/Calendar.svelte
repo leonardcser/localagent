@@ -1,11 +1,11 @@
 <script lang="ts">
 import { onMount } from "svelte";
-import { slotStore } from "$lib/stores/slot.svelte";
+import { blockStore } from "$lib/stores/block.svelte";
 import { taskStore } from "$lib/stores/task.svelte";
 import {
   getWeekStart,
   addDays,
-  slotToEvent,
+  blockToEvent,
   taskToEvent,
   type CalendarEvent,
 } from "$lib/calendar";
@@ -28,7 +28,7 @@ function setDate(d: Date) {
 }
 
 $effect(() => {
-  slotStore.load(weekStart.getTime(), weekEnd.getTime());
+  blockStore.load(weekStart.getTime(), weekEnd.getTime());
 });
 
 onMount(() => {
@@ -38,9 +38,9 @@ onMount(() => {
 let events = $derived.by(() => {
   const result: CalendarEvent[] = [];
 
-  for (const slot of slotStore.slots) {
-    const task = taskStore.tasks.find((t) => t.id === slot.taskId);
-    result.push(slotToEvent(slot, task));
+  for (const block of blockStore.blocks) {
+    const task = taskStore.tasks.find((t) => t.id === block.taskId);
+    result.push(blockToEvent(block, task));
   }
 
   for (const task of taskStore.tasks) {

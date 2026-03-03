@@ -1,4 +1,4 @@
-import type { Slot, Task } from "./api";
+import type { Block, Task } from "./api";
 
 export interface CalendarEvent {
   id: string;
@@ -7,7 +7,7 @@ export interface CalendarEvent {
   endMs: number;
   color: string;
   taskId: string;
-  slotId?: string;
+  blockId?: string;
   note?: string;
   isAllDay: boolean;
   draggable: boolean;
@@ -18,16 +18,16 @@ export type EventWithOverlap = CalendarEvent & {
   overlapCount: number;
 };
 
-export function slotToEvent(slot: Slot, task?: Task): CalendarEvent {
+export function blockToEvent(block: Block, task?: Task): CalendarEvent {
   return {
-    id: `slot:${slot.id}`,
+    id: `block:${block.id}`,
     title: task?.title ?? "Untitled",
-    startMs: slot.startAtMs,
-    endMs: slot.endAtMs,
+    startMs: block.startAtMs,
+    endMs: block.endAtMs,
     color: "var(--color-accent)",
-    taskId: slot.taskId,
-    slotId: slot.id,
-    note: slot.note,
+    taskId: block.taskId,
+    blockId: block.id,
+    note: block.note,
     isAllDay: false,
     draggable: true,
   };

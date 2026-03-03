@@ -17,7 +17,7 @@ CREATE TABLE tasks (
 CREATE INDEX idx_tasks_status ON tasks(status);
 CREATE INDEX idx_tasks_parent ON tasks(parent_id);
 
-CREATE TABLE slots (
+CREATE TABLE blocks (
     id            TEXT PRIMARY KEY,
     task_id       TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
     start_at_ms   INTEGER NOT NULL,
@@ -26,5 +26,5 @@ CREATE TABLE slots (
     created_at_ms INTEGER NOT NULL
 );
 
-CREATE INDEX idx_slots_task ON slots(task_id);
-CREATE INDEX idx_slots_range ON slots(start_at_ms, end_at_ms);
+CREATE INDEX idx_blocks_task ON blocks(task_id);
+CREATE INDEX idx_blocks_range ON blocks(start_at_ms, end_at_ms);

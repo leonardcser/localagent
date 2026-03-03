@@ -370,11 +370,11 @@ func (s *Server) handleTaskDelete(c *echo.Context) error {
 	return c.JSON(http.StatusNotFound, map[string]string{"error": "task not found"})
 }
 
-// --- Slot handlers ---
+// --- Block handlers ---
 
-func (s *Server) handleSlotList(c *echo.Context) error {
+func (s *Server) handleBlockList(c *echo.Context) error {
 	if s.todoService == nil {
-		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "slots not available"})
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "blocks not available"})
 	}
 
 	taskID := c.QueryParam("taskId")
@@ -386,36 +386,36 @@ func (s *Server) handleSlotList(c *echo.Context) error {
 		fmt.Sscanf(v, "%d", &endBefore)
 	}
 
-	slots := s.todoService.ListSlots(taskID, startAfter, endBefore)
-	if slots == nil {
-		slots = []todo.Slot{}
+	blocks := s.todoService.ListBlocks(taskID, startAfter, endBefore)
+	if blocks == nil {
+		blocks = []todo.Block{}
 	}
-	return c.JSON(http.StatusOK, map[string]any{"slots": slots})
+	return c.JSON(http.StatusOK, map[string]any{"blocks": blocks})
 }
 
-func (s *Server) handleSlotCreate(c *echo.Context) error {
+func (s *Server) handleBlockCreate(c *echo.Context) error {
 	if s.todoService == nil {
-		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "slots not available"})
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "blocks not available"})
 	}
 
-	var slot todo.Slot
-	if err := c.Bind(&slot); err != nil {
+	var block todo.Block
+	if err := c.Bind(&block); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
-	if slot.TaskID == "" {
+	if block.TaskID == "" {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "taskId is required"})
 	}
 
-	created, err := s.todoService.AddSlot(slot)
+	created, err := s.todoService.AddBlock(block)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 	return c.JSON(http.StatusOK, created)
 }
 
-func (s *Server) handleSlotUpdate(c *echo.Context) error {
+func (s *Server) handleBlockUpdate(c *echo.Context) error {
 	if s.todoService == nil {
-		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "slots not available"})
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "blocks not available"})
 	}
 
 	id := c.Param("id")
@@ -424,23 +424,23 @@ func (s *Server) handleSlotUpdate(c *echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 
-	slot, err := s.todoService.UpdateSlot(id, patch)
+	block, err := s.todoService.UpdateBlock(id, patch)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
 	}
-	return c.JSON(http.StatusOK, slot)
+	return c.JSON(http.StatusOK, block)
 }
 
-func (s *Server) handleSlotDelete(c *echo.Context) error {
+func (s *Server) handleBlockDelete(c *echo.Context) error {
 	if s.todoService == nil {
-		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "slots not available"})
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "blocks not available"})
 	}
 
 	id := c.Param("id")
-	if s.todoService.RemoveSlot(id) {
+	if s.todoService.RemoveBlock(id) {
 		return c.JSON(http.StatusOK, map[string]bool{"ok": true})
 	}
-	return c.JSON(http.StatusNotFound, map[string]string{"error": "slot not found"})
+	return c.JSON(http.StatusNotFound, map[string]string{"error": "block not found"})
 }
 
 func (s *Server) handlePushSubscribe(c *echo.Context) error {

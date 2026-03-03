@@ -27,8 +27,9 @@ import {
 import TaskContextMenu from "$lib/components/TaskContextMenu.svelte";
 import DatePicker from "$lib/components/DatePicker.svelte";
 import RecurrencePicker from "$lib/components/RecurrencePicker.svelte";
-import { slotStore } from "$lib/stores/slot.svelte";
-import type { Slot } from "$lib/api";
+import BlockPicker from "$lib/components/BlockPicker.svelte";
+import { blockStore } from "$lib/stores/block.svelte";
+import type { Block } from "$lib/api";
 
 let panelOpen = $state(false);
 let panelMode = $state<"add" | "edit">("add");
@@ -67,9 +68,16 @@ let lastKeyD = 0;
 
 onMount(async () => {
   await taskStore.load();
-  if (taskStore.selectedId) {
-    const task = taskStore.tasks.find((t) => t.id === taskStore.selectedId);
+  const selectParam = new URLSearchParams(window.location.search).get("select");
+  const preselect = selectParam || taskStore.selectedId;
+  if (preselect) {
+    const task = taskStore.tasks.find((t) => t.id === preselect);
     if (task) openDetail(task);
+    if (selectParam) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("select");
+      history.replaceState({}, "", url.toString());
+    }
   }
 });
 
@@ -769,19 +777,22 @@ const priorityOptions = [
 
 		<!-- Time Blocks (edit mode only) -->
 		{#if panelMode === "edit" && taskStore.selectedId}
-			{@const taskSlots = slotStore.forTask(taskStore.selectedId)}
+			{@const taskBlocks = blockStore.forTask(taskStore.selectedId)}
 			<div class="flex flex-col gap-1 border-t border-border pt-3">
-				<span class="text-[11px] font-semibold uppercase tracking-widest text-text-muted">Time Blocks</span>
-				{#each taskSlots as slot}
+				<div class="flex items-center justify-between">
+					<span class="text-[11px] font-semibold uppercase tracking-widest text-text-muted">Time Blocks</span>
+					<BlockPicker oncreate={(startMs, endMs) => blockStore.add({ taskId: taskStore.selectedId!, startAtMs: startMs, endAtMs: endMs })} />
+				</div>
+				{#each taskBlocks as block}
 					<div class="flex items-center justify-between rounded-lg px-2 {mobile ? 'py-2' : 'py-1.5'} hover:bg-overlay-light">
 						<span class="{mobile ? 'text-[13px]' : 'text-[11px]'} text-text-secondary">
 							<Icon src={FiClock} size="11" className="inline-block text-text-muted mr-1" />
-							{new Date(slot.startAtMs).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-							{new Date(slot.startAtMs).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}
-							– {new Date(slot.endAtMs).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}
+							{new Date(block.startAtMs).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+							{new Date(block.startAtMs).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}
+							– {new Date(block.endAtMs).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}
 						</span>
 						<button
-							onclick={() => slotStore.remove(slot.id)}
+							onclick={() => blockStore.remove(block.id)}
 							class="text-text-muted hover:text-error transition-colors"
 						>
 							<Icon src={FiX} size="12" />
