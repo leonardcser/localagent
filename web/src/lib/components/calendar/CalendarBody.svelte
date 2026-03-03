@@ -206,7 +206,7 @@ let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
 
 <!-- Scrollable time grid -->
 <div
-	class="flex flex-1 overflow-auto"
+	class="flex flex-1 items-start overflow-auto"
 	bind:this={scrollableRef}
 	onscroll={handleScroll}
 >
