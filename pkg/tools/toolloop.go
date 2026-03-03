@@ -23,10 +23,11 @@ type ToolLoopResult struct {
 }
 
 // BuildAssistantToolCallMessage builds an assistant message with serialized tool call arguments.
-func BuildAssistantToolCallMessage(content string, toolCalls []providers.ToolCall) providers.Message {
+func BuildAssistantToolCallMessage(content, reasoningContent string, toolCalls []providers.ToolCall) providers.Message {
 	msg := providers.Message{
-		Role:    "assistant",
-		Content: content,
+		Role:             "assistant",
+		Content:          content,
+		ReasoningContent: reasoningContent,
 	}
 	for _, tc := range toolCalls {
 		argumentsJSON, _ := json.Marshal(tc.Arguments)
@@ -90,7 +91,7 @@ func RunToolLoop(ctx context.Context, config ToolLoopConfig, messages []provider
 
 		logger.Info("toolloop: LLM requested %d tool call(s)", len(response.ToolCalls))
 
-		messages = append(messages, BuildAssistantToolCallMessage(response.Content, response.ToolCalls))
+		messages = append(messages, BuildAssistantToolCallMessage(response.Content, response.ReasoningContent, response.ToolCalls))
 
 		for _, tc := range response.ToolCalls {
 			argsJSON, _ := json.Marshal(tc.Arguments)

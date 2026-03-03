@@ -609,7 +609,7 @@ func (al *AgentLoop) runLLMIteration(ctx context.Context, messages []providers.M
 		})
 
 		// Build assistant message with tool calls
-		assistantMsg := tools.BuildAssistantToolCallMessage(response.Content, response.ToolCalls)
+		assistantMsg := tools.BuildAssistantToolCallMessage(response.Content, response.ReasoningContent, response.ToolCalls)
 		messages = append(messages, assistantMsg)
 
 		// Save assistant message with tool calls to session

@@ -19,10 +19,11 @@ type FunctionCall struct {
 }
 
 type LLMResponse struct {
-	Content      string     `json:"content"`
-	ToolCalls    []ToolCall `json:"tool_calls,omitempty"`
-	FinishReason string     `json:"finish_reason"`
-	Usage        *UsageInfo `json:"usage,omitempty"`
+	Content          string     `json:"content"`
+	ReasoningContent string     `json:"reasoning_content,omitempty"`
+	ToolCalls        []ToolCall `json:"tool_calls,omitempty"`
+	FinishReason     string     `json:"finish_reason"`
+	Usage            *UsageInfo `json:"usage,omitempty"`
 }
 
 type UsageInfo struct {
@@ -48,25 +49,28 @@ type ImageURL struct {
 // field is serialized as an array of content parts (for multimodal messages).
 // Otherwise it is serialized as a plain string.
 type Message struct {
-	Role         string        `json:"-"`
-	Content      string        `json:"-"`
-	ContentParts []ContentPart `json:"-"`
-	ToolCalls    []ToolCall    `json:"-"`
-	ToolCallID   string        `json:"-"`
-	ToolName     string        `json:"-"` // name of the tool that produced this result (role=tool only)
+	Role             string        `json:"-"`
+	Content          string        `json:"-"`
+	ReasoningContent string        `json:"-"`
+	ContentParts     []ContentPart `json:"-"`
+	ToolCalls        []ToolCall    `json:"-"`
+	ToolCallID       string        `json:"-"`
+	ToolName         string        `json:"-"` // name of the tool that produced this result (role=tool only)
 }
 
 func (m Message) MarshalJSON() ([]byte, error) {
 	type alias struct {
-		Role       string     `json:"role"`
-		Content    any        `json:"content"`
-		ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-		ToolCallID string     `json:"tool_call_id,omitempty"`
+		Role             string     `json:"role"`
+		Content          any        `json:"content"`
+		ReasoningContent string     `json:"reasoning_content,omitempty"`
+		ToolCalls        []ToolCall `json:"tool_calls,omitempty"`
+		ToolCallID       string     `json:"tool_call_id,omitempty"`
 	}
 	a := alias{
-		Role:       m.Role,
-		ToolCalls:  m.ToolCalls,
-		ToolCallID: m.ToolCallID,
+		Role:             m.Role,
+		ReasoningContent: m.ReasoningContent,
+		ToolCalls:        m.ToolCalls,
+		ToolCallID:       m.ToolCallID,
 	}
 	if len(m.ContentParts) > 0 {
 		a.Content = m.ContentParts
@@ -78,16 +82,18 @@ func (m Message) MarshalJSON() ([]byte, error) {
 
 func (m *Message) UnmarshalJSON(data []byte) error {
 	type alias struct {
-		Role       string          `json:"role"`
-		Content    json.RawMessage `json:"content"`
-		ToolCalls  []ToolCall      `json:"tool_calls,omitempty"`
-		ToolCallID string          `json:"tool_call_id,omitempty"`
+		Role             string          `json:"role"`
+		Content          json.RawMessage `json:"content"`
+		ReasoningContent string          `json:"reasoning_content,omitempty"`
+		ToolCalls        []ToolCall      `json:"tool_calls,omitempty"`
+		ToolCallID       string          `json:"tool_call_id,omitempty"`
 	}
 	var a alias
 	if err := json.Unmarshal(data, &a); err != nil {
 		return err
 	}
 	m.Role = a.Role
+	m.ReasoningContent = a.ReasoningContent
 	m.ToolCalls = a.ToolCalls
 	m.ToolCallID = a.ToolCallID
 
