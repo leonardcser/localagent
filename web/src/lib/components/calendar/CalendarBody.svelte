@@ -183,85 +183,87 @@ async function submitCreate() {
 let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
 </script>
 
-<!-- All-day events row -->
-{#if dayEvents.length > 0}
-	<div
-		class="grid auto-rows-min border-b border-border"
-		style="padding-left: {indexColWidth}px; grid-template-columns: repeat({numCols}, 1fr)"
-	>
-		{#each dayEventsByCol as col, colI}
-			<div class="min-h-[28px] border-r border-border/50 px-0.5 py-0.5">
-				{#each col as evt}
-					<CalendarDayEvent
-						event={evt}
-						{colWidth}
-						onMove={(delta) => handleAllDayMove(evt, colI, delta)}
-						onViewTask={onViewTask}
-					/>
-				{/each}
-			</div>
-		{/each}
-	</div>
-{/if}
-
-<!-- Scrollable time grid -->
-<div
-	class="flex flex-1 items-start overflow-auto"
-	bind:this={scrollableRef}
-	onscroll={handleScroll}
->
-	<!-- Hour labels -->
-	<div class="shrink-0" style="width: {indexColWidth}px">
-		{#each Array.from({ length: 25 }) as _, hour}
-			<div
-				class="flex items-center justify-center text-[10px] text-text-muted"
-				style="height: {rowHeight}px"
-			>
-				{formatHour(hour)}
-			</div>
-		{/each}
-	</div>
-
-	<!-- Grid -->
-	<div
-		class="relative grid flex-1 cursor-crosshair"
-		role="presentation"
-		style="grid-template-columns: repeat({numCols}, 1fr)"
-		bind:this={calendarBodyRef}
-		onclick={handleGridClick}
-		onkeydown={() => {}}
-	>
-		<CalendarTime {rowHeight} yOffset={rowStartOffset} {viewStart} {numCols} />
-
-		{#each eventsWithOverlap as event}
-			<CalendarEventComp
-				{event}
-				{calendarWidth}
-				{rowHeight}
-				yOffset={rowStartOffset}
-				{viewStart}
-				{numCols}
-				onDragEnd={(d) => handleDragEnd(event, d)}
-				onResize={(newEnd) => handleResize(event, newEnd)}
-				onDelete={event.blockId ? () => blockStore.remove(event.blockId!) : undefined}
-				onViewTask={onViewTask}
-			/>
-		{/each}
-
-		<!-- Half-row top padding -->
-		{#each Array.from({ length: numCols }) as _}
-			<div
-				class="border-b border-r border-border/50"
-				style="height: {rowStartOffset}px"
-			></div>
-		{/each}
-
-		<!-- Hour cells -->
-		{#each Array.from({ length: 24 }) as _}
-			{#each Array.from({ length: numCols }) as _}
-				<div class="border-b border-r border-border/50" style="height: {rowHeight}px"></div>
+<div class="flex min-h-0 flex-1 flex-col">
+	<!-- All-day events row -->
+	{#if dayEvents.length > 0}
+		<div
+			class="grid shrink-0 auto-rows-min border-b border-border"
+			style="padding-left: {indexColWidth}px; grid-template-columns: repeat({numCols}, 1fr)"
+		>
+			{#each dayEventsByCol as col, colI}
+				<div class="min-h-[28px] border-r border-border/50 px-0.5 py-0.5">
+					{#each col as evt}
+						<CalendarDayEvent
+							event={evt}
+							{colWidth}
+							onMove={(delta) => handleAllDayMove(evt, colI, delta)}
+							onViewTask={onViewTask}
+						/>
+					{/each}
+				</div>
 			{/each}
-		{/each}
+		</div>
+	{/if}
+
+	<!-- Scrollable time grid -->
+	<div
+		class="flex min-h-0 flex-1 items-start overflow-auto"
+		bind:this={scrollableRef}
+		onscroll={handleScroll}
+	>
+		<!-- Hour labels -->
+		<div class="shrink-0" style="width: {indexColWidth}px">
+			{#each Array.from({ length: 25 }) as _, hour}
+				<div
+					class="flex items-center justify-center text-[10px] text-text-muted"
+					style="height: {rowHeight}px"
+				>
+					{formatHour(hour)}
+				</div>
+			{/each}
+		</div>
+
+		<!-- Grid -->
+		<div
+			class="relative grid flex-1 cursor-crosshair"
+			role="presentation"
+			style="grid-template-columns: repeat({numCols}, 1fr)"
+			bind:this={calendarBodyRef}
+			onclick={handleGridClick}
+			onkeydown={() => {}}
+		>
+			<CalendarTime {rowHeight} yOffset={rowStartOffset} {viewStart} {numCols} />
+
+			{#each eventsWithOverlap as event}
+				<CalendarEventComp
+					{event}
+					{calendarWidth}
+					{rowHeight}
+					yOffset={rowStartOffset}
+					{viewStart}
+					{numCols}
+					onDragEnd={(d) => handleDragEnd(event, d)}
+					onResize={(newEnd) => handleResize(event, newEnd)}
+					onDelete={event.blockId ? () => blockStore.remove(event.blockId!) : undefined}
+					onViewTask={onViewTask}
+				/>
+			{/each}
+
+			<!-- Half-row top padding -->
+			{#each Array.from({ length: numCols }) as _}
+				<div
+					class="border-b border-r border-border/50"
+					style="height: {rowStartOffset}px"
+				></div>
+			{/each}
+
+			<!-- Hour cells -->
+			{#each Array.from({ length: 24 }) as _}
+				{#each Array.from({ length: numCols }) as _}
+					<div class="border-b border-r border-border/50" style="height: {rowHeight}px"></div>
+				{/each}
+			{/each}
+		</div>
 	</div>
 </div>
 

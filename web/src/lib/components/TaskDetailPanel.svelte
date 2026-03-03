@@ -40,15 +40,15 @@ let {
 
 let mode = $derived<"add" | "edit">(task === null ? "add" : "edit");
 
-// Form state — synced from task prop
-let title = $state(task?.title ?? "");
-let description = $state(task?.description ?? "");
-let priority = $state(task?.priority ?? "");
-let due = $state(task?.due ?? "");
-let recurrence = $state(task?.recurrence ?? "");
-let tagsRaw = $state((task?.tags ?? []).join(", "));
-let status = $state(task?.status ?? "todo");
-let selectedParentId = $state(task?.parentId ?? parentId);
+// Form state — synced from task prop via $effect below
+let title = $state("");
+let description = $state("");
+let priority = $state("");
+let due = $state("");
+let recurrence = $state("");
+let tagsRaw = $state("");
+let status = $state("todo");
+let selectedParentId = $state("");
 
 // Re-sync when task changes (e.g. navigating between tasks)
 $effect(() => {
