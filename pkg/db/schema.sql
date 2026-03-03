@@ -28,3 +28,15 @@ CREATE TABLE blocks (
 
 CREATE INDEX idx_blocks_task ON blocks(task_id);
 CREATE INDEX idx_blocks_range ON blocks(start_at_ms, end_at_ms);
+
+CREATE TABLE links (
+    id            TEXT PRIMARY KEY,
+    url           TEXT NOT NULL,
+    title         TEXT NOT NULL DEFAULT '',
+    description   TEXT NOT NULL DEFAULT '',
+    tags          TEXT NOT NULL DEFAULT '[]',
+    created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL
+);
+
+CREATE INDEX idx_links_created ON links(created_at_ms);

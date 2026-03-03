@@ -443,6 +443,68 @@ func (s *Server) handleBlockDelete(c *echo.Context) error {
 	return c.JSON(http.StatusNotFound, map[string]string{"error": "block not found"})
 }
 
+func (s *Server) handleLinkList(c *echo.Context) error {
+	if s.todoService == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "links not available"})
+	}
+	tag := c.QueryParam("tag")
+	links := s.todoService.ListLinks(tag)
+	if links == nil {
+		links = []todo.Link{}
+	}
+	return c.JSON(http.StatusOK, map[string]any{"links": links})
+}
+
+func (s *Server) handleLinkCreate(c *echo.Context) error {
+	if s.todoService == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "links not available"})
+	}
+
+	var link todo.Link
+	if err := c.Bind(&link); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+	if link.URL == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "url is required"})
+	}
+
+	created, err := s.todoService.AddLink(link)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, created)
+}
+
+func (s *Server) handleLinkUpdate(c *echo.Context) error {
+	if s.todoService == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "links not available"})
+	}
+
+	id := c.Param("id")
+	var patch map[string]any
+	if err := c.Bind(&patch); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+
+	link, err := s.todoService.UpdateLink(id, patch)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, link)
+}
+
+func (s *Server) handleLinkDelete(c *echo.Context) error {
+	if s.todoService == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "links not available"})
+	}
+
+	id := c.Param("id")
+	if s.todoService.RemoveLink(id) {
+		return c.JSON(http.StatusOK, map[string]bool{"ok": true})
+	}
+	return c.JSON(http.StatusNotFound, map[string]string{"error": "link not found"})
+}
+
 func (s *Server) handlePushSubscribe(c *echo.Context) error {
 	if s.pushManager == nil {
 		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "push not available"})

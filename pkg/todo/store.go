@@ -37,10 +37,11 @@ type TaskEvent struct {
 }
 
 type TodoService struct {
-	db           *sql.DB
-	q            *dbq.Queries
-	listener     func(TaskEvent)
+	db            *sql.DB
+	q             *dbq.Queries
+	listener      func(TaskEvent)
 	blockListener func(BlockEvent)
+	linkListener  func(LinkEvent)
 }
 
 func NewTodoService(database *sql.DB) *TodoService {
@@ -50,10 +51,12 @@ func NewTodoService(database *sql.DB) *TodoService {
 	}
 }
 
-func (s *TodoService) SetListener(fn func(TaskEvent))     { s.listener = fn }
+func (s *TodoService) SetListener(fn func(TaskEvent))        { s.listener = fn }
 func (s *TodoService) SetBlockListener(fn func(BlockEvent))  { s.blockListener = fn }
+func (s *TodoService) SetLinkListener(fn func(LinkEvent))    { s.linkListener = fn }
 func (s *TodoService) notify(evt TaskEvent)                  { if s.listener != nil { s.listener(evt) } }
 func (s *TodoService) notifyBlock(evt BlockEvent)            { if s.blockListener != nil { s.blockListener(evt) } }
+func (s *TodoService) notifyLink(evt LinkEvent)              { if s.linkListener != nil { s.linkListener(evt) } }
 
 // Load is a no-op for SQLite (kept for backward compat).
 func (s *TodoService) Load() error { return nil }
@@ -363,6 +366,112 @@ func (s *TodoService) RemoveBlock(blockID string) bool {
 	return false
 }
 
+// --- Link methods ---
+
+func (s *TodoService) ListLinks(tag string) []Link {
+	ctx := context.Background()
+	rows, err := s.q.ListLinks(ctx)
+	if err != nil {
+		return nil
+	}
+	var links []Link
+	for _, r := range rows {
+		l := dbLinkToLink(r)
+		if tag != "" && !slices.Contains(l.Tags, tag) {
+			continue
+		}
+		links = append(links, l)
+	}
+	return links
+}
+
+func (s *TodoService) AddLink(link Link) (*Link, error) {
+	ctx := context.Background()
+	now := time.Now().UnixMilli()
+	if link.ID == "" {
+		link.ID = utils.RandHex(8)
+	}
+	link.CreatedAtMS = now
+	link.UpdatedAtMS = now
+
+	err := s.q.InsertLink(ctx, dbq.InsertLinkParams{
+		ID:          link.ID,
+		URL:         link.URL,
+		Title:       link.Title,
+		Description: link.Description,
+		Tags:        marshalTags(link.Tags),
+		CreatedAtMs: link.CreatedAtMS,
+		UpdatedAtMs: link.UpdatedAtMS,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	s.notifyLink(LinkEvent{Action: "created", Link: link})
+	return &link, nil
+}
+
+func (s *TodoService) UpdateLink(linkID string, patch map[string]any) (*Link, error) {
+	var sets []string
+	var args []any
+
+	if v, ok := patch["url"].(string); ok {
+		sets = append(sets, "url = ?")
+		args = append(args, v)
+	}
+	if v, ok := patch["title"].(string); ok {
+		sets = append(sets, "title = ?")
+		args = append(args, v)
+	}
+	if v, ok := patch["description"].(string); ok {
+		sets = append(sets, "description = ?")
+		args = append(args, v)
+	}
+	if v, ok := patch["tags"]; ok {
+		sets = append(sets, "tags = ?")
+		args = append(args, marshalTags(toStringSlice(v)))
+	}
+
+	if len(sets) == 0 {
+		return nil, fmt.Errorf("no fields to update")
+	}
+
+	now := time.Now().UnixMilli()
+	sets = append(sets, "updated_at_ms = ?")
+	args = append(args, now)
+	args = append(args, linkID)
+
+	query := fmt.Sprintf("UPDATE links SET %s WHERE id = ?", strings.Join(sets, ", "))
+	res, err := s.db.Exec(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return nil, fmt.Errorf("link not found: %s", linkID)
+	}
+
+	link := s.getLink(linkID)
+	if link != nil {
+		s.notifyLink(LinkEvent{Action: "updated", Link: *link})
+	}
+	return link, nil
+}
+
+func (s *TodoService) RemoveLink(linkID string) bool {
+	ctx := context.Background()
+	res, err := s.q.DeleteLink(ctx, linkID)
+	if err != nil {
+		return false
+	}
+	n, _ := res.RowsAffected()
+	if n > 0 {
+		s.notifyLink(LinkEvent{Action: "deleted", Link: Link{ID: linkID}})
+		return true
+	}
+	return false
+}
+
 // --- helpers ---
 
 func (s *TodoService) getTask(id string) *Task {
@@ -410,6 +519,29 @@ func dbTaskToTask(r dbq.Task) Task {
 		t.DoneAtMS = &r.DoneAtMs.Int64
 	}
 	return t
+}
+
+func (s *TodoService) getLink(id string) *Link {
+	ctx := context.Background()
+	row, err := s.q.GetLink(ctx, id)
+	if err != nil {
+		return nil
+	}
+	l := dbLinkToLink(row)
+	return &l
+}
+
+func dbLinkToLink(r dbq.Link) Link {
+	l := Link{
+		ID:          r.ID,
+		URL:         r.URL,
+		Title:       r.Title,
+		Description: r.Description,
+		CreatedAtMS: r.CreatedAtMs,
+		UpdatedAtMS: r.UpdatedAtMs,
+	}
+	json.Unmarshal([]byte(r.Tags), &l.Tags)
+	return l
 }
 
 func marshalTags(tags []string) string {

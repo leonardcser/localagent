@@ -581,6 +581,74 @@ export async function deleteBlock(id: string): Promise<boolean> {
   }
 }
 
+// --- Link API ---
+
+export interface Link {
+  id: string;
+  url: string;
+  title?: string;
+  description?: string;
+  tags?: string[];
+  createdAtMs: number;
+  updatedAtMs: number;
+}
+
+export async function getLinks(tag?: string): Promise<Link[]> {
+  if (DEV) return [];
+  try {
+    const qs = tag ? `?tag=${encodeURIComponent(tag)}` : "";
+    const res = await fetch(`/api/links${qs}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.links || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function createLink(link: Partial<Link>): Promise<Link | null> {
+  if (DEV) return null;
+  try {
+    const res = await fetch("/api/links", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(link),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function updateLink(
+  id: string,
+  patch: Partial<Link>,
+): Promise<Link | null> {
+  if (DEV) return null;
+  try {
+    const res = await fetch(`/api/links/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteLink(id: string): Promise<boolean> {
+  if (DEV) return true;
+  try {
+    const res = await fetch(`/api/links/${id}`, { method: "DELETE" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 // --- Image API ---
 
 export interface ImageJob {
@@ -796,6 +864,7 @@ export function connectSSE(
   onReconnect?: () => void,
   onTask?: (action: string, task: Task) => void,
   onBlock?: (action: string, block: Block) => void,
+  onLink?: (action: string, link: Link) => void,
 ): EventSource {
   if (DEV) return mockSSE(onMessage, onActivity);
 
@@ -824,6 +893,13 @@ export function connectSSE(
         onBlock
       ) {
         onBlock(data.action, data.block);
+      } else if (
+        data.type === "link" &&
+        data.action &&
+        data.link &&
+        onLink
+      ) {
+        onLink(data.action, data.link);
       } else if (data.type === "activity" && data.event) {
         onActivity(data.event);
       } else if (data.role && data.content) {

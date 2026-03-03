@@ -11,6 +11,7 @@ import {
 } from "$lib/api";
 import { taskStore } from "$lib/stores/task.svelte";
 import { blockStore } from "$lib/stores/block.svelte";
+import { linkStore } from "$lib/stores/link.svelte";
 import { nowTimestamp } from "$lib/utils";
 
 export type TimelineItem =
@@ -123,6 +124,9 @@ function createChat() {
       },
       (action, block) => {
         blockStore.applyEvent(action, block);
+      },
+      (action, link) => {
+        linkStore.applyEvent(action, link);
       },
     );
   }

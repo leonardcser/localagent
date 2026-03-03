@@ -8,6 +8,7 @@ import {
   FiCheckSquare,
   FiImage,
   FiCalendar,
+  FiLink,
   FiMenu,
   FiBell,
   FiBellOff,
@@ -41,6 +42,7 @@ const navItems = [
   { href: "/", icon: FiMessageCircle, label: "Chat" },
   { href: "/tasks", icon: FiCheckSquare, label: "Tasks" },
   { href: "/calendar", icon: FiCalendar, label: "Calendar" },
+  { href: "/links", icon: FiLink, label: "Links" },
   { href: "/images", icon: FiImage, label: "Images" },
 ];
 

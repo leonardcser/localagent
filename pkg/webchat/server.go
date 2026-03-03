@@ -95,6 +95,11 @@ func (s *Server) setupRoutes() {
 	s.echo.PUT("/api/blocks/:id", s.handleBlockUpdate)
 	s.echo.DELETE("/api/blocks/:id", s.handleBlockDelete)
 
+	s.echo.GET("/api/links", s.handleLinkList)
+	s.echo.POST("/api/links", s.handleLinkCreate)
+	s.echo.PUT("/api/links/:id", s.handleLinkUpdate)
+	s.echo.DELETE("/api/links/:id", s.handleLinkDelete)
+
 	s.echo.GET("/*", s.handleSPA)
 }
 

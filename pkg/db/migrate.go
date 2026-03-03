@@ -13,6 +13,7 @@ type migration struct {
 var migrations = []migration{
 	{1, migrateCreateTasks},
 	{2, migrateCreateBlocks},
+	{3, migrateCreateLinks},
 }
 
 func Migrate(db *sql.DB) error {
@@ -69,6 +70,23 @@ func migrateCreateTasks(tx *sql.Tx) error {
 		return err
 	}
 	_, err = tx.Exec(`CREATE INDEX idx_tasks_parent ON tasks(parent_id)`)
+	return err
+}
+
+func migrateCreateLinks(tx *sql.Tx) error {
+	_, err := tx.Exec(`CREATE TABLE links (
+		id            TEXT PRIMARY KEY,
+		url           TEXT NOT NULL,
+		title         TEXT NOT NULL DEFAULT '',
+		description   TEXT NOT NULL DEFAULT '',
+		tags          TEXT NOT NULL DEFAULT '[]',
+		created_at_ms INTEGER NOT NULL,
+		updated_at_ms INTEGER NOT NULL
+	)`)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`CREATE INDEX idx_links_created ON links(created_at_ms)`)
 	return err
 }
 

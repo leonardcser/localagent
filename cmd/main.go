@@ -275,6 +275,7 @@ func gatewayCmd() {
 	webCh.SetTodoService(agentLoop.GetTodoService())
 	agentLoop.GetTodoService().SetListener(webCh.BroadcastTaskEvent)
 	agentLoop.GetTodoService().SetBlockListener(webCh.BroadcastBlockEvent)
+	agentLoop.GetTodoService().SetLinkListener(webCh.BroadcastLinkEvent)
 	channelManager.RegisterChannel("web", webCh)
 	agentLoop.SetActivityEmitter(webCh)
 

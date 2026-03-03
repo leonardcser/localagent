@@ -17,6 +17,16 @@ type Block struct {
 	CreatedAtMs int64  `json:"createdAtMs"`
 }
 
+type Link struct {
+	ID          string `json:"id"`
+	URL         string `json:"url"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Tags        string `json:"tags"`
+	CreatedAtMs int64  `json:"createdAtMs"`
+	UpdatedAtMs int64  `json:"updatedAtMs"`
+}
+
 type Task struct {
 	ID          string        `json:"id"`
 	Title       string        `json:"title"`

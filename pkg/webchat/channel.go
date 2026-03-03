@@ -26,6 +26,7 @@ type OutgoingEvent struct {
 	Action     string        `json:"action,omitempty"`
 	TaskData   *todo.Task    `json:"task,omitempty"`
 	BlockData  *todo.Block   `json:"block,omitempty"`
+	LinkData   *todo.Link    `json:"link,omitempty"`
 }
 
 type ActivityData struct {
@@ -157,6 +158,14 @@ func (ch *WebChatChannel) BroadcastBlockEvent(evt todo.BlockEvent) {
 		Type:      "block",
 		Action:    evt.Action,
 		BlockData: &evt.Block,
+	})
+}
+
+func (ch *WebChatChannel) BroadcastLinkEvent(evt todo.LinkEvent) {
+	ch.broadcast(OutgoingEvent{
+		Type:     "link",
+		Action:   evt.Action,
+		LinkData: &evt.Link,
 	})
 }
 

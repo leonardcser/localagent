@@ -100,6 +100,11 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 	registry.Register(tools.NewAddBlockTool(todoService))
 	registry.Register(tools.NewRemoveBlockTool(todoService))
 
+	// Link tools
+	registry.Register(tools.NewListLinksTool(todoService))
+	registry.Register(tools.NewAddLinkTool(todoService))
+	registry.Register(tools.NewRemoveLinkTool(todoService))
+
 	registry.Register(tools.NewMessageTool(msgBus, sessions))
 
 	if cfg.Tools.PDF.URL != "" {
