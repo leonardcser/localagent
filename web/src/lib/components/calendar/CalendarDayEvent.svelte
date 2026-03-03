@@ -5,10 +5,10 @@ import { Icon } from "svelte-icons-pack";
 import { FiExternalLink } from "svelte-icons-pack/fi";
 
 interface Props {
-	event: CalendarEvent;
-	colWidth: number;
-	onMove?: (colDelta: number) => void;
-	onViewTask?: (taskId: string) => void;
+  event: CalendarEvent;
+  colWidth: number;
+  onMove?: (colDelta: number) => void;
+  onViewTask?: (taskId: string) => void;
 }
 
 let { event, colWidth, onMove, onViewTask }: Props = $props();
@@ -18,24 +18,24 @@ let deltaX = $state(0);
 let startX = 0;
 
 function startDrag(e: MouseEvent) {
-	if (!onMove || e.button !== 0) return;
-	e.preventDefault();
-	dragging = true;
-	startX = e.clientX;
-	deltaX = 0;
+  if (!onMove || e.button !== 0) return;
+  e.preventDefault();
+  dragging = true;
+  startX = e.clientX;
+  deltaX = 0;
 }
 
 function handleMove(e: MouseEvent) {
-	if (!dragging) return;
-	deltaX = e.clientX - startX;
+  if (!dragging) return;
+  deltaX = e.clientX - startX;
 }
 
 function handleUp() {
-	if (!dragging) return;
-	dragging = false;
-	const colDelta = Math.round(deltaX / colWidth);
-	if (colDelta !== 0) onMove?.(colDelta);
-	deltaX = 0;
+  if (!dragging) return;
+  dragging = false;
+  const colDelta = Math.round(deltaX / colWidth);
+  if (colDelta !== 0) onMove?.(colDelta);
+  deltaX = 0;
 }
 </script>
 

@@ -136,7 +136,10 @@ export function calculateNewEventTime(
   const absoluteY =
     delta.y + startHour * rowHeight + (startMinute / 60) * rowHeight;
 
-  const newCol = Math.max(0, Math.min(numCols - 1, Math.round(absoluteX / colWidth)));
+  const newCol = Math.max(
+    0,
+    Math.min(numCols - 1, Math.round(absoluteX / colWidth)),
+  );
   const rawHours = absoluteY / rowHeight;
   const newHours = Math.max(0, Math.min(23, Math.floor(rawHours)));
   const newMinutes =

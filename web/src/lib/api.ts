@@ -893,12 +893,7 @@ export function connectSSE(
         onBlock
       ) {
         onBlock(data.action, data.block);
-      } else if (
-        data.type === "link" &&
-        data.action &&
-        data.link &&
-        onLink
-      ) {
+      } else if (data.type === "link" && data.action && data.link && onLink) {
         onLink(data.action, data.link);
       } else if (data.type === "activity" && data.event) {
         onActivity(data.event);

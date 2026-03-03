@@ -2,18 +2,18 @@
 import { Select } from "bits-ui";
 import { Icon } from "svelte-icons-pack";
 import {
-	FiX,
-	FiTrash2,
-	FiArrowLeft,
-	FiPlus,
-	FiCheck,
-	FiList,
-	FiCalendar,
-	FiTag,
-	FiCornerDownRight,
-	FiChevronDown,
-	FiRepeat,
-	FiClock,
+  FiX,
+  FiTrash2,
+  FiArrowLeft,
+  FiPlus,
+  FiCheck,
+  FiList,
+  FiCalendar,
+  FiTag,
+  FiCornerDownRight,
+  FiChevronDown,
+  FiRepeat,
+  FiClock,
 } from "svelte-icons-pack/fi";
 import { taskStore } from "$lib/stores/task.svelte";
 import { blockStore } from "$lib/stores/block.svelte";
@@ -23,14 +23,20 @@ import BlockPicker from "$lib/components/BlockPicker.svelte";
 import type { Task } from "$lib/api";
 
 interface Props {
-	task: Task | null; // null = add mode
-	parentId?: string;
-	onClose: () => void;
-	onSelectTask?: (task: Task) => void; // navigate to subtask
-	onAddSubtask?: (parentId: string) => void;
+  task: Task | null; // null = add mode
+  parentId?: string;
+  onClose: () => void;
+  onSelectTask?: (task: Task) => void; // navigate to subtask
+  onAddSubtask?: (parentId: string) => void;
 }
 
-let { task, parentId = "", onClose, onSelectTask, onAddSubtask }: Props = $props();
+let {
+  task,
+  parentId = "",
+  onClose,
+  onSelectTask,
+  onAddSubtask,
+}: Props = $props();
 
 let mode = $derived<"add" | "edit">(task === null ? "add" : "edit");
 
@@ -46,75 +52,78 @@ let selectedParentId = $state(task?.parentId ?? parentId);
 
 // Re-sync when task changes (e.g. navigating between tasks)
 $effect(() => {
-	title = task?.title ?? "";
-	description = task?.description ?? "";
-	priority = task?.priority ?? "";
-	due = task?.due ?? "";
-	recurrence = task?.recurrence ?? "";
-	tagsRaw = (task?.tags ?? []).join(", ");
-	status = task?.status ?? "todo";
-	selectedParentId = task?.parentId ?? parentId;
+  title = task?.title ?? "";
+  description = task?.description ?? "";
+  priority = task?.priority ?? "";
+  due = task?.due ?? "";
+  recurrence = task?.recurrence ?? "";
+  tagsRaw = (task?.tags ?? []).join(", ");
+  status = task?.status ?? "todo";
+  selectedParentId = task?.parentId ?? parentId;
 });
 
 const statusOptions = [
-	{ value: "todo", label: "To Do" },
-	{ value: "doing", label: "In Progress" },
-	{ value: "done", label: "Done" },
+  { value: "todo", label: "To Do" },
+  { value: "doing", label: "In Progress" },
+  { value: "done", label: "Done" },
 ];
 
 const priorityOptions = [
-	{ value: "", label: "None" },
-	{ value: "low", label: "Low" },
-	{ value: "medium", label: "Medium" },
-	{ value: "high", label: "High" },
+  { value: "", label: "None" },
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
 ];
 
 function parseTags(raw: string): string[] | undefined {
-	const tags = raw.split(",").map((t) => t.trim()).filter(Boolean);
-	return tags.length > 0 ? tags : undefined;
+  const tags = raw
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  return tags.length > 0 ? tags : undefined;
 }
 
 function priorityColor(p?: string): string {
-	if (p === "high") return "bg-error";
-	if (p === "medium") return "bg-warning";
-	if (p === "low") return "bg-text-muted";
-	return "";
+  if (p === "high") return "bg-error";
+  if (p === "medium") return "bg-warning";
+  if (p === "low") return "bg-text-muted";
+  return "";
 }
 
 // Auto-save
 async function autoSave(patch: Partial<Task>) {
-	if (mode !== "edit" || !task) return;
-	await taskStore.update(task.id, patch);
+  if (mode !== "edit" || !task) return;
+  await taskStore.update(task.id, patch);
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function debouncedAutoSave(patch: Partial<Task>) {
-	if (saveTimer) clearTimeout(saveTimer);
-	saveTimer = setTimeout(() => autoSave(patch), 400);
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => autoSave(patch), 400);
 }
 
 // Add mode submit
 async function handleAddSubmit(e: SubmitEvent) {
-	e.preventDefault();
-	if (!title.trim()) return;
-	await taskStore.add({
-		title: title.trim(),
-		description: description.trim() || undefined,
-		priority: priority || undefined,
-		due: due || undefined,
-		recurrence: recurrence || undefined,
-		tags: parseTags(tagsRaw),
-		status,
-		parentId: selectedParentId || undefined,
-	});
-	onClose();
+  e.preventDefault();
+  if (!title.trim()) return;
+  await taskStore.add({
+    title: title.trim(),
+    description: description.trim() || undefined,
+    priority: priority || undefined,
+    due: due || undefined,
+    recurrence: recurrence || undefined,
+    tags: parseTags(tagsRaw),
+    status,
+    parentId: selectedParentId || undefined,
+  });
+  onClose();
 }
 
 async function handleDelete() {
-	if (mode === "edit" && task) {
-		await taskStore.remove(task.id);
-		onClose();
-	}
+  if (mode === "edit" && task) {
+    await taskStore.remove(task.id);
+    onClose();
+  }
 }
 
 let taskBlocks = $derived(task ? blockStore.forTask(task.id) : []);

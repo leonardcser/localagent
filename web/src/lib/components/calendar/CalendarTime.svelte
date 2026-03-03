@@ -3,10 +3,10 @@ import { onMount } from "svelte";
 import { isSameDay, addDays } from "$lib/calendar";
 
 interface Props {
-	rowHeight: number;
-	yOffset: number;
-	viewStart: Date;
-	numCols: number;
+  rowHeight: number;
+  yOffset: number;
+  viewStart: Date;
+  numCols: number;
 }
 
 let { rowHeight, yOffset, viewStart, numCols }: Props = $props();
@@ -14,29 +14,32 @@ let { rowHeight, yOffset, viewStart, numCols }: Props = $props();
 let now = $state(new Date());
 
 let top = $derived(
-	yOffset + rowHeight * now.getHours() + (rowHeight / 60) * now.getMinutes() + 1,
+  yOffset +
+    rowHeight * now.getHours() +
+    (rowHeight / 60) * now.getMinutes() +
+    1,
 );
 
 let dayIndex = $derived.by(() => {
-	for (let i = 0; i < numCols; i++) {
-		if (isSameDay(now, addDays(viewStart, i))) return i;
-	}
-	return -1;
+  for (let i = 0; i < numCols; i++) {
+    if (isSameDay(now, addDays(viewStart, i))) return i;
+  }
+  return -1;
 });
 
 onMount(() => {
-	const interval = setInterval(() => {
-		now = new Date();
-	}, 60000);
-	return () => clearInterval(interval);
+  const interval = setInterval(() => {
+    now = new Date();
+  }, 60000);
+  return () => clearInterval(interval);
 });
 
 function formatTime(d: Date): string {
-	return d.toLocaleTimeString(undefined, {
-		hour: "2-digit",
-		minute: "2-digit",
-		hour12: false,
-	});
+  return d.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 </script>
 

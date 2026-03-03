@@ -7,47 +7,51 @@ import { FiExternalLink, FiTrash2 } from "svelte-icons-pack/fi";
 import Draggable from "./Draggable.svelte";
 
 interface Props {
-	event: EventWithOverlap;
-	calendarWidth: number;
-	rowHeight: number;
-	yOffset: number;
-	viewStart: Date;
-	numCols: number;
-	onDragEnd?: (delta: { x: number; y: number }) => void;
-	onResize?: (newEndMs: number) => void;
-	onDelete?: () => void;
-	onViewTask?: (taskId: string) => void;
+  event: EventWithOverlap;
+  calendarWidth: number;
+  rowHeight: number;
+  yOffset: number;
+  viewStart: Date;
+  numCols: number;
+  onDragEnd?: (delta: { x: number; y: number }) => void;
+  onResize?: (newEndMs: number) => void;
+  onDelete?: () => void;
+  onViewTask?: (taskId: string) => void;
 }
 
 let {
-	event,
-	calendarWidth,
-	rowHeight,
-	yOffset,
-	viewStart,
-	numCols,
-	onDragEnd,
-	onResize,
-	onDelete,
-	onViewTask,
+  event,
+  calendarWidth,
+  rowHeight,
+  yOffset,
+  viewStart,
+  numCols,
+  onDragEnd,
+  onResize,
+  onDelete,
+  onViewTask,
 }: Props = $props();
 
 let start = $derived(new Date(event.startMs));
 let durationMin = $derived((event.endMs - event.startMs) / 60000);
 
 let colIndex = $derived.by(() => {
-	for (let i = 0; i < numCols; i++) {
-		if (isSameDay(start, addDays(viewStart, i))) return i;
-	}
-	return 0;
+  for (let i = 0; i < numCols; i++) {
+    if (isSameDay(start, addDays(viewStart, i))) return i;
+  }
+  return 0;
 });
 
 let colWidth = $derived(calendarWidth / numCols);
-let top = $derived(start.getHours() * rowHeight + (start.getMinutes() / 60) * rowHeight);
+let top = $derived(
+  start.getHours() * rowHeight + (start.getMinutes() / 60) * rowHeight,
+);
 let leftPct = $derived((100 / event.overlapCount) * event.overlapIndex);
 let widthPct = $derived(100 / event.overlapCount);
 // min height = 15 min
-let baseHeight = $derived(Math.max((durationMin / 60) * rowHeight, rowHeight / 4));
+let baseHeight = $derived(
+  Math.max((durationMin / 60) * rowHeight, rowHeight / 4),
+);
 
 // --- Resize ---
 let resizing = $state(false);
@@ -55,44 +59,46 @@ let resizeDeltaY = $state(0);
 let resizeStartY = 0;
 
 function startResize(e: MouseEvent) {
-	e.stopPropagation();
-	e.preventDefault();
-	resizing = true;
-	resizeStartY = e.clientY;
-	resizeDeltaY = 0;
+  e.stopPropagation();
+  e.preventDefault();
+  resizing = true;
+  resizeStartY = e.clientY;
+  resizeDeltaY = 0;
 }
 
 function handleResizeMove(e: MouseEvent) {
-	if (!resizing) return;
-	resizeDeltaY = e.clientY - resizeStartY;
+  if (!resizing) return;
+  resizeDeltaY = e.clientY - resizeStartY;
 }
 
 function handleResizeUp() {
-	if (!resizing) return;
-	resizing = false;
-	// Snap to 15-min grid
-	const step = rowHeight / 4;
-	const snapped = Math.round(resizeDeltaY / step) * step;
-	const deltaMs = (snapped / rowHeight) * 3600000;
-	const newEndMs = Math.max(event.startMs + 15 * 60000, event.endMs + deltaMs);
-	onResize?.(newEndMs);
-	resizeDeltaY = 0;
+  if (!resizing) return;
+  resizing = false;
+  // Snap to 15-min grid
+  const step = rowHeight / 4;
+  const snapped = Math.round(resizeDeltaY / step) * step;
+  const deltaMs = (snapped / rowHeight) * 3600000;
+  const newEndMs = Math.max(event.startMs + 15 * 60000, event.endMs + deltaMs);
+  onResize?.(newEndMs);
+  resizeDeltaY = 0;
 }
 
-let displayHeight = $derived(Math.max(baseHeight + resizeDeltaY, rowHeight / 4));
+let displayHeight = $derived(
+  Math.max(baseHeight + resizeDeltaY, rowHeight / 4),
+);
 
 function formatTime(d: Date): string {
-	return d.toLocaleTimeString(undefined, {
-		hour: "2-digit",
-		minute: "2-digit",
-		hour12: false,
-	});
+  return d.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 let draggableRef = $state<{ reset: () => void }>();
 
 $effect(() => {
-	if (draggableRef && event.draggable) draggableRef.reset();
+  if (draggableRef && event.draggable) draggableRef.reset();
 });
 </script>
 

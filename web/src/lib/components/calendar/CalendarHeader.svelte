@@ -6,74 +6,102 @@ import type { CalendarView } from "$lib/calendar";
 import { cn } from "$lib/utils";
 
 interface Props {
-	indexColWidth: number;
-	date: Date;
-	view: CalendarView;
-	numCols: number;
-	viewStart: Date;
-	navigate: (dir: -1 | 1) => void;
-	goToToday: () => void;
-	setView: (v: CalendarView) => void;
+  indexColWidth: number;
+  date: Date;
+  view: CalendarView;
+  numCols: number;
+  viewStart: Date;
+  navigate: (dir: -1 | 1) => void;
+  goToToday: () => void;
+  setView: (v: CalendarView) => void;
 }
 
-let { indexColWidth, date, view, numCols, viewStart, navigate, goToToday, setView }: Props =
-	$props();
+let {
+  indexColWidth,
+  date,
+  view,
+  numCols,
+  viewStart,
+  navigate,
+  goToToday,
+  setView,
+}: Props = $props();
 
 let today = $state(new Date());
 
 let isCurrentPeriod = $derived.by(() => {
-	const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-	const end = addDays(viewStart, numCols);
-	return t >= viewStart && t < end;
+  const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const end = addDays(viewStart, numCols);
+  return t >= viewStart && t < end;
 });
 
 const MONTHS = [
-	"January", "February", "March", "April", "May", "June",
-	"July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 const MONTHS_SHORT = [
-	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 function getISOWeek(d: Date): number {
-	const tmp = new Date(d.getTime());
-	tmp.setHours(0, 0, 0, 0);
-	tmp.setDate(tmp.getDate() + 3 - ((tmp.getDay() + 6) % 7));
-	const week1 = new Date(tmp.getFullYear(), 0, 4);
-	return (
-		1 +
-		Math.round(
-			((tmp.getTime() - week1.getTime()) / 86400000 -
-				3 +
-				((week1.getDay() + 6) % 7)) /
-				7,
-		)
-	);
+  const tmp = new Date(d.getTime());
+  tmp.setHours(0, 0, 0, 0);
+  tmp.setDate(tmp.getDate() + 3 - ((tmp.getDay() + 6) % 7));
+  const week1 = new Date(tmp.getFullYear(), 0, 4);
+  return (
+    1 +
+    Math.round(
+      ((tmp.getTime() - week1.getTime()) / 86400000 -
+        3 +
+        ((week1.getDay() + 6) % 7)) /
+        7,
+    )
+  );
 }
 
 function headerTitle(): string {
-	if (view === "day") {
-		const d = viewStart;
-		const day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()];
-		return `${day}, ${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}`;
-	}
-	if (view === "3day") {
-		const end = addDays(viewStart, 2);
-		if (viewStart.getMonth() === end.getMonth()) {
-			return `${MONTHS_SHORT[viewStart.getMonth()]} ${viewStart.getDate()}–${end.getDate()}`;
-		}
-		return `${MONTHS_SHORT[viewStart.getMonth()]} ${viewStart.getDate()} – ${MONTHS_SHORT[end.getMonth()]} ${end.getDate()}`;
-	}
-	// week
-	return `${MONTHS[viewStart.getMonth()]} ${viewStart.getFullYear()}`;
+  if (view === "day") {
+    const d = viewStart;
+    const day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()];
+    return `${day}, ${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}`;
+  }
+  if (view === "3day") {
+    const end = addDays(viewStart, 2);
+    if (viewStart.getMonth() === end.getMonth()) {
+      return `${MONTHS_SHORT[viewStart.getMonth()]} ${viewStart.getDate()}–${end.getDate()}`;
+    }
+    return `${MONTHS_SHORT[viewStart.getMonth()]} ${viewStart.getDate()} – ${MONTHS_SHORT[end.getMonth()]} ${end.getDate()}`;
+  }
+  // week
+  return `${MONTHS[viewStart.getMonth()]} ${viewStart.getFullYear()}`;
 }
 
 const views: { key: CalendarView; label: string }[] = [
-	{ key: "day", label: "Day" },
-	{ key: "3day", label: "3D" },
-	{ key: "week", label: "Week" },
+  { key: "day", label: "Day" },
+  { key: "3day", label: "3D" },
+  { key: "week", label: "Week" },
 ];
 </script>
 

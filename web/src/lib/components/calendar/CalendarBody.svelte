@@ -1,10 +1,10 @@
 <script lang="ts">
 import {
-	computeCalendarEventsOverlaps,
-	calculateNewEventTime,
-	addDays,
-	isSameDay,
-	type CalendarEvent as CalendarEventType,
+  computeCalendarEventsOverlaps,
+  calculateNewEventTime,
+  addDays,
+  isSameDay,
+  type CalendarEvent as CalendarEventType,
 } from "$lib/calendar";
 import { blockStore } from "$lib/stores/block.svelte";
 import { taskStore } from "$lib/stores/task.svelte";
@@ -16,15 +16,22 @@ import CalendarEventComp from "./CalendarEvent.svelte";
 import CalendarDayEvent from "./CalendarDayEvent.svelte";
 
 interface Props {
-	events: CalendarEventType[];
-	indexColWidth: number;
-	rowHeight: number;
-	viewStart: Date;
-	numCols: number;
-	onViewTask?: (taskId: string) => void;
+  events: CalendarEventType[];
+  indexColWidth: number;
+  rowHeight: number;
+  viewStart: Date;
+  numCols: number;
+  onViewTask?: (taskId: string) => void;
 }
 
-let { events, indexColWidth, rowHeight, viewStart, numCols, onViewTask }: Props = $props();
+let {
+  events,
+  indexColWidth,
+  rowHeight,
+  viewStart,
+  numCols,
+  onViewTask,
+}: Props = $props();
 
 let timedEvents = $derived(events.filter((e) => !e.isAllDay));
 let dayEvents = $derived(events.filter((e) => e.isAllDay));
@@ -32,17 +39,20 @@ let dayEvents = $derived(events.filter((e) => e.isAllDay));
 let eventsWithOverlap = $derived(computeCalendarEventsOverlaps(timedEvents));
 
 let dayEventsByCol = $derived.by(() => {
-	const byCol: CalendarEventType[][] = Array.from({ length: numCols }, () => []);
-	for (const evt of dayEvents) {
-		const d = new Date(evt.startMs);
-		for (let i = 0; i < numCols; i++) {
-			if (isSameDay(d, addDays(viewStart, i))) {
-				byCol[i].push(evt);
-				break;
-			}
-		}
-	}
-	return byCol;
+  const byCol: CalendarEventType[][] = Array.from(
+    { length: numCols },
+    () => [],
+  );
+  for (const evt of dayEvents) {
+    const d = new Date(evt.startMs);
+    for (let i = 0; i < numCols; i++) {
+      if (isSameDay(d, addDays(viewStart, i))) {
+        byCol[i].push(evt);
+        break;
+      }
+    }
+  }
+  return byCol;
 });
 
 let scrollableRef = $state<HTMLDivElement>();
@@ -50,67 +60,71 @@ let calendarBodyRef = $state<HTMLDivElement>();
 let calendarWidth = $state(0);
 
 onMount(() => {
-	if (scrollableRef) {
-		const saved = localStorage.getItem("calendarScrollY");
-		if (saved) {
-			scrollableRef.scrollTo(0, parseInt(saved));
-		} else {
-			scrollableRef.scrollTo(0, new Date().getHours() * rowHeight);
-		}
-	}
+  if (scrollableRef) {
+    const saved = localStorage.getItem("calendarScrollY");
+    if (saved) {
+      scrollableRef.scrollTo(0, parseInt(saved));
+    } else {
+      scrollableRef.scrollTo(0, new Date().getHours() * rowHeight);
+    }
+  }
 
-	if (calendarBodyRef) {
-		calendarWidth = calendarBodyRef.clientWidth;
-		const ro = new ResizeObserver(() => {
-			if (calendarBodyRef) calendarWidth = calendarBodyRef.clientWidth;
-		});
-		ro.observe(calendarBodyRef);
-		return () => ro.disconnect();
-	}
+  if (calendarBodyRef) {
+    calendarWidth = calendarBodyRef.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (calendarBodyRef) calendarWidth = calendarBodyRef.clientWidth;
+    });
+    ro.observe(calendarBodyRef);
+    return () => ro.disconnect();
+  }
 });
 
 function handleScroll() {
-	if (scrollableRef) {
-		localStorage.setItem("calendarScrollY", String(scrollableRef.scrollTop));
-	}
+  if (scrollableRef) {
+    localStorage.setItem("calendarScrollY", String(scrollableRef.scrollTop));
+  }
 }
 
 // --- Timed event drag ---
 function handleDragEnd(
-	event: CalendarEventType & { overlapIndex: number; overlapCount: number },
-	delta: { x: number; y: number },
+  event: CalendarEventType & { overlapIndex: number; overlapCount: number },
+  delta: { x: number; y: number },
 ) {
-	if (!event.blockId) return;
-	const newTime = calculateNewEventTime(
-		event,
-		delta,
-		calendarWidth,
-		rowHeight,
-		numCols,
-		viewStart,
-	);
-	blockStore.update(event.blockId, {
-		startAtMs: newTime.startMs,
-		endAtMs: newTime.endMs,
-	});
+  if (!event.blockId) return;
+  const newTime = calculateNewEventTime(
+    event,
+    delta,
+    calendarWidth,
+    rowHeight,
+    numCols,
+    viewStart,
+  );
+  blockStore.update(event.blockId, {
+    startAtMs: newTime.startMs,
+    endAtMs: newTime.endMs,
+  });
 }
 
 // --- Timed event resize ---
 function handleResize(event: CalendarEventType, newEndMs: number) {
-	if (!event.blockId) return;
-	blockStore.update(event.blockId, { endAtMs: newEndMs });
+  if (!event.blockId) return;
+  blockStore.update(event.blockId, { endAtMs: newEndMs });
 }
 
 // --- All-day event drag (task due date change) ---
-function handleAllDayMove(event: CalendarEventType, colI: number, colDelta: number) {
-	const newCol = Math.max(0, Math.min(numCols - 1, colI + colDelta));
-	const newDate = addDays(viewStart, newCol);
-	const dateStr = newDate.toISOString().slice(0, 10);
-	taskStore.update(event.taskId, { due: dateStr });
+function handleAllDayMove(
+  event: CalendarEventType,
+  colI: number,
+  colDelta: number,
+) {
+  const newCol = Math.max(0, Math.min(numCols - 1, colI + colDelta));
+  const newDate = addDays(viewStart, newCol);
+  const dateStr = newDate.toISOString().slice(0, 10);
+  taskStore.update(event.taskId, { due: dateStr });
 }
 
 function formatHour(hour: number): string {
-	return `${hour.toString().padStart(2, "0")}:00`;
+  return `${hour.toString().padStart(2, "0")}:00`;
 }
 
 let rowStartOffset = $derived(rowHeight / 2);
@@ -119,48 +133,51 @@ let colWidth = $derived(calendarWidth / numCols);
 // --- Click-to-create ---
 
 interface CreateState {
-	startMs: number;
-	endMs: number;
-	taskId: string;
-	note: string;
+  startMs: number;
+  endMs: number;
+  taskId: string;
+  note: string;
 }
 
 let createState = $state<CreateState | null>(null);
 
 function msToTimeStr(ms: number): string {
-	const d = new Date(ms);
-	return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+  const d = new Date(ms);
+  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
 function handleGridClick(e: MouseEvent) {
-	if (!calendarBodyRef || !calendarWidth) return;
-	const rect = calendarBodyRef.getBoundingClientRect();
-	const x = e.clientX - rect.left;
-	const y = e.clientY - rect.top - rowStartOffset;
-	if (y < 0) return;
+  if (!calendarBodyRef || !calendarWidth) return;
+  const rect = calendarBodyRef.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top - rowStartOffset;
+  if (y < 0) return;
 
-	const col = Math.max(0, Math.min(numCols - 1, Math.floor((x / calendarWidth) * numCols)));
-	const totalMinutes = Math.floor(((y / rowHeight) * 60) / 15) * 15;
-	const hours = Math.floor(totalMinutes / 60);
-	const minutes = totalMinutes % 60;
+  const col = Math.max(
+    0,
+    Math.min(numCols - 1, Math.floor((x / calendarWidth) * numCols)),
+  );
+  const totalMinutes = Math.floor(((y / rowHeight) * 60) / 15) * 15;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
 
-	const day = addDays(viewStart, col);
-	day.setHours(hours, minutes, 0, 0);
-	const startMs = day.getTime();
-	const endMs = startMs + 3600000;
+  const day = addDays(viewStart, col);
+  day.setHours(hours, minutes, 0, 0);
+  const startMs = day.getTime();
+  const endMs = startMs + 3600000;
 
-	createState = { startMs, endMs, taskId: "", note: "" };
+  createState = { startMs, endMs, taskId: "", note: "" };
 }
 
 async function submitCreate() {
-	if (!createState || !createState.taskId) return;
-	await blockStore.add({
-		taskId: createState.taskId,
-		startAtMs: createState.startMs,
-		endAtMs: createState.endMs,
-		note: createState.note || undefined,
-	});
-	createState = null;
+  if (!createState || !createState.taskId) return;
+  await blockStore.add({
+    taskId: createState.taskId,
+    startAtMs: createState.startMs,
+    endAtMs: createState.endMs,
+    note: createState.note || undefined,
+  });
+  createState = null;
 }
 
 let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
