@@ -19,7 +19,7 @@ type Block struct {
 
 type Link struct {
 	ID          string `json:"id"`
-	URL         string `json:"url"`
+	Url         string `json:"url"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Tags        string `json:"tags"`

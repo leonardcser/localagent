@@ -396,7 +396,7 @@ func (s *TodoService) AddLink(link Link) (*Link, error) {
 
 	err := s.q.InsertLink(ctx, dbq.InsertLinkParams{
 		ID:          link.ID,
-		URL:         link.URL,
+		Url:         link.URL,
 		Title:       link.Title,
 		Description: link.Description,
 		Tags:        marshalTags(link.Tags),
@@ -534,7 +534,7 @@ func (s *TodoService) getLink(id string) *Link {
 func dbLinkToLink(r dbq.Link) Link {
 	l := Link{
 		ID:          r.ID,
-		URL:         r.URL,
+		URL:         r.Url,
 		Title:       r.Title,
 		Description: r.Description,
 		CreatedAtMS: r.CreatedAtMs,

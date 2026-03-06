@@ -1,8 +1,8 @@
 -- name: ListTasks :many
-SELECT * FROM tasks ORDER BY sort_order;
+SELECT * FROM tasks ORDER BY sort_order, CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END;
 
 -- name: ListTasksByStatus :many
-SELECT * FROM tasks WHERE status = ? ORDER BY sort_order;
+SELECT * FROM tasks WHERE status = ? ORDER BY sort_order, CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END;
 
 -- name: GetTask :one
 SELECT * FROM tasks WHERE id = ?;

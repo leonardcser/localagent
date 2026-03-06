@@ -119,7 +119,7 @@ func (q *Queries) InsertTask(ctx context.Context, arg InsertTaskParams) error {
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT id, title, description, status, priority, due, recurrence, tags, parent_id, sort_order, created_at_ms, updated_at_ms, done_at_ms FROM tasks ORDER BY sort_order
+SELECT id, title, description, status, priority, due, recurrence, tags, parent_id, sort_order, created_at_ms, updated_at_ms, done_at_ms FROM tasks ORDER BY sort_order, CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END
 `
 
 func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
@@ -160,7 +160,7 @@ func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
 }
 
 const listTasksByStatus = `-- name: ListTasksByStatus :many
-SELECT id, title, description, status, priority, due, recurrence, tags, parent_id, sort_order, created_at_ms, updated_at_ms, done_at_ms FROM tasks WHERE status = ? ORDER BY sort_order
+SELECT id, title, description, status, priority, due, recurrence, tags, parent_id, sort_order, created_at_ms, updated_at_ms, done_at_ms FROM tasks WHERE status = ? ORDER BY sort_order, CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END
 `
 
 func (q *Queries) ListTasksByStatus(ctx context.Context, status string) ([]Task, error) {

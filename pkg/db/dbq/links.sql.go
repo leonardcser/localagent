@@ -27,7 +27,7 @@ func (q *Queries) GetLink(ctx context.Context, id string) (Link, error) {
 	var i Link
 	err := row.Scan(
 		&i.ID,
-		&i.URL,
+		&i.Url,
 		&i.Title,
 		&i.Description,
 		&i.Tags,
@@ -44,7 +44,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?)
 
 type InsertLinkParams struct {
 	ID          string `json:"id"`
-	URL         string `json:"url"`
+	Url         string `json:"url"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Tags        string `json:"tags"`
@@ -55,7 +55,7 @@ type InsertLinkParams struct {
 func (q *Queries) InsertLink(ctx context.Context, arg InsertLinkParams) error {
 	_, err := q.db.ExecContext(ctx, insertLink,
 		arg.ID,
-		arg.URL,
+		arg.Url,
 		arg.Title,
 		arg.Description,
 		arg.Tags,
@@ -80,7 +80,7 @@ func (q *Queries) ListLinks(ctx context.Context) ([]Link, error) {
 		var i Link
 		if err := rows.Scan(
 			&i.ID,
-			&i.URL,
+			&i.Url,
 			&i.Title,
 			&i.Description,
 			&i.Tags,
@@ -105,7 +105,7 @@ UPDATE links SET url=?, title=?, description=?, tags=?, updated_at_ms=? WHERE id
 `
 
 type UpdateLinkParams struct {
-	URL         string `json:"url"`
+	Url         string `json:"url"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Tags        string `json:"tags"`
@@ -115,7 +115,7 @@ type UpdateLinkParams struct {
 
 func (q *Queries) UpdateLink(ctx context.Context, arg UpdateLinkParams) error {
 	_, err := q.db.ExecContext(ctx, updateLink,
-		arg.URL,
+		arg.Url,
 		arg.Title,
 		arg.Description,
 		arg.Tags,

@@ -133,6 +133,19 @@ function createTaskStore() {
     };
   });
 
+  function getPriorityValue(priority?: string): number {
+    switch (priority) {
+      case "high":
+        return 1;
+      case "medium":
+        return 2;
+      case "low":
+        return 3;
+      default:
+        return 4;
+    }
+  }
+
   let filtered = $derived.by(() => {
     let result = tasks;
 
@@ -202,7 +215,15 @@ function createTaskStore() {
       );
     }
 
-    return [...result].sort((a, b) => (a.order || 0) - (b.order || 0));
+    return [...result].sort((a, b) => {
+      const orderA = a.order ?? 0;
+      const orderB = b.order ?? 0;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      // Same order, sort by priority (high > medium > low)
+      return getPriorityValue(a.priority) - getPriorityValue(b.priority);
+    });
   });
 
   let kanbanColumns = $derived.by(() => {
