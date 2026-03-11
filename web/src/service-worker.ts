@@ -2,68 +2,19 @@
 /// <reference lib="esnext" />
 /// <reference lib="webworker" />
 
-import { build, files, version } from "$service-worker";
-
 const sw = self as unknown as ServiceWorkerGlobalScope;
-const CACHE_NAME = `app-${version}`;
 
-// Assets to precache: build output (JS/CSS) + static files (icons, manifest)
-const precacheUrls = [...build, ...files];
-
-// --- Install: precache app shell ---
-sw.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(CACHE_NAME)
-      .then((cache) => cache.addAll(precacheUrls))
-      .then(() => sw.skipWaiting()),
-  );
-});
-
-// --- Activate: clean old caches, claim clients ---
+// Activate immediately, claim all clients.
+// No caching, no fetch interception — the Go server handles everything.
+// This SW exists solely for push notifications.
+sw.addEventListener("install", () => sw.skipWaiting());
 sw.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) =>
-        Promise.all(
-          keys
-            .filter((k) => k.startsWith("app-") && k !== CACHE_NAME)
-            .map((k) => caches.delete(k)),
-        ),
-      )
+      .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
       .then(() => sw.clients.claim()),
   );
-});
-
-// --- Fetch: cache-first for immutable build assets only ---
-// Navigation requests are NOT intercepted — let the browser fetch from the
-// server directly. Intercepting navigation breaks iOS PWAs: WebKit can fail
-// to restore the SW context after force-quit, returning an empty response
-// and causing a white screen (WebKit #211018, #261767).
-sw.addEventListener("fetch", (event) => {
-  const url = new URL(event.request.url);
-
-  // Only handle immutable build assets (hashed filenames, safe to cache forever)
-  if (
-    event.request.method === "GET" &&
-    url.pathname.startsWith("/_app/immutable/")
-  ) {
-    event.respondWith(
-      caches.match(event.request).then((cached) => {
-        if (cached) return cached;
-        return fetch(event.request).then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches
-              .open(CACHE_NAME)
-              .then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        });
-      }),
-    );
-  }
 });
 
 // --- Push notifications ---
