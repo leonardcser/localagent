@@ -2,6 +2,7 @@
 import { onMount } from "svelte";
 import { linkStore } from "$lib/stores/link.svelte";
 import type { Link } from "$lib/api";
+import { ContextMenu } from "bits-ui";
 import { Icon } from "svelte-icons-pack";
 import {
   FiPlus,
@@ -13,6 +14,8 @@ import {
   FiArrowLeft,
   FiLink,
   FiChevronRight,
+  FiEdit2,
+  FiCopy,
 } from "svelte-icons-pack/fi";
 
 // --- State ---
@@ -145,6 +148,10 @@ async function removeLink(id: string, e?: MouseEvent) {
   e?.stopPropagation();
   await linkStore.remove(id);
   if (panelOpen && editId === id) closePanel();
+}
+
+async function copyUrl(url: string) {
+  await navigator.clipboard.writeText(url);
 }
 </script>
 
@@ -367,74 +374,115 @@ async function removeLink(id: string, e?: MouseEvent) {
 			{:else}
 				<div class="flex flex-col gap-0.5">
 					{#each filteredLinks as link (link.id)}
-						<!-- svelte-ignore a11y_click_events_have_key_events -->
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<div
-							class="group flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-overlay-light
-								{panelOpen && editId === link.id ? 'bg-overlay-light' : ''}"
-							onclick={() => openEdit(link)}
-						>
-							<img
-								src={faviconUrl(link.url)}
-								alt=""
-								class="h-4 w-4 shrink-0 rounded-sm"
-								onerror={(e) => {
-									(e.currentTarget as HTMLImageElement).style.display =
-										"none";
-								}}
-							/>
-							<div class="flex min-w-0 flex-1 flex-col gap-0.5">
-								<div class="flex items-center gap-2">
-									<span
-										class="truncate text-[13px] font-medium text-text-primary"
-										>{link.title || hostname(link.url)}</span
-									>
-									<span class="shrink-0 text-[10px] text-text-muted"
-										>{hostname(link.url)}</span
-									>
-								</div>
-								{#if link.description}
-									<span
-										class="truncate text-[11px] text-text-secondary"
-										>{link.description}</span
-									>
-								{/if}
-								{#if (link.tags ?? []).length > 0}
-									<div class="flex items-center gap-1 mt-0.5">
-										{#each link.tags ?? [] as tag}
+						<ContextMenu.Root>
+							<ContextMenu.Trigger class="contents">
+								<!-- svelte-ignore a11y_click_events_have_key_events -->
+								<!-- svelte-ignore a11y_no_static_element_interactions -->
+								<div
+									class="group flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-overlay-light
+										{panelOpen && editId === link.id ? 'bg-overlay-light' : ''}"
+									onclick={() => openEdit(link)}
+								>
+									<img
+										src={faviconUrl(link.url)}
+										alt=""
+										class="h-4 w-4 shrink-0 rounded-sm"
+										onerror={(e) => {
+											(e.currentTarget as HTMLImageElement).style.display =
+												"none";
+										}}
+									/>
+									<div class="flex min-w-0 flex-1 flex-col gap-0.5">
+										<div class="flex items-center gap-2">
 											<span
-												class="rounded-sm bg-overlay-light px-1.5 py-0.5 text-[10px] font-medium text-text-secondary"
-												>{tag}</span
+												class="truncate text-[13px] font-medium text-text-primary"
+												>{link.title || hostname(link.url)}</span
 											>
-										{/each}
-										<span class="ml-1 text-[10px] text-text-muted"
-											>{relativeDate(link.createdAtMs)}</span
-										>
+											<span class="shrink-0 text-[10px] text-text-muted"
+												>{hostname(link.url)}</span
+											>
+										</div>
+										{#if link.description}
+											<span
+												class="truncate text-[11px] text-text-secondary"
+												>{link.description}</span
+											>
+										{/if}
+										{#if (link.tags ?? []).length > 0}
+											<div class="flex items-center gap-1 mt-0.5">
+												{#each link.tags ?? [] as tag}
+													<span
+														class="rounded-sm bg-overlay-light px-1.5 py-0.5 text-[10px] font-medium text-text-secondary"
+														>{tag}</span
+													>
+												{/each}
+												<span class="ml-1 text-[10px] text-text-muted"
+													>{relativeDate(link.createdAtMs)}</span
+												>
+											</div>
+										{:else}
+											<span class="text-[10px] text-text-muted mt-0.5"
+												>{relativeDate(link.createdAtMs)}</span
+											>
+										{/if}
 									</div>
-								{:else}
-									<span class="text-[10px] text-text-muted mt-0.5"
-										>{relativeDate(link.createdAtMs)}</span
+									<a
+										href={link.url}
+										target="_blank"
+										rel="noopener noreferrer"
+										onclick={(e) => e.stopPropagation()}
+										class="shrink-0 text-text-muted hover:text-accent"
+										title="Open link"
 									>
-								{/if}
-							</div>
-							<a
-								href={link.url}
-								target="_blank"
-								rel="noopener noreferrer"
-								onclick={(e) => e.stopPropagation()}
-								class="shrink-0 text-text-muted hover:text-accent"
-								title="Open link"
-							>
-								<Icon src={FiExternalLink} size="13" />
-							</a>
-							<button
-								onclick={(e) => removeLink(link.id, e)}
-								class="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-error/10 hover:text-error group-hover:flex"
-								title="Delete"
-							>
-								<Icon src={FiTrash2} size="12" />
-							</button>
-						</div>
+										<Icon src={FiExternalLink} size="13" />
+									</a>
+									<button
+										onclick={(e) => removeLink(link.id, e)}
+										class="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-error/10 hover:text-error group-hover:flex"
+										title="Delete"
+									>
+										<Icon src={FiTrash2} size="12" />
+									</button>
+								</div>
+							</ContextMenu.Trigger>
+
+							<ContextMenu.Portal>
+								<ContextMenu.Content
+									class="z-50 min-w-44 rounded-lg border border-border bg-bg-secondary p-1 shadow-elevated"
+									sideOffset={5}
+								>
+									<ContextMenu.Item
+										class="flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary outline-none data-[highlighted]:bg-overlay-light data-[highlighted]:text-text-primary"
+										onSelect={() => window.open(link.url, "_blank", "noopener,noreferrer")}
+									>
+										<Icon src={FiExternalLink} size="14" className="text-text-muted" />
+										Open URL
+									</ContextMenu.Item>
+									<ContextMenu.Item
+										class="flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary outline-none data-[highlighted]:bg-overlay-light data-[highlighted]:text-text-primary"
+										onSelect={() => copyUrl(link.url)}
+									>
+										<Icon src={FiCopy} size="14" className="text-text-muted" />
+										Copy URL
+									</ContextMenu.Item>
+									<ContextMenu.Item
+										class="flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary outline-none data-[highlighted]:bg-overlay-light data-[highlighted]:text-text-primary"
+										onSelect={() => openEdit(link)}
+									>
+										<Icon src={FiEdit2} size="14" className="text-text-muted" />
+										Edit
+									</ContextMenu.Item>
+									<ContextMenu.Separator class="mx-1 my-1 h-px bg-border" />
+									<ContextMenu.Item
+										class="flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary outline-none data-[highlighted]:bg-error/10 data-[highlighted]:text-error"
+										onSelect={() => removeLink(link.id)}
+									>
+										<Icon src={FiTrash2} size="14" />
+										Delete
+									</ContextMenu.Item>
+								</ContextMenu.Content>
+							</ContextMenu.Portal>
+						</ContextMenu.Root>
 					{/each}
 				</div>
 			{/if}
