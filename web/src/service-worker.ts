@@ -44,13 +44,22 @@ sw.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   if (url.pathname.startsWith("/api/")) return;
 
-  // For navigation requests (HTML pages), serve index.html from cache (SPA)
+  // For navigation requests: network-first, fall back to cached shell.
+  // Cache-first breaks on iOS — Safari's SW context can fail to restore after
+  // backgrounding, serving a corrupt/empty response (WebKit #211018).
   if (event.request.mode === "navigate") {
     event.respondWith(
-      caches.match("/index.html").then((cached) => {
-        if (cached) return cached;
-        return fetch(event.request);
-      }),
+      fetch(event.request)
+        .then((response) => {
+          // Update cached shell with fresh copy
+          const clone = response.clone();
+          caches
+            .open(CACHE_NAME)
+            .then((cache) => cache.put("/index.html", clone));
+          return response;
+        })
+        .catch(() => caches.match("/index.html"))
+        .then((r) => r || fetch(event.request)),
     );
     return;
   }
