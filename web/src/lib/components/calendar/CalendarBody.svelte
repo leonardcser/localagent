@@ -130,7 +130,7 @@ function formatHour(hour: number): string {
 let rowStartOffset = $derived(rowHeight / 2);
 let colWidth = $derived(calendarWidth / numCols);
 
-// --- Click-to-create ---
+// --- Click-and-drag to create ---
 
 interface CreateState {
   startMs: number;
@@ -141,32 +141,98 @@ interface CreateState {
 
 let createState = $state<CreateState | null>(null);
 
-function msToTimeStr(ms: number): string {
-  const d = new Date(ms);
-  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+interface DragPreview {
+  col: number;
+  anchorMinutes: number;
+  currentMinutes: number;
 }
 
-function handleGridClick(e: MouseEvent) {
-  if (!calendarBodyRef || !calendarWidth) return;
-  const rect = calendarBodyRef.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top - rowStartOffset;
-  if (y < 0) return;
+let dragPreview = $state<DragPreview | null>(null);
+const DRAG_THRESHOLD = 4;
+let dragStartY = 0;
+let didDrag = $state(false);
 
-  const col = Math.max(
+function yToMinutes(y: number): number {
+  const raw = ((y - rowStartOffset) / rowHeight) * 60;
+  return Math.max(0, Math.min(24 * 60, Math.floor(raw / 15) * 15));
+}
+
+function xToCol(x: number): number {
+  return Math.max(
     0,
     Math.min(numCols - 1, Math.floor((x / calendarWidth) * numCols)),
   );
-  const totalMinutes = Math.floor(((y / rowHeight) * 60) / 15) * 15;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
+}
 
-  const day = addDays(viewStart, col);
-  day.setHours(hours, minutes, 0, 0);
-  const startMs = day.getTime();
-  const endMs = startMs + 3600000;
+function handleGridMousedown(e: MouseEvent) {
+  if (!calendarBodyRef || !calendarWidth) return;
+  if (e.button !== 0) return;
+  // Don't start drag if clicking on an existing event
+  if ((e.target as HTMLElement).closest("[data-calendar-event]")) return;
 
-  createState = { startMs, endMs, taskId: "", note: "" };
+  const rect = calendarBodyRef.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  if (y < rowStartOffset) return;
+
+  const col = xToCol(x);
+  const minutes = yToMinutes(y);
+
+  dragStartY = e.clientY;
+  didDrag = false;
+  dragPreview = { col, anchorMinutes: minutes, currentMinutes: minutes };
+
+  window.addEventListener("mousemove", handleGridMousemove);
+  window.addEventListener("mouseup", handleGridMouseup);
+}
+
+function handleGridMousemove(e: MouseEvent) {
+  if (!dragPreview || !calendarBodyRef) return;
+
+  if (!didDrag && Math.abs(e.clientY - dragStartY) > DRAG_THRESHOLD) {
+    didDrag = true;
+  }
+
+  const rect = calendarBodyRef.getBoundingClientRect();
+  const y = e.clientY - rect.top;
+  dragPreview.currentMinutes = yToMinutes(y);
+}
+
+function handleGridMouseup() {
+  window.removeEventListener("mousemove", handleGridMousemove);
+  window.removeEventListener("mouseup", handleGridMouseup);
+
+  if (!dragPreview) return;
+
+  let startMin = Math.min(
+    dragPreview.anchorMinutes,
+    dragPreview.currentMinutes,
+  );
+  let endMin = Math.max(dragPreview.anchorMinutes, dragPreview.currentMinutes);
+
+  // If no drag (just a click), default to 1-hour block
+  if (!didDrag || endMin - startMin < 15) {
+    endMin = Math.min(startMin + 60, 24 * 60);
+  }
+
+  const day = addDays(viewStart, dragPreview.col);
+  const startDay = new Date(day);
+  startDay.setHours(Math.floor(startMin / 60), startMin % 60, 0, 0);
+  const endDay = new Date(day);
+  endDay.setHours(Math.floor(endMin / 60), endMin % 60, 0, 0);
+
+  dragPreview = null;
+  createState = {
+    startMs: startDay.getTime(),
+    endMs: endDay.getTime(),
+    taskId: "",
+    note: "",
+  };
+}
+
+function msToTimeStr(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
 async function submitCreate() {
@@ -225,11 +291,11 @@ let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
 
 		<!-- Grid -->
 		<div
-			class="relative grid flex-1 cursor-crosshair"
+			class="relative grid flex-1 cursor-crosshair select-none"
 			role="presentation"
 			style="grid-template-columns: repeat({numCols}, 1fr)"
 			bind:this={calendarBodyRef}
-			onclick={handleGridClick}
+			onmousedown={handleGridMousedown}
 			onkeydown={() => {}}
 		>
 			<CalendarTime {rowHeight} yOffset={rowStartOffset} {viewStart} {numCols} />
@@ -248,6 +314,29 @@ let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
 					onViewTask={onViewTask}
 				/>
 			{/each}
+
+			<!-- Drag preview block -->
+			{#if dragPreview && didDrag}
+				{@const previewStartMin = Math.min(dragPreview.anchorMinutes, dragPreview.currentMinutes)}
+				{@const previewEndMin = Math.max(dragPreview.anchorMinutes, dragPreview.currentMinutes)}
+				{@const topPx = rowStartOffset + (previewStartMin / 60) * rowHeight}
+				{@const heightPx = Math.max(rowHeight / 4, ((previewEndMin - previewStartMin) / 60) * rowHeight)}
+				<div
+					class="pointer-events-none absolute z-20 rounded-md border border-accent/60 bg-accent/20"
+					style="
+						left: calc({dragPreview.col} * (100% / {numCols}) + 2px);
+						width: calc(100% / {numCols} - 4px);
+						top: {topPx}px;
+						height: {heightPx}px;
+					"
+				>
+					<span class="block px-1.5 pt-0.5 text-[10px] font-medium text-accent">
+						{Math.floor(previewStartMin / 60).toString().padStart(2, "0")}:{(previewStartMin % 60).toString().padStart(2, "0")}
+						–
+						{Math.floor(previewEndMin / 60).toString().padStart(2, "0")}:{(previewEndMin % 60).toString().padStart(2, "0")}
+					</span>
+				</div>
+			{/if}
 
 			<!-- Half-row top padding -->
 			{#each Array.from({ length: numCols }) as _}

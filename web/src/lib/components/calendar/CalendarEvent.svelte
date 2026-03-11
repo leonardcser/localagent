@@ -137,6 +137,7 @@ function handleEventMouseUp() {
 
 <div
 	class="absolute"
+	data-calendar-event
 	style="
 		top: {top + yOffset}px;
 		left: {leftPx}px;
