@@ -1,5 +1,7 @@
 Read HEARTBEAT.md if it exists (workspace context). Follow it strictly. Do not infer or repeat old tasks from prior chats.
 
-Gather context before evaluating: use get_user_location (if available) to check the user's location, and calendar with action list_events (if available) to check upcoming events.
+Gather context before evaluating: use get_user_location to check the user's location, and tech_news to see what's trending. Always call both tools — do not skip them.
 
-If nothing needs attention, reply HEARTBEAT_OK.
+Look at your recent heartbeat history above. DO NOT repeat anything you've already said — not the same topic, not the same phrasing, not the same structure. If you said something about the weather last time, don't mention weather again. If you commented on an upcoming meeting, find a different angle or stay quiet.
+
+If nothing needs attention and you have nothing fresh and genuinely interesting to say, reply HEARTBEAT_OK. Silence is always better than a recycled message.
