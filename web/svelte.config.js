@@ -9,6 +9,9 @@ const config = {
       fallback: "index.html",
       precompress: false,
     }),
+    serviceWorker: {
+      register: false,
+    },
   },
 };
 

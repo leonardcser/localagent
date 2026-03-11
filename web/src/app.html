@@ -49,18 +49,15 @@
 			window.addEventListener("vite:preloadError", function() {
 				window.location.reload();
 			});
-			// iOS PWA recovery: when the app returns from background or is
-			// restored after iOS killed the WKWebView process, check if the
-			// Svelte app actually rendered. If not, force a reload.
+			// Recovery: if the app hasn't mounted after 8s, reload.
+			// Covers iOS PWA force-quit (fresh load where JS modules fail),
+			// bfcache restore, and visibility restore after process kill.
+			var _recovery = setTimeout(function() {
+				window.location.reload();
+			}, 8000);
+			window.__cancelRecovery = function() { clearTimeout(_recovery); };
 			window.addEventListener("pageshow", function(e) {
-				if (e.persisted && !document.querySelector("[data-app-ready]")) {
-					window.location.reload();
-				}
-			});
-			document.addEventListener("visibilitychange", function() {
-				if (document.visibilityState === "visible" && !document.querySelector("[data-app-ready]")) {
-					window.location.reload();
-				}
+				if (e.persisted) window.location.reload();
 			});
 		</script>
 		<div style="display: contents">%sveltekit.body%</div>

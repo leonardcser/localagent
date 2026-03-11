@@ -34,6 +34,8 @@ function createPush() {
       permission = perm;
       if (perm !== "granted") return;
 
+      // Register SW on demand — only when push is actually needed
+      await navigator.serviceWorker.register("/service-worker.js");
       const reg = await navigator.serviceWorker.ready;
       const keyRes = await getVAPIDPublicKey();
       if (!keyRes) return;
