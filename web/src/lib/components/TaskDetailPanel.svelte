@@ -54,6 +54,7 @@ let selectedParentId = $state("");
 
 // Re-sync when task changes (e.g. navigating between tasks)
 $effect(() => {
+  flushPendingSave();
   title = task?.title ?? "";
   description = task?.description ?? "";
   priority = task?.priority ?? "";
@@ -100,9 +101,25 @@ async function autoSave(patch: Partial<Task>) {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingPatch: Partial<Task> | null = null;
 function debouncedAutoSave(patch: Partial<Task>) {
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => autoSave(patch), 400);
+  pendingPatch = patch;
+  saveTimer = setTimeout(() => {
+    pendingPatch = null;
+    autoSave(patch);
+  }, 400);
+}
+function flushPendingSave() {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  if (pendingPatch) {
+    const patch = pendingPatch;
+    pendingPatch = null;
+    autoSave(patch);
+  }
 }
 
 // Add mode submit
