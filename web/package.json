@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@internationalized/date": "^3.11.0",
+    "@ricky0123/vad-web": "^0.0.30",
     "@tailwindcss/vite": "^4.1.18",
     "bits-ui": "^2.16.2",
     "clsx": "^2.1.1",

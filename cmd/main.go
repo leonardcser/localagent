@@ -271,7 +271,7 @@ func gatewayCmd() {
 		os.Exit(1)
 	}
 
-	webCh := webchat.NewWebChatChannel(&cfg.WebChat, msgBus, cfg.DataDir(), cfg.Tools.STT, cfg.Tools.Image)
+	webCh := webchat.NewWebChatChannel(&cfg.WebChat, msgBus, cfg.DataDir(), cfg.Tools.STT, cfg.Tools.TTS, cfg.Tools.Image)
 	webCh.SetSessionManager(agentLoop.GetSessionManager())
 	webCh.SetTodoService(agentLoop.GetTodoService())
 	agentLoop.GetTodoService().SetListener(webCh.BroadcastTaskEvent)

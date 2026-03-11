@@ -10,6 +10,8 @@ import ActivityGroup from "$lib/components/ActivityGroup.svelte";
 import LoadingBubble from "$lib/components/LoadingBubble.svelte";
 import InputArea from "$lib/components/InputArea.svelte";
 import DropOverlay from "$lib/components/DropOverlay.svelte";
+import VoiceOverlay from "$lib/components/VoiceOverlay.svelte";
+import { voice } from "$lib/stores/voice.svelte";
 import { Icon } from "svelte-icons-pack";
 import { FiChevronDown } from "svelte-icons-pack/fi";
 
@@ -213,3 +215,7 @@ onDestroy(() => {
 		<DropOverlay />
 	{/if}
 </div>
+
+{#if voice.active}
+	<VoiceOverlay />
+{/if}

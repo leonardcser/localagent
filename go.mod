@@ -7,6 +7,7 @@ require (
 	github.com/adhocore/gronx v1.19.6
 	github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608
 	github.com/emersion/go-webdav v0.7.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/labstack/echo/v5 v5.0.0
 	github.com/teambition/rrule-go v1.8.2
 	golang.org/x/net v0.50.0

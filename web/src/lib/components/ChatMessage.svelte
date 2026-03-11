@@ -2,7 +2,7 @@
 import { renderMarkdown, COPY_SVG, CHECK_SVG } from "$lib/markdown";
 import { cn, filename, isAudio, mediaUrl, formatTimestamp } from "$lib/utils";
 import { Icon } from "svelte-icons-pack";
-import { FiFile } from "svelte-icons-pack/fi";
+import { FiFile, FiCopy, FiVolume2 } from "svelte-icons-pack/fi";
 
 let {
   role,
@@ -19,6 +19,10 @@ let {
 } = $props();
 
 let html = $state("");
+let speaking = $state(false);
+let copied = $state(false);
+let ttsAbort: AbortController | null = null;
+let ttsSources: AudioBufferSourceNode[] = [];
 
 $effect(() => {
   renderMarkdown(content).then((result) => {
@@ -36,6 +40,139 @@ function handleClick(e: MouseEvent) {
   setTimeout(() => {
     btn.innerHTML = COPY_SVG;
   }, 1500);
+}
+
+function copyMessage() {
+  navigator.clipboard.writeText(content);
+  copied = true;
+  setTimeout(() => (copied = false), 1500);
+}
+
+function stopSpeaking() {
+  ttsAbort?.abort();
+  ttsAbort = null;
+  for (const s of ttsSources) {
+    try {
+      s.stop();
+    } catch {
+      /* already stopped */
+    }
+  }
+  ttsSources = [];
+  speaking = false;
+}
+
+async function speakMessage() {
+  if (speaking) {
+    stopSpeaking();
+    return;
+  }
+
+  speaking = true;
+  ttsAbort = new AbortController();
+
+  try {
+    const res = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: content }),
+      signal: ttsAbort.signal,
+    });
+    if (!res.ok || !res.body) {
+      speaking = false;
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const audioCtx = new AudioContext();
+    let scheduledEnd = 0;
+    let headerBuf = new Uint8Array(0);
+    let sampleRate = 0;
+    let carry: number | null = null;
+    let isFirst = true;
+
+    const playPCM = (bytes: Uint8Array) => {
+      const numSamples = Math.floor(bytes.length / 2);
+      if (numSamples === 0) return;
+      const float32 = new Float32Array(numSamples);
+      const view = new DataView(
+        bytes.buffer,
+        bytes.byteOffset,
+        bytes.byteLength,
+      );
+      for (let i = 0; i < numSamples; i++) {
+        float32[i] = view.getInt16(i * 2, true) / 32768;
+      }
+      if (isFirst) {
+        const fadeLen = Math.min(Math.floor(sampleRate * 0.01), numSamples);
+        for (let i = 0; i < fadeLen; i++) float32[i] *= i / fadeLen;
+        isFirst = false;
+      }
+      const buffer = audioCtx.createBuffer(1, numSamples, sampleRate);
+      buffer.getChannelData(0).set(float32);
+      const source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioCtx.destination);
+      const now = audioCtx.currentTime;
+      const startTime = Math.max(now, scheduledEnd);
+      source.start(startTime);
+      scheduledEnd = startTime + buffer.duration;
+      ttsSources.push(source);
+      source.onended = () => {
+        const idx = ttsSources.indexOf(source);
+        if (idx >= 0) ttsSources.splice(idx, 1);
+        if (ttsSources.length === 0 && speaking) speaking = false;
+      };
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      if (sampleRate === 0) {
+        const merged = new Uint8Array(headerBuf.length + value.length);
+        merged.set(headerBuf);
+        merged.set(value, headerBuf.length);
+        headerBuf = merged;
+        if (headerBuf.length < 44) continue;
+        sampleRate =
+          headerBuf[24] |
+          (headerBuf[25] << 8) |
+          (headerBuf[26] << 16) |
+          (headerBuf[27] << 24);
+        const pcmData = headerBuf.slice(44);
+        if (pcmData.length > 0) {
+          let data = pcmData;
+          if (data.length % 2 !== 0) {
+            carry = data[data.length - 1];
+            data = data.slice(0, -1);
+          }
+          if (data.length > 0) playPCM(data);
+        }
+        continue;
+      }
+
+      let data: Uint8Array;
+      if (carry !== null) {
+        data = new Uint8Array(1 + value.length);
+        data[0] = carry;
+        data.set(value, 1);
+        carry = null;
+      } else {
+        data = value;
+      }
+      if (data.length % 2 !== 0) {
+        carry = data[data.length - 1];
+        data = data.slice(0, -1);
+      }
+      if (data.length > 0) playPCM(data);
+    }
+
+    // Wait for all scheduled audio to finish
+    if (ttsSources.length === 0) speaking = false;
+  } catch {
+    speaking = false;
+  }
 }
 </script>
 
@@ -69,15 +206,47 @@ function handleClick(e: MouseEvent) {
 	</div>
 {:else}
 	<div class="flex flex-col items-start self-start min-w-0 max-w-[95%] sm:max-w-[85%]">
-		<div class="assistant-msg max-w-full overflow-hidden rounded-2xl rounded-bl-md bg-bg-secondary px-3.5 py-2.5 text-[14px] leading-relaxed text-text-primary">
+		<div class="assistant-msg max-w-full overflow-hidden rounded-2xl rounded-bl-md bg-bg-secondary px-3.5 pt-2.5 pb-1 text-[14px] leading-relaxed text-text-primary">
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div class="msg-content" onclick={handleClick} onkeydown={() => {}}>{@html html}</div>
+			<div class="flex items-center justify-end gap-1 mt-1">
+				<button class="msg-action-btn" title="Copy message" onclick={copyMessage}>
+					{#if copied}
+						<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+					{:else}
+						<Icon src={FiCopy} size="12" />
+					{/if}
+				</button>
+				<button class="msg-action-btn" class:speaking title={speaking ? "Stop" : "Speak"} onclick={speakMessage}>
+					<Icon src={FiVolume2} size="12" />
+				</button>
+			</div>
 		</div>
 		<span class="mt-1 text-[10px] font-mono text-text-muted">{formatTimestamp(timestamp)}</span>
 	</div>
 {/if}
 
 <style>
+	.msg-action-btn {
+		display: flex;
+		align-items: center;
+		padding: 2px;
+		color: var(--color-text-muted);
+		background: none;
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+		transition: color 0.15s;
+	}
+
+	.msg-action-btn:hover {
+		color: var(--color-text-primary);
+	}
+
+	.msg-action-btn.speaking {
+		color: var(--color-accent);
+	}
+
 	.audio-player {
 		width: 100%;
 		min-width: 200px;

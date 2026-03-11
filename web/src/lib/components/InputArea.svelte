@@ -1,10 +1,16 @@
 <script lang="ts">
 import { cn } from "$lib/utils";
 import { chat } from "$lib/stores/chat.svelte";
+import { voice } from "$lib/stores/voice.svelte";
 import MediaPreview from "./MediaPreview.svelte";
 import AudioWaveform from "./AudioWaveform.svelte";
 import { Icon } from "svelte-icons-pack";
-import { FiPaperclip, FiMic, FiArrowUp } from "svelte-icons-pack/fi";
+import {
+  FiPaperclip,
+  FiMic,
+  FiArrowUp,
+  FiHeadphones,
+} from "svelte-icons-pack/fi";
 
 let textarea = $state<HTMLTextAreaElement>();
 let fileInput = $state<HTMLInputElement>();
@@ -104,6 +110,14 @@ $effect(() => {
 			{:else}
 				<Icon src={FiMic} size="18" />
 			{/if}
+		</button>
+		<button
+			type="button"
+			class="flex size-10.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-text-muted transition-[color,background] duration-150 hover:bg-border hover:text-text-primary"
+			onclick={() => voice.start()}
+			title="Voice mode"
+		>
+			<Icon src={FiHeadphones} size="18" />
 		</button>
 		<button
 			type="button"

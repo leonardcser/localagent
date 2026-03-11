@@ -35,7 +35,8 @@ func NewServer(addr string, channel *WebChatChannel) *Server {
 	e.Use(middleware.BodyLimit(10 * 1024 * 1024))
 	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{
 		Skipper: func(c *echo.Context) bool {
-			return strings.HasSuffix(c.Request().URL.Path, "/events")
+			p := c.Request().URL.Path
+			return strings.HasSuffix(p, "/events") || strings.HasSuffix(p, "/voice")
 		},
 	}))
 
@@ -71,6 +72,8 @@ func (s *Server) setupRoutes() {
 	s.echo.GET("/api/events", s.handleSSE)
 	s.echo.GET("/api/media/:filename", s.handleMedia)
 	s.echo.POST("/api/transcribe", s.handleTranscribe)
+	s.echo.GET("/api/voice", s.handleVoice)
+	s.echo.POST("/api/tts", s.handleTTS)
 	s.echo.POST("/api/active", s.handleActive)
 
 	s.echo.GET("/api/image/models", s.handleImageModels)

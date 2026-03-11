@@ -50,19 +50,25 @@ type WebChatChannel struct {
 	todoService *todo.TodoService
 	dataDir     string
 	stt         config.STTConfig
+	tts         config.TTSConfig
 	image       config.ImageConfig
 	clients     map[string]*sseClient
 	mu          sync.RWMutex
 	processing  atomic.Bool
+
+	// voiceResponseCh captures assistant responses for the active voice session.
+	// When non-nil, Send() will also deliver the response text here.
+	voiceResponseCh chan string
 }
 
-func NewWebChatChannel(cfg *config.WebChatConfig, msgBus *bus.MessageBus, dataDir string, stt config.STTConfig, image config.ImageConfig) *WebChatChannel {
+func NewWebChatChannel(cfg *config.WebChatConfig, msgBus *bus.MessageBus, dataDir string, stt config.STTConfig, tts config.TTSConfig, image config.ImageConfig) *WebChatChannel {
 	base := channels.NewBaseChannel("web", cfg, msgBus, nil)
 	ch := &WebChatChannel{
 		BaseChannel: base,
 		config:      cfg,
 		dataDir:     dataDir,
 		stt:         stt,
+		tts:         tts,
 		image:       image,
 		clients:     make(map[string]*sseClient),
 	}
@@ -119,6 +125,17 @@ func (ch *WebChatChannel) Send(ctx context.Context, msg bus.OutboundMessage) err
 	}
 	ch.broadcast(event)
 
+	// Deliver to voice session if active
+	ch.mu.RLock()
+	vch := ch.voiceResponseCh
+	ch.mu.RUnlock()
+	if vch != nil {
+		select {
+		case vch <- msg.Content:
+		default:
+		}
+	}
+
 	if ch.server != nil && ch.server.pushManager != nil && !ch.hasActiveClient() {
 		body := msg.Content
 		if len(body) > 200 {
@@ -133,6 +150,13 @@ func (ch *WebChatChannel) Send(ctx context.Context, msg bus.OutboundMessage) err
 	}
 
 	return nil
+}
+
+// setVoiceResponseCh sets (or clears) the channel used to intercept responses for voice mode.
+func (ch *WebChatChannel) setVoiceResponseCh(c chan string) {
+	ch.mu.Lock()
+	ch.voiceResponseCh = c
+	ch.mu.Unlock()
 }
 
 func (ch *WebChatChannel) Emit(evt activity.Event) {

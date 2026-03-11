@@ -133,9 +133,24 @@ func (c CalendarConfig) ResolvePassword() string {
 	return os.Getenv(c.PasswordEnv)
 }
 
+type TTSConfig struct {
+	URL       string `json:"url"`
+	APIKeyEnv string `json:"api_key_env"`
+	Speaker   string `json:"speaker"`
+	Language  string `json:"language"`
+}
+
+func (t TTSConfig) ResolveAPIKey() string {
+	if t.APIKeyEnv == "" {
+		return ""
+	}
+	return os.Getenv(t.APIKeyEnv)
+}
+
 type ToolsConfig struct {
 	PDF           PDFConfig           `json:"pdf"`
 	STT           STTConfig           `json:"stt"`
+	TTS           TTSConfig           `json:"tts"`
 	Image         ImageConfig         `json:"image"`
 	Cron          CronToolsConfig     `json:"cron"`
 	HomeAssistant HomeAssistantConfig `json:"home_assistant"`
@@ -223,6 +238,7 @@ func (c *Config) ServiceDomains() []string {
 		c.Provider.APIBase,
 		c.Tools.PDF.URL,
 		c.Tools.STT.URL,
+		c.Tools.TTS.URL,
 		c.Tools.Image.URL,
 		c.Tools.HomeAssistant.URL,
 		c.Tools.Calendar.URL,
