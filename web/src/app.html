@@ -49,13 +49,6 @@
 			window.addEventListener("vite:preloadError", function() {
 				window.location.reload();
 			});
-			// Recovery: if the app hasn't mounted after 8s, reload.
-			// Covers iOS PWA force-quit (fresh load where JS modules fail),
-			// bfcache restore, and visibility restore after process kill.
-			var _recovery = setTimeout(function() {
-				window.location.reload();
-			}, 8000);
-			window.__cancelRecovery = function() { clearTimeout(_recovery); };
 			window.addEventListener("pageshow", function(e) {
 				if (e.persisted) window.location.reload();
 			});
