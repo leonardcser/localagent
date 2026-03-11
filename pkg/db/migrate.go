@@ -15,6 +15,7 @@ var migrations = []migration{
 	{2, migrateCreateBlocks},
 	{3, migrateCreateLinks},
 	{4, migrateBackfillTaskOrder},
+	{5, migrateAddReminders},
 }
 
 func Migrate(db *sql.DB) error {
@@ -96,6 +97,20 @@ func migrateBackfillTaskOrder(tx *sql.Tx) error {
 		UPDATE tasks SET sort_order = (
 			SELECT COUNT(*) FROM tasks t2 WHERE t2.created_at_ms <= tasks.created_at_ms
 		) WHERE sort_order = 0`)
+	return err
+}
+
+func migrateAddReminders(tx *sql.Tx) error {
+	if _, err := tx.Exec(`ALTER TABLE tasks ADD COLUMN reminders TEXT NOT NULL DEFAULT '[]'`); err != nil {
+		return err
+	}
+	_, err := tx.Exec(`CREATE TABLE sent_reminders (
+		task_id    TEXT NOT NULL,
+		offset     TEXT NOT NULL,
+		fire_at_ms INTEGER NOT NULL,
+		sent_at_ms INTEGER NOT NULL,
+		PRIMARY KEY (task_id, offset, fire_at_ms)
+	)`)
 	return err
 }
 

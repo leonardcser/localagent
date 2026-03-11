@@ -36,6 +36,7 @@ type Task struct {
 	Due         string        `json:"due"`
 	Recurrence  string        `json:"recurrence"`
 	Tags        string        `json:"tags"`
+	Reminders   string        `json:"reminders"`
 	ParentID    string        `json:"parentId"`
 	SortOrder   float64       `json:"sortOrder"`
 	CreatedAtMs int64         `json:"createdAtMs"`

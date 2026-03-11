@@ -60,6 +60,10 @@ func NewServer(addr string, channel *WebChatChannel) *Server {
 	return s
 }
 
+func (s *Server) GetPushManager() *PushManager {
+	return s.pushManager
+}
+
 func (s *Server) setupRoutes() {
 	s.echo.POST("/api/messages", s.handleSendMessage)
 	s.echo.POST("/api/upload", s.handleUpload)

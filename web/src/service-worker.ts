@@ -8,14 +8,31 @@ sw.addEventListener("push", (event: PushEvent) => {
   if (!event.data) return;
 
   const data = event.data.json() as {
+    type?: string;
     title?: string;
     body?: string;
     url?: string;
+    taskId?: string;
   };
+  const type = data.type || "chat";
   const title = data.title || "localagent";
   const body = data.body || "";
   const url = data.url || "/";
 
+  if (type === "reminder") {
+    // Always show reminders, even if the app is open
+    event.waitUntil(
+      sw.registration.showNotification(title, {
+        body,
+        tag: `reminder-${data.taskId ?? "unknown"}`,
+        requireInteraction: true,
+        data: { url },
+      }),
+    );
+    return;
+  }
+
+  // Chat notifications: suppress when chat tab is active
   event.waitUntil(
     sw.clients
       .matchAll({ type: "window", includeUncontrolled: true })

@@ -59,7 +59,15 @@ func (pm *PushManager) AddSubscription(sub webpush.Subscription) error {
 	return pm.saveSubscriptions()
 }
 
-func (pm *PushManager) SendPush(title, body, url string) {
+type PushMessage struct {
+	Type   string `json:"type"`
+	Title  string `json:"title"`
+	Body   string `json:"body"`
+	URL    string `json:"url"`
+	TaskID string `json:"taskId,omitempty"`
+}
+
+func (pm *PushManager) SendPush(msg PushMessage) {
 	pm.mu.RLock()
 	subs := make([]webpush.Subscription, len(pm.subscriptions))
 	copy(subs, pm.subscriptions)
@@ -69,11 +77,7 @@ func (pm *PushManager) SendPush(title, body, url string) {
 		return
 	}
 
-	payload, _ := json.Marshal(map[string]string{
-		"title": title,
-		"body":  body,
-		"url":   url,
-	})
+	payload, _ := json.Marshal(msg)
 
 	var expired []int
 	for i, sub := range subs {

@@ -14,6 +14,7 @@ import {
   FiChevronDown,
   FiRepeat,
   FiClock,
+  FiBell,
 } from "svelte-icons-pack/fi";
 import { taskStore } from "$lib/stores/task.svelte";
 import { blockStore } from "$lib/stores/block.svelte";
@@ -47,6 +48,7 @@ let priority = $state("");
 let due = $state("");
 let recurrence = $state("");
 let tagsRaw = $state("");
+let reminders = $state<string[]>([]);
 let status = $state("todo");
 let selectedParentId = $state("");
 
@@ -58,6 +60,7 @@ $effect(() => {
   due = task?.due ?? "";
   recurrence = task?.recurrence ?? "";
   tagsRaw = (task?.tags ?? []).join(", ");
+  reminders = task?.reminders ?? [];
   status = task?.status ?? "todo";
   selectedParentId = task?.parentId ?? parentId;
 });
@@ -286,6 +289,42 @@ let subtasks = $derived(task ? taskStore.subtasksOf(task.id) : []);
 					}}
 				/>
 			</div>
+
+			<!-- Reminders -->
+			{#if due}
+				<div class="flex items-center justify-between {py} border-b border-border/50">
+					<span class="flex items-center {gap} {szLabel} text-text-secondary">
+						<Icon src={FiBell} size={iconSz} className="text-text-muted" />
+						Reminders
+					</span>
+					<div class="flex flex-wrap justify-end gap-1">
+						{#each [{ key: "15m", label: "15m" }, { key: "30m", label: "30m" }, { key: "1h", label: "1h" }, { key: "2h", label: "2h" }, { key: "1d", label: "1d" }, { key: "2d", label: "2d" }, { key: "1w", label: "1w" }] as opt}
+							{@const active = reminders.includes(opt.key)}
+							{@const isTimeBased = !["1d", "2d", "1w"].includes(opt.key)}
+							{@const hasTime = due.includes("T")}
+							{#if !isTimeBased || hasTime}
+								<button
+									type="button"
+									class="rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors
+										{active
+											? 'border-accent bg-accent/15 text-accent'
+											: 'border-border bg-bg-tertiary text-text-muted hover:border-border-light hover:text-text-secondary'}"
+									onclick={() => {
+										if (active) {
+											reminders = reminders.filter((r) => r !== opt.key);
+										} else {
+											reminders = [...reminders, opt.key];
+										}
+										autoSave({ reminders } as Partial<Task>);
+									}}
+								>
+									{opt.label}
+								</button>
+							{/if}
+						{/each}
+					</div>
+				</div>
+			{/if}
 
 			<!-- Recurrence -->
 			<div class="flex items-center justify-between {py} border-b border-border/50">

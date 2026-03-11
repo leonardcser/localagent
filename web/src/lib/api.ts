@@ -362,6 +362,7 @@ export interface Task {
   due?: string;
   recurrence?: string;
   tags?: string[];
+  reminders?: string[];
   parentId?: string;
   order: number;
   createdAtMs: number;

@@ -7,6 +7,7 @@ CREATE TABLE tasks (
     due           TEXT NOT NULL DEFAULT '',
     recurrence    TEXT NOT NULL DEFAULT '',
     tags          TEXT NOT NULL DEFAULT '[]',
+    reminders     TEXT NOT NULL DEFAULT '[]',
     parent_id     TEXT NOT NULL DEFAULT '',
     sort_order    REAL NOT NULL DEFAULT 0,
     created_at_ms INTEGER NOT NULL,

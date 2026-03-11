@@ -20,6 +20,7 @@ import (
 	"localagent/pkg/logger"
 	"localagent/pkg/providers"
 	"localagent/pkg/proxy"
+	"localagent/pkg/reminder"
 	"localagent/pkg/tools"
 	"localagent/pkg/webchat"
 )
@@ -318,6 +319,12 @@ func gatewayCmd() {
 		fmt.Printf("Error starting channels: %v\n", err)
 	}
 
+	var reminderService *reminder.Service
+	if pm := webCh.GetPushManager(); pm != nil {
+		reminderService = reminder.NewService(agentLoop.GetTodoService().DB(), pm)
+		reminderService.Start()
+	}
+
 	go agentLoop.Run(ctx)
 
 	healthServer.SetReady(true)
@@ -332,6 +339,9 @@ func gatewayCmd() {
 	healthServer.SetReady(false)
 	cancel()
 	healthServer.Stop(context.Background())
+	if reminderService != nil {
+		reminderService.Stop()
+	}
 	heartbeatService.Stop()
 	cronService.Stop()
 	agentLoop.Stop()

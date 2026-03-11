@@ -69,6 +69,13 @@ func NewWebChatChannel(cfg *config.WebChatConfig, msgBus *bus.MessageBus, dataDi
 	return ch
 }
 
+func (ch *WebChatChannel) GetPushManager() *PushManager {
+	if ch.server != nil {
+		return ch.server.GetPushManager()
+	}
+	return nil
+}
+
 func (ch *WebChatChannel) SetSessionManager(sm *session.SessionManager) {
 	ch.sessions = sm
 }
@@ -117,7 +124,12 @@ func (ch *WebChatChannel) Send(ctx context.Context, msg bus.OutboundMessage) err
 		if len(body) > 200 {
 			body = body[:200] + "..."
 		}
-		go ch.server.pushManager.SendPush("localagent", body, "/")
+		go ch.server.pushManager.SendPush(PushMessage{
+			Type:  "chat",
+			Title: "localagent",
+			Body:  body,
+			URL:   "/",
+		})
 	}
 
 	return nil

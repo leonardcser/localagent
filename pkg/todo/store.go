@@ -24,6 +24,7 @@ type Task struct {
 	Due         string   `json:"due,omitempty"`
 	Recurrence  string   `json:"recurrence,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
+	Reminders   []string `json:"reminders,omitempty"`
 	ParentID    string   `json:"parentId,omitempty"`
 	Order       float64  `json:"order"`
 	CreatedAtMS int64    `json:"createdAtMs"`
@@ -51,6 +52,7 @@ func NewTodoService(database *sql.DB) *TodoService {
 	}
 }
 
+func (s *TodoService) DB() *sql.DB                           { return s.db }
 func (s *TodoService) SetListener(fn func(TaskEvent))        { s.listener = fn }
 func (s *TodoService) SetBlockListener(fn func(BlockEvent))  { s.blockListener = fn }
 func (s *TodoService) SetLinkListener(fn func(LinkEvent))    { s.linkListener = fn }
@@ -120,6 +122,7 @@ func (s *TodoService) AddTask(task Task) (*Task, error) {
 		Due:         task.Due,
 		Recurrence:  task.Recurrence,
 		Tags:        marshalTags(task.Tags),
+		Reminders:   marshalTags(task.Reminders),
 		ParentID:    task.ParentID,
 		SortOrder:   task.Order,
 		CreatedAtMs: task.CreatedAtMS,
@@ -143,9 +146,8 @@ func (s *TodoService) UpdateTask(taskID string, patch map[string]any) (*Task, er
 		if col == "" {
 			continue
 		}
-		if key == "tags" {
-			tags := toStringSlice(val)
-			args = append(args, marshalTags(tags))
+		if key == "tags" || key == "reminders" {
+			args = append(args, marshalTags(toStringSlice(val)))
 		} else {
 			args = append(args, val)
 		}
@@ -213,6 +215,7 @@ func (s *TodoService) CompleteTask(taskID string) (*Task, error) {
 				Due:         nextDue,
 				Recurrence:  task.Recurrence,
 				Tags:        task.Tags,
+				Reminders:   task.Reminders,
 				CreatedAtMS: now,
 				UpdatedAtMS: now,
 			}
@@ -513,6 +516,7 @@ func dbTaskToTask(r dbq.Task) Task {
 		UpdatedAtMS: r.UpdatedAtMs,
 	}
 	json.Unmarshal([]byte(r.Tags), &t.Tags)
+	json.Unmarshal([]byte(r.Reminders), &t.Reminders)
 	if r.DoneAtMs.Valid {
 		t.DoneAtMS = &r.DoneAtMs.Int64
 	}
@@ -566,6 +570,8 @@ func patchKeyToColumn(key string) string {
 		return "recurrence"
 	case "tags":
 		return "tags"
+	case "reminders":
+		return "reminders"
 	case "parentId":
 		return "parent_id"
 	case "order":
@@ -580,7 +586,14 @@ func computeNextDue(due string, recurrence string) string {
 		return ""
 	}
 
-	dueDate, err := time.Parse("2006-01-02", due)
+	hasTime := strings.Contains(due, "T")
+	var dueDate time.Time
+	var err error
+	if hasTime {
+		dueDate, err = time.ParseInLocation("2006-01-02T15:04", due, time.Now().Location())
+	} else {
+		dueDate, err = time.Parse("2006-01-02", due)
+	}
 	if err != nil {
 		return ""
 	}
@@ -600,6 +613,9 @@ func computeNextDue(due string, recurrence string) string {
 	next := rule.After(after, true)
 	if next.IsZero() {
 		return ""
+	}
+	if hasTime {
+		return next.Format("2006-01-02T15:04")
 	}
 	return next.Format("2006-01-02")
 }

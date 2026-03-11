@@ -54,7 +54,7 @@ func (q *Queries) DeleteTaskChildren(ctx context.Context, parentID string) error
 }
 
 const getTask = `-- name: GetTask :one
-SELECT id, title, description, status, priority, due, recurrence, tags, parent_id, sort_order, created_at_ms, updated_at_ms, done_at_ms FROM tasks WHERE id = ?
+SELECT id, title, description, status, priority, due, recurrence, tags, reminders, parent_id, sort_order, created_at_ms, updated_at_ms, done_at_ms FROM tasks WHERE id = ?
 `
 
 func (q *Queries) GetTask(ctx context.Context, id string) (Task, error) {
@@ -69,6 +69,7 @@ func (q *Queries) GetTask(ctx context.Context, id string) (Task, error) {
 		&i.Due,
 		&i.Recurrence,
 		&i.Tags,
+		&i.Reminders,
 		&i.ParentID,
 		&i.SortOrder,
 		&i.CreatedAtMs,
@@ -79,8 +80,8 @@ func (q *Queries) GetTask(ctx context.Context, id string) (Task, error) {
 }
 
 const insertTask = `-- name: InsertTask :exec
-INSERT INTO tasks (id, title, description, status, priority, due, recurrence, tags, parent_id, sort_order, created_at_ms, updated_at_ms, done_at_ms)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO tasks (id, title, description, status, priority, due, recurrence, tags, reminders, parent_id, sort_order, created_at_ms, updated_at_ms, done_at_ms)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertTaskParams struct {
@@ -92,6 +93,7 @@ type InsertTaskParams struct {
 	Due         string        `json:"due"`
 	Recurrence  string        `json:"recurrence"`
 	Tags        string        `json:"tags"`
+	Reminders   string        `json:"reminders"`
 	ParentID    string        `json:"parentId"`
 	SortOrder   float64       `json:"sortOrder"`
 	CreatedAtMs int64         `json:"createdAtMs"`
@@ -109,6 +111,7 @@ func (q *Queries) InsertTask(ctx context.Context, arg InsertTaskParams) error {
 		arg.Due,
 		arg.Recurrence,
 		arg.Tags,
+		arg.Reminders,
 		arg.ParentID,
 		arg.SortOrder,
 		arg.CreatedAtMs,
@@ -119,7 +122,7 @@ func (q *Queries) InsertTask(ctx context.Context, arg InsertTaskParams) error {
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT id, title, description, status, priority, due, recurrence, tags, parent_id, sort_order, created_at_ms, updated_at_ms, done_at_ms FROM tasks ORDER BY (status = 'done'), CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, sort_order
+SELECT id, title, description, status, priority, due, recurrence, tags, reminders, parent_id, sort_order, created_at_ms, updated_at_ms, done_at_ms FROM tasks ORDER BY (status = 'done'), CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, sort_order
 `
 
 func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
@@ -140,6 +143,7 @@ func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
 			&i.Due,
 			&i.Recurrence,
 			&i.Tags,
+			&i.Reminders,
 			&i.ParentID,
 			&i.SortOrder,
 			&i.CreatedAtMs,
@@ -160,7 +164,7 @@ func (q *Queries) ListTasks(ctx context.Context) ([]Task, error) {
 }
 
 const listTasksByStatus = `-- name: ListTasksByStatus :many
-SELECT id, title, description, status, priority, due, recurrence, tags, parent_id, sort_order, created_at_ms, updated_at_ms, done_at_ms FROM tasks WHERE status = ? ORDER BY (status = 'done'), CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, sort_order
+SELECT id, title, description, status, priority, due, recurrence, tags, reminders, parent_id, sort_order, created_at_ms, updated_at_ms, done_at_ms FROM tasks WHERE status = ? ORDER BY (status = 'done'), CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, sort_order
 `
 
 func (q *Queries) ListTasksByStatus(ctx context.Context, status string) ([]Task, error) {
@@ -181,6 +185,7 @@ func (q *Queries) ListTasksByStatus(ctx context.Context, status string) ([]Task,
 			&i.Due,
 			&i.Recurrence,
 			&i.Tags,
+			&i.Reminders,
 			&i.ParentID,
 			&i.SortOrder,
 			&i.CreatedAtMs,
