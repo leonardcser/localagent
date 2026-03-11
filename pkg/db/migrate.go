@@ -14,6 +14,7 @@ var migrations = []migration{
 	{1, migrateCreateTasks},
 	{2, migrateCreateBlocks},
 	{3, migrateCreateLinks},
+	{4, migrateBackfillTaskOrder},
 }
 
 func Migrate(db *sql.DB) error {
@@ -87,6 +88,14 @@ func migrateCreateLinks(tx *sql.Tx) error {
 		return err
 	}
 	_, err = tx.Exec(`CREATE INDEX idx_links_created ON links(created_at_ms)`)
+	return err
+}
+
+func migrateBackfillTaskOrder(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+		UPDATE tasks SET sort_order = (
+			SELECT COUNT(*) FROM tasks t2 WHERE t2.created_at_ms <= tasks.created_at_ms
+		) WHERE sort_order = 0`)
 	return err
 }
 

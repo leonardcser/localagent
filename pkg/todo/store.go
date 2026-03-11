@@ -99,13 +99,11 @@ func (s *TodoService) AddTask(task Task) (*Task, error) {
 	task.CreatedAtMS = now
 	task.UpdatedAtMS = now
 
-	if task.Order == 0 {
-		maxOrder, err := s.q.MaxTaskOrder(ctx)
-		if err == nil {
-			task.Order = maxOrder + 1
-		} else {
-			task.Order = 1
-		}
+	maxOrder, err := s.q.MaxTaskOrder(ctx)
+	if err == nil {
+		task.Order = maxOrder + 1
+	} else {
+		task.Order = 1
 	}
 
 	var doneAt sql.NullInt64
@@ -113,7 +111,7 @@ func (s *TodoService) AddTask(task Task) (*Task, error) {
 		doneAt = sql.NullInt64{Int64: *task.DoneAtMS, Valid: true}
 	}
 
-	err := s.q.InsertTask(ctx, dbq.InsertTaskParams{
+	err = s.q.InsertTask(ctx, dbq.InsertTaskParams{
 		ID:          task.ID,
 		Title:       task.Title,
 		Description: task.Description,
