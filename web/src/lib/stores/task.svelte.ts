@@ -146,6 +146,15 @@ function createTaskStore() {
     }
   }
 
+  function sortTasks(a: Task, b: Task): number {
+    const aDone = a.status === "done" ? 1 : 0;
+    const bDone = b.status === "done" ? 1 : 0;
+    if (aDone !== bDone) return aDone - bDone;
+    const pDiff = getPriorityValue(a.priority) - getPriorityValue(b.priority);
+    if (pDiff !== 0) return pDiff;
+    return (a.order ?? 0) - (b.order ?? 0);
+  }
+
   let filtered = $derived.by(() => {
     let result = tasks;
 
@@ -215,15 +224,7 @@ function createTaskStore() {
       );
     }
 
-    return [...result].sort((a, b) => {
-      const orderA = a.order ?? 0;
-      const orderB = b.order ?? 0;
-      if (orderA !== orderB) {
-        return orderA - orderB;
-      }
-      // Same order, sort by priority (high > medium > low)
-      return getPriorityValue(a.priority) - getPriorityValue(b.priority);
-    });
+    return [...result].sort(sortTasks);
   });
 
   let kanbanColumns = $derived.by(() => {
