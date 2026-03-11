@@ -46,19 +46,22 @@
 	<body data-sveltekit-preload-data="hover">
 		<div id="app-loader"><div class="spinner"></div></div>
 		<script>
-			window.addEventListener("vite:preloadError", () => {
+			window.addEventListener("vite:preloadError", function() {
 				window.location.reload();
 			});
-			// Safety net: if the app fails to boot (iOS SW freeze bug),
-			// unregister the service worker and reload from network.
-			setTimeout(function() {
-				var loader = document.getElementById("app-loader");
-				if (loader) {
-					navigator.serviceWorker && navigator.serviceWorker.getRegistrations().then(function(regs) {
-						return Promise.all(regs.map(function(r) { return r.unregister(); }));
-					}).then(function() { location.reload(); });
+			// iOS PWA recovery: when the app returns from background or is
+			// restored after iOS killed the WKWebView process, check if the
+			// Svelte app actually rendered. If not, force a reload.
+			window.addEventListener("pageshow", function(e) {
+				if (e.persisted && !document.querySelector("[data-app-ready]")) {
+					window.location.reload();
 				}
-			}, 5000);
+			});
+			document.addEventListener("visibilitychange", function() {
+				if (document.visibilityState === "visible" && !document.querySelector("[data-app-ready]")) {
+					window.location.reload();
+				}
+			});
 		</script>
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>

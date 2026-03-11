@@ -21,6 +21,7 @@ let menuOpen = $state(false);
 
 onMount(() => {
   document.getElementById("app-loader")?.remove();
+  document.documentElement.setAttribute("data-app-ready", "");
 
   function preventZoom(e: TouchEvent) {
     if (e.touches.length > 1) e.preventDefault();

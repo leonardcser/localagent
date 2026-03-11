@@ -36,50 +36,34 @@ sw.addEventListener("activate", (event) => {
   );
 });
 
-// --- Fetch: serve from cache, fall back to network ---
+// --- Fetch: cache-first for immutable build assets only ---
+// Navigation requests are NOT intercepted — let the browser fetch from the
+// server directly. Intercepting navigation breaks iOS PWAs: WebKit can fail
+// to restore the SW context after force-quit, returning an empty response
+// and causing a white screen (WebKit #211018, #261767).
 sw.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Skip non-GET, API calls, and SSE
-  if (event.request.method !== "GET") return;
-  if (url.pathname.startsWith("/api/")) return;
-
-  // For navigation requests: network-first, fall back to cached shell.
-  // Cache-first breaks on iOS — Safari's SW context can fail to restore after
-  // backgrounding, serving a corrupt/empty response (WebKit #211018).
-  if (event.request.mode === "navigate") {
+  // Only handle immutable build assets (hashed filenames, safe to cache forever)
+  if (
+    event.request.method === "GET" &&
+    url.pathname.startsWith("/_app/immutable/")
+  ) {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          // Update cached shell with fresh copy
-          const clone = response.clone();
-          caches
-            .open(CACHE_NAME)
-            .then((cache) => cache.put("/index.html", clone));
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches
+              .open(CACHE_NAME)
+              .then((cache) => cache.put(event.request, clone));
+          }
           return response;
-        })
-        .catch(() => caches.match("/index.html"))
-        .then((r) => r || fetch(event.request)),
+        });
+      }),
     );
-    return;
   }
-
-  // For all other assets: cache-first
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
-        // Cache immutable build assets on the fly
-        if (response.ok && url.pathname.startsWith("/_app/immutable/")) {
-          const clone = response.clone();
-          caches
-            .open(CACHE_NAME)
-            .then((cache) => cache.put(event.request, clone));
-        }
-        return response;
-      });
-    }),
-  );
 });
 
 // --- Push notifications ---
