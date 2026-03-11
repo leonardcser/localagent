@@ -20,6 +20,8 @@ let { children } = $props();
 let menuOpen = $state(false);
 
 onMount(() => {
+  document.getElementById("app-loader")?.remove();
+
   function preventZoom(e: TouchEvent) {
     if (e.touches.length > 1) e.preventDefault();
   }

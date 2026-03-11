@@ -2,8 +2,78 @@
 /// <reference lib="esnext" />
 /// <reference lib="webworker" />
 
-const sw = self as unknown as ServiceWorkerGlobalScope;
+import { build, files, version } from "$service-worker";
 
+const sw = self as unknown as ServiceWorkerGlobalScope;
+const CACHE_NAME = `app-${version}`;
+
+// Assets to precache: build output (JS/CSS) + static files (icons, manifest)
+const precacheUrls = [...build, ...files];
+
+// --- Install: precache app shell ---
+sw.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => cache.addAll(precacheUrls))
+      .then(() => sw.skipWaiting()),
+  );
+});
+
+// --- Activate: clean old caches, claim clients ---
+sw.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((k) => k.startsWith("app-") && k !== CACHE_NAME)
+            .map((k) => caches.delete(k)),
+        ),
+      )
+      .then(() => sw.clients.claim()),
+  );
+});
+
+// --- Fetch: serve from cache, fall back to network ---
+sw.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+
+  // Skip non-GET, API calls, and SSE
+  if (event.request.method !== "GET") return;
+  if (url.pathname.startsWith("/api/")) return;
+
+  // For navigation requests (HTML pages), serve index.html from cache (SPA)
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      caches.match("/index.html").then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request);
+      }),
+    );
+    return;
+  }
+
+  // For all other assets: cache-first
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+      return fetch(event.request).then((response) => {
+        // Cache immutable build assets on the fly
+        if (response.ok && url.pathname.startsWith("/_app/immutable/")) {
+          const clone = response.clone();
+          caches
+            .open(CACHE_NAME)
+            .then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      });
+    }),
+  );
+});
+
+// --- Push notifications ---
 sw.addEventListener("push", (event: PushEvent) => {
   if (!event.data) return;
 
@@ -20,7 +90,6 @@ sw.addEventListener("push", (event: PushEvent) => {
   const url = data.url || "/";
 
   if (type === "reminder") {
-    // Always show reminders, even if the app is open
     event.waitUntil(
       sw.registration.showNotification(title, {
         body,
@@ -32,7 +101,6 @@ sw.addEventListener("push", (event: PushEvent) => {
     return;
   }
 
-  // Chat notifications: suppress when chat tab is active
   event.waitUntil(
     sw.clients
       .matchAll({ type: "window", includeUncontrolled: true })
@@ -52,6 +120,7 @@ sw.addEventListener("push", (event: PushEvent) => {
   );
 });
 
+// --- Notification click ---
 sw.addEventListener("notificationclick", (event: NotificationEvent) => {
   event.notification.close();
   const url = (event.notification.data?.url as string) || "/";
