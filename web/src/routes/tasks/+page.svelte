@@ -258,7 +258,7 @@ async function batchSetDue(due: string | undefined) {
 
 async function batchSetPriority(priority: string) {
   for (const id of selectedIds) {
-    await taskStore.update(id, { priority: priority || null } as Partial<Task>);
+    await taskStore.update(id, { priority: priority || "" } as Partial<Task>);
   }
   selectedIds = new Set();
 }
@@ -841,12 +841,12 @@ let kanbanCols = $derived(
   {@const iconSz = mobile ? "16" : "13"}
   {@const py = mobile ? "py-3" : "py-2.5"}
 
-  <div class="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+  <div class="flex flex-1 flex-col overflow-y-auto p-4">
     <input
       type="text"
       bind:value={panelTitle}
       placeholder="Task title"
-      class="bg-transparent {mobile ? 'text-[17px] font-semibold' : 'text-[15px] font-medium'} text-text-primary placeholder:text-text-muted outline-none"
+      class="shrink-0 bg-transparent {mobile ? 'text-[17px] font-semibold' : 'text-[15px] font-medium'} text-text-primary placeholder:text-text-muted outline-none"
       oninput={() => {
         if (panelTitle.trim()) debouncedAutoSave({ title: panelTitle.trim() });
       }}
@@ -855,12 +855,11 @@ let kanbanCols = $derived(
     <textarea
       bind:value={panelDescription}
       placeholder="Add notes..."
-      rows={mobile ? 4 : 3}
-      class="resize-none bg-transparent {mobile ? 'text-[14px]' : 'text-[13px]'} text-text-secondary placeholder:text-text-muted outline-none"
-      oninput={() => debouncedAutoSave({ description: panelDescription.trim() || null } as Partial<Task>)}
+      class="mt-3 min-h-[4rem] flex-1 resize-none bg-transparent {mobile ? 'text-[14px]' : 'text-[13px]'} text-text-secondary placeholder:text-text-muted outline-none"
+      oninput={() => debouncedAutoSave({ description: panelDescription.trim() } as Partial<Task>)}
     ></textarea>
 
-    <div class="flex flex-col gap-0 border-t border-border pt-2">
+    <div class="mt-4 flex shrink-0 flex-col gap-0 border-t border-border pt-2">
       <!-- Status -->
       <div class="flex items-center justify-between {py} border-b border-border/50">
         <span class="flex items-center {gap} {szLabel} text-text-secondary">
@@ -923,7 +922,7 @@ let kanbanCols = $derived(
           value={panelPriority}
           onValueChange={(v) => {
             panelPriority = v;
-            autoSave({ priority: v || null } as Partial<Task>);
+            autoSave({ priority: v || "" } as Partial<Task>);
           }}
         >
           <Select.Trigger
@@ -976,7 +975,7 @@ let kanbanCols = $derived(
           value={panelDue}
           onchange={(v) => {
             panelDue = v;
-            autoSave({ due: v || null } as Partial<Task>);
+            autoSave({ due: v || "" } as Partial<Task>);
           }}
         />
       </div>
@@ -1027,7 +1026,7 @@ let kanbanCols = $derived(
           value={panelRecurrence}
           onchange={(v) => {
             panelRecurrence = v;
-            autoSave({ recurrence: v || null } as Partial<Task>);
+            autoSave({ recurrence: v || "" } as Partial<Task>);
           }}
         />
       </div>
@@ -1083,7 +1082,7 @@ let kanbanCols = $derived(
           value={panelParentId}
           onValueChange={(v) => {
             panelParentId = v;
-            autoSave({ parentId: v || null } as Partial<Task>);
+            autoSave({ parentId: v || "" } as Partial<Task>);
           }}
         >
           <Select.Trigger

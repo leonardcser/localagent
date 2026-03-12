@@ -459,14 +459,27 @@ let todayDate = $state(new Date());
           class="w-full rounded-lg border border-border bg-bg-tertiary px-2 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
         />
         {#if createTaskDropdownOpen && filteredTasks.length > 0}
-          <div class="absolute left-0 right-0 top-full z-10 mt-1 max-h-40 overflow-y-auto rounded-lg border border-border bg-bg-secondary shadow-elevated">
+          <div class="absolute left-0 right-0 top-full z-10 mt-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-bg-secondary shadow-elevated">
             {#each filteredTasks as task}
               <button
                 type="button"
-                class="w-full px-2 py-1.5 text-left text-[12px] text-text-primary hover:bg-overlay-light"
+                class="flex w-full items-start gap-2 px-2 py-1.5 text-left hover:bg-overlay-light"
                 onmousedown={(e) => { e.preventDefault(); selectTask(task); }}
               >
-                {task.title}
+                <div class="min-w-0 flex-1">
+                  <div class="truncate text-[12px] text-text-primary">{task.title}</div>
+                  <div class="flex items-center gap-1.5 text-[10px] text-text-muted">
+                    {#if task.priority}
+                      <span class="capitalize {task.priority === 'high' ? 'text-error' : task.priority === 'medium' ? 'text-warning' : 'text-accent'}">{task.priority}</span>
+                    {/if}
+                    {#if task.due}
+                      <span>{task.due}</span>
+                    {/if}
+                    {#if task.tags?.length}
+                      <span class="truncate">{task.tags.join(', ')}</span>
+                    {/if}
+                  </div>
+                </div>
               </button>
             {/each}
           </div>

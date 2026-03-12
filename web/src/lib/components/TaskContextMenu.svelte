@@ -62,7 +62,7 @@ async function setPriority(priority: string) {
     onBatchPriority(priority);
   } else {
     await taskStore.update(task.id, {
-      priority: priority || null,
+      priority: priority || "",
     } as Partial<Task>);
   }
 }

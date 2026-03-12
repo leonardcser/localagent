@@ -1,9 +1,16 @@
 <script lang="ts">
 import type { EventWithOverlap } from "$lib/calendar";
 import { addDays, isSameDay } from "$lib/calendar";
+import { taskStore } from "$lib/stores/task.svelte";
 import { ContextMenu } from "bits-ui";
 import { Icon } from "svelte-icons-pack";
-import { FiExternalLink, FiTrash2 } from "svelte-icons-pack/fi";
+import {
+  FiExternalLink,
+  FiTrash2,
+  FiClock,
+  FiFlag,
+  FiAlignLeft,
+} from "svelte-icons-pack/fi";
 import Draggable from "./Draggable.svelte";
 
 interface Props {
@@ -93,6 +100,9 @@ function formatTime(d: Date): string {
   return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
+let end = $derived(new Date(event.endMs));
+let linkedTask = $derived(taskStore.tasks.find((t) => t.id === event.taskId));
+
 let draggableRef = $state<{ reset: () => void }>();
 
 $effect(() => {
@@ -161,15 +171,19 @@ function handleEventMouseUp() {
         onclick={null}
       >
         <div
-          class="h-full rounded-sm border-l-2 px-1.5 pt-0.5 pb-1 text-left text-[11px] backdrop-blur-sm select-none overflow-hidden"
+          class="relative h-full rounded-sm border-l-2 px-1.5 pt-0.5 pb-1 text-left text-[11px] backdrop-blur-sm select-none overflow-hidden"
           style="background-color: color-mix(in srgb, {event.color} 15%, transparent); border-color: {event.color}; color: {event.color}"
         >
           {#if durationMin >= 30}
-            <div class="truncate opacity-70">{formatTime(start)}</div>
-          {/if}
-          <div class="truncate font-semibold">{event.title}</div>
-          {#if event.note && durationMin >= 30}
-            <div class="truncate opacity-70">{event.note}</div>
+            <div class="truncate leading-tight opacity-70">{formatTime(start)}</div>
+            <div class="truncate font-semibold leading-tight">{event.title}</div>
+            {#if event.note && durationMin >= 45}
+              <div class="truncate leading-tight opacity-70">{event.note}</div>
+            {/if}
+          {:else}
+            <div class="truncate font-semibold leading-tight">
+              <span class="opacity-70">{formatTime(start)}</span> {event.title}
+            </div>
           {/if}
 
           <!-- Resize handle -->
@@ -186,28 +200,64 @@ function handleEventMouseUp() {
 
     <ContextMenu.Portal>
       <ContextMenu.Content
-        class="z-50 min-w-[140px] rounded-lg border border-border bg-bg-secondary p-1 shadow-elevated"
+        class="z-50 min-w-[220px] max-w-[280px] rounded-lg border border-border bg-bg-secondary shadow-elevated"
       >
-        {#if onViewTask}
-          <ContextMenu.Item
-            class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary outline-none hover:bg-overlay-light hover:text-text-primary"
-            onSelect={() => onViewTask(event.taskId)}
-          >
-            <Icon src={FiExternalLink} size="12" className="text-text-muted" />
-            Edit task
-          </ContextMenu.Item>
-        {/if}
+        <!-- Event details header -->
+        <div class="border-b border-border px-3 py-2.5">
+          <div class="flex items-center gap-2">
+            <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background: {event.color}"></span>
+            <span class="truncate text-[13px] font-semibold text-text-primary">{event.title}</span>
+          </div>
 
-        {#if event.blockId && onDelete}
-          <ContextMenu.Separator class="my-1 border-t border-border" />
-          <ContextMenu.Item
-            class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-error outline-none hover:bg-error/10"
-            onSelect={onDelete}
-          >
-            <Icon src={FiTrash2} size="12" />
-            Delete block
-          </ContextMenu.Item>
-        {/if}
+          <div class="mt-1.5 flex items-center gap-1.5 text-[11px] text-text-secondary">
+            <Icon src={FiClock} size="11" className="shrink-0 text-text-muted" />
+            <span>{formatTime(start)} – {formatTime(end)}</span>
+            <span class="text-text-muted">({durationMin}min)</span>
+          </div>
+
+          {#if linkedTask?.priority}
+            <div class="mt-1 flex items-center gap-1.5 text-[11px] text-text-secondary">
+              <Icon src={FiFlag} size="11" className="shrink-0 {linkedTask.priority === 'high' ? 'text-error' : linkedTask.priority === 'medium' ? 'text-warning' : 'text-accent'}" />
+              <span class="capitalize">{linkedTask.priority} priority</span>
+            </div>
+          {/if}
+
+          {#if event.note}
+            <div class="mt-1.5 flex items-start gap-1.5 text-[11px] text-text-muted">
+              <Icon src={FiAlignLeft} size="11" className="mt-0.5 shrink-0" />
+              <span class="line-clamp-2">{event.note}</span>
+            </div>
+          {/if}
+
+          {#if linkedTask?.description}
+            <div class="mt-1.5 text-[11px] leading-relaxed text-text-muted line-clamp-3">
+              {linkedTask.description}
+            </div>
+          {/if}
+        </div>
+
+        <!-- Actions -->
+        <div class="p-1">
+          {#if onViewTask}
+            <ContextMenu.Item
+              class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary outline-none hover:bg-overlay-light hover:text-text-primary"
+              onSelect={() => onViewTask(event.taskId)}
+            >
+              <Icon src={FiExternalLink} size="12" className="text-text-muted" />
+              Edit task
+            </ContextMenu.Item>
+          {/if}
+
+          {#if event.blockId && onDelete}
+            <ContextMenu.Item
+              class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-error outline-none hover:bg-error/10"
+              onSelect={onDelete}
+            >
+              <Icon src={FiTrash2} size="12" />
+              Delete block
+            </ContextMenu.Item>
+          {/if}
+        </div>
       </ContextMenu.Content>
     </ContextMenu.Portal>
   </ContextMenu.Root>
