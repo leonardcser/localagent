@@ -138,6 +138,7 @@ const SWIPE_THRESHOLD = 80;
 const SWIPE_MAX = 120;
 
 let moreMenuOpen = $state(false);
+let completedExpanded = $state(false);
 
 onMount(async () => {
   await taskStore.load();
@@ -1292,7 +1293,7 @@ let kanbanCols = $derived(
             </div>
           </div>
 
-          {#if taskStore.filtered.length === 0}
+          {#if taskStore.filtered.length === 0 && taskStore.completedFiltered.length === 0}
             <div class="flex h-48 flex-col items-center justify-center gap-2">
               <span class="text-[24px] opacity-30">&#10003;</span>
               <span class="text-[13px] text-text-muted">
@@ -1386,14 +1387,9 @@ let kanbanCols = $derived(
                             {#each task.tags as tag}
                               {@const tc = tagColorStore.get(tag)}
                               {@const tagLabel = tag.includes("::") ? tag.split("::").pop() : tag}
-                              <span class="flex items-center gap-0.5 text-[11px] text-text-muted">
-                                {#if tc}
-                                  <span class="h-1.5 w-1.5 rounded-full" style="background:{tc}"></span>
-                                {:else}
-                                  <Icon src={FiTag} size="9" />
-                                {/if}
-                                {tagLabel}
-                              </span>
+                              <span class="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] {tc ? '' : 'bg-overlay-light text-text-muted'}"
+                                style={tc ? `background:${tc}18;color:${tc}` : ""}
+                              >{tagLabel}</span>
                             {/each}
                           {/if}
                         </span>
@@ -1519,6 +1515,144 @@ let kanbanCols = $derived(
                 {/if}
               {/each}
             </div>
+
+            <!-- Completed section -->
+            {#if taskStore.completedFiltered.length > 0}
+              <div class="border-t border-border">
+                <button
+                  onclick={() => (completedExpanded = !completedExpanded)}
+                  class="flex w-full items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-overlay-subtle md:px-5"
+                >
+                  <Icon
+                    src={FiChevronRight}
+                    size="13"
+                    className="text-text-muted transition-transform {completedExpanded ? 'rotate-90' : ''}"
+                  />
+                  <Icon src={FiCheck} size="13" className="text-success" />
+                  <span class="text-[13px] font-medium text-text-secondary">Completed</span>
+                  <span class="text-[11px] tabular-nums text-text-muted">{taskStore.completedFiltered.length}</span>
+                </button>
+
+                {#if completedExpanded}
+                  <div class="flex flex-col">
+                    {#each taskStore.topLevelCompletedFiltered as task (task.id)}
+                      {@const subtasks = taskStore.subtasksOf(task.id)}
+                      {@const hasChildren = subtasks.length > 0}
+                      {@const isExpanded = expandedParents.has(task.id)}
+                      <div role="listitem">
+                        <TaskContextMenu {task} onAddSubtask={openAdd}>
+                          <button
+                            class="relative flex w-full items-center gap-3 bg-bg px-4 py-2 text-left transition-colors duration-75 md:px-5
+                              {panelOpen && taskStore.selectedId === task.id ? 'bg-accent/5' : 'hover:bg-overlay-subtle'}"
+                            onclick={() => openDetail(task)}
+                          >
+                            <span
+                              role="checkbox"
+                              tabindex="-1"
+                              aria-checked={true}
+                              onclick={(e) => {
+                                e.stopPropagation();
+                                taskStore.update(task.id, { status: "todo" });
+                              }}
+                              onkeydown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  taskStore.update(task.id, { status: "todo" });
+                                }
+                              }}
+                              class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
+                                {checkboxDoneColor(task)}"
+                            >
+                              <Icon src={FiCheck} size="11" />
+                            </span>
+
+                            <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                              <span class="truncate text-[13px] text-text-muted line-through">
+                                {task.title}
+                              </span>
+                              {#if task.tags && task.tags.length > 0}
+                                <span class="flex items-center gap-1.5 mt-0.5">
+                                  {#each task.tags as tag}
+                                    {@const tc = tagColorStore.get(tag)}
+                                    {@const tagLabel = tag.includes("::") ? tag.split("::").pop() : tag}
+                                    <span class="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] {tc ? '' : 'bg-overlay-light text-text-muted'}"
+                                      style={tc ? `background:${tc}18;color:${tc}` : ""}
+                                    >{tagLabel}</span>
+                                  {/each}
+                                </span>
+                              {/if}
+                            </span>
+
+                            {#if hasChildren}
+                              <span
+                                role="button"
+                                tabindex="-1"
+                                onclick={(e) => { e.stopPropagation(); toggleExpand(task.id); }}
+                                onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); toggleExpand(task.id); } }}
+                                class="flex h-5 w-5 shrink-0 items-center justify-center rounded text-text-muted hover:text-text-secondary transition-transform {isExpanded ? '' : '-rotate-90'}"
+                              >
+                                <span class="flex items-center gap-1">
+                                  <span class="text-[10px] text-text-muted tabular-nums">
+                                    {subtasks.filter((s) => s.status === "done").length}/{subtasks.length}
+                                  </span>
+                                  <Icon src={FiChevronDown} size="12" />
+                                </span>
+                              </span>
+                            {/if}
+                          </button>
+                        </TaskContextMenu>
+                        <div class="mx-4 border-b border-border/30 md:mx-5"></div>
+                      </div>
+
+                      {#if hasChildren && isExpanded}
+                        {#each subtasks as sub (sub.id)}
+                          <div role="listitem">
+                            <TaskContextMenu task={sub}>
+                              <button
+                                class="relative flex w-full items-center gap-3 bg-bg pl-10 pr-4 py-2 text-left transition-colors duration-75 md:pl-12 md:pr-5
+                                  {panelOpen && taskStore.selectedId === sub.id ? 'bg-accent/5' : 'hover:bg-overlay-subtle'}"
+                                onclick={() => openDetail(sub)}
+                              >
+                                <Icon src={FiCornerDownRight} size="11" className="shrink-0 text-text-muted/40" />
+                                <span
+                                  role="checkbox"
+                                  tabindex="-1"
+                                  aria-checked={sub.status === "done"}
+                                  onclick={(e) => {
+                                    e.stopPropagation();
+                                    sub.status === "done"
+                                      ? taskStore.update(sub.id, { status: "todo" })
+                                      : taskStore.complete(sub.id);
+                                  }}
+                                  onkeydown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      sub.status === "done"
+                                        ? taskStore.update(sub.id, { status: "todo" })
+                                        : taskStore.complete(sub.id);
+                                    }
+                                  }}
+                                  class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
+                                    {sub.status === 'done' ? checkboxDoneColor(sub) : checkboxBorderColor(sub)}"
+                                >
+                                  <Icon src={FiCheck} size="9" />
+                                </span>
+                                <span class="truncate text-[12px] {sub.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}">
+                                  {sub.title}
+                                </span>
+                              </button>
+                            </TaskContextMenu>
+                            <div class="ml-10 mr-4 border-b border-border/30 md:ml-12 md:mr-5"></div>
+                          </div>
+                        {/each}
+                      {/if}
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+            {/if}
           {/if}
         </div>
       {:else}

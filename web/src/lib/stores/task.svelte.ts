@@ -155,6 +155,40 @@ function createTaskStore() {
     return (a.order ?? 0) - (b.order ?? 0);
   }
 
+  function applyDateFilter(t: Task): boolean {
+    switch (smartList) {
+      case "today":
+        return !!t.due && dueDatePart(t.due) <= todayStr();
+      case "tomorrow":
+        return !!t.due && dueDatePart(t.due) === tomorrowStr();
+      case "next7":
+        return !!t.due && dueDatePart(t.due) <= next7Str();
+      case "overdue":
+        return !!t.due && dueDatePart(t.due) < todayStr();
+      case "inbox":
+        return !t.due;
+      case "done":
+        return true;
+      case "all":
+        return true;
+    }
+  }
+
+  function applyTagFilter(result: Task[]): Task[] {
+    if (filterTags.length === 0) return result;
+    const matchingParentIds = new Set<string>();
+    for (const t of tasks) {
+      if (t.parentId && filterTags.every((tag) => t.tags?.includes(tag))) {
+        matchingParentIds.add(t.parentId);
+      }
+    }
+    return result.filter(
+      (t) =>
+        filterTags.every((tag) => t.tags?.includes(tag)) ||
+        matchingParentIds.has(t.id),
+    );
+  }
+
   let filtered = $derived.by(() => {
     let result = tasks;
 
@@ -168,63 +202,25 @@ function createTaskStore() {
       return result;
     }
 
-    switch (smartList) {
-      case "today": {
-        const today = todayStr();
-        result = result.filter(
-          (t) => t.status !== "done" && t.due && dueDatePart(t.due) <= today,
-        );
-        break;
-      }
-      case "tomorrow": {
-        const tomorrow = tomorrowStr();
-        result = result.filter(
-          (t) =>
-            t.status !== "done" && t.due && dueDatePart(t.due) === tomorrow,
-        );
-        break;
-      }
-      case "next7": {
-        const next7 = next7Str();
-        result = result.filter(
-          (t) => t.status !== "done" && t.due && dueDatePart(t.due) <= next7,
-        );
-        break;
-      }
-      case "overdue": {
-        const today = todayStr();
-        result = result.filter(
-          (t) => t.status !== "done" && t.due && dueDatePart(t.due) < today,
-        );
-        break;
-      }
-      case "inbox":
-        result = result.filter((t) => t.status !== "done" && !t.due);
-        break;
-      case "done":
-        result = result.filter((t) => t.status === "done");
-        break;
-      case "all":
-        result = result.filter((t) => t.status !== "done");
-        break;
-    }
-
-    if (filterTags.length > 0) {
-      // Include parents whose subtasks match all filter tags
-      const matchingParentIds = new Set<string>();
-      for (const t of tasks) {
-        if (t.parentId && filterTags.every((tag) => t.tags?.includes(tag))) {
-          matchingParentIds.add(t.parentId);
-        }
-      }
+    if (smartList === "done") {
+      result = result.filter((t) => t.status === "done" && applyDateFilter(t));
+    } else {
       result = result.filter(
-        (t) =>
-          filterTags.every((tag) => t.tags?.includes(tag)) ||
-          matchingParentIds.has(t.id),
+        (t) => t.status !== "done" && applyDateFilter(t),
       );
     }
 
+    result = applyTagFilter(result);
     return [...result].sort(sortTasks);
+  });
+
+  let completedFiltered = $derived.by(() => {
+    if (smartList === "done" || search) return [];
+    let result = tasks.filter(
+      (t) => t.status === "done" && applyDateFilter(t),
+    );
+    result = applyTagFilter(result);
+    return [...result].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   });
 
   let kanbanColumns = $derived.by(() => {
@@ -263,6 +259,10 @@ function createTaskStore() {
 
   let topLevelFiltered = $derived.by(() => {
     return filtered.filter((t) => !t.parentId);
+  });
+
+  let topLevelCompletedFiltered = $derived.by(() => {
+    return completedFiltered.filter((t) => !t.parentId);
   });
 
   async function load() {
@@ -396,6 +396,12 @@ function createTaskStore() {
     },
     get topLevelFiltered() {
       return topLevelFiltered;
+    },
+    get completedFiltered() {
+      return completedFiltered;
+    },
+    get topLevelCompletedFiltered() {
+      return topLevelCompletedFiltered;
     },
     subtasksOf,
     isParent,
