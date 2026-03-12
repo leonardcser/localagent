@@ -144,7 +144,7 @@ function handleBlur() {
 onMount(() => {
   chat.onSend = () => {
     isAtBottom = true;
-    requestAnimationFrame(() => snapToBottom());
+    requestAnimationFrame(() => scrollToBottom());
   };
   chat.init();
   document.addEventListener("visibilitychange", handleVisibility);
