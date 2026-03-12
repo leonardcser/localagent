@@ -22,6 +22,7 @@ interface TaskPrefs {
   view: "list" | "kanban";
   smartList: SmartList;
   filterTags: string[];
+  filterPriority: string;
   selectedId: string;
 }
 
@@ -35,6 +36,7 @@ function loadPrefs(): TaskPrefs {
         smartList: parsed.smartList ?? "all",
         filterTags:
           parsed.filterTags ?? (parsed.filterTag ? [parsed.filterTag] : []),
+        filterPriority: parsed.filterPriority ?? "",
         selectedId: parsed.selectedId ?? "",
       };
     }
@@ -45,6 +47,7 @@ function loadPrefs(): TaskPrefs {
     view: "list",
     smartList: "all",
     filterTags: [],
+    filterPriority: "",
     selectedId: "",
   };
 }
@@ -80,12 +83,16 @@ function createTaskStore() {
   let search = $state("");
   let smartList = $state<SmartList>(initialPrefs.smartList);
   let filterTags = $state<string[]>(initialPrefs.filterTags);
+  let filterPriority = $state(initialPrefs.filterPriority);
   let view = $state<"list" | "kanban">(initialPrefs.view);
   let selectedId = $state(initialPrefs.selectedId);
 
   function persistPrefs() {
-    savePrefs({ view, smartList, filterTags, selectedId });
+    savePrefs({ view, smartList, filterTags, filterPriority, selectedId });
   }
+
+  // When viewing by tags, smartList is ignored. When viewing by smartList, filterTags is empty.
+  // This makes sidebar navigation mutually exclusive.
 
   let allTags = $derived.by(() => {
     const set = new Set<string>();
@@ -150,6 +157,11 @@ function createTaskStore() {
     const aDone = a.status === "done" ? 1 : 0;
     const bDone = b.status === "done" ? 1 : 0;
     if (aDone !== bDone) return aDone - bDone;
+    // Tasks with due dates first
+    const aHasDue = a.due ? 0 : 1;
+    const bHasDue = b.due ? 0 : 1;
+    if (aHasDue !== bHasDue) return aHasDue - bHasDue;
+    // Then by priority
     const pDiff = getPriorityValue(a.priority) - getPriorityValue(b.priority);
     if (pDiff !== 0) return pDiff;
     return (a.order ?? 0) - (b.order ?? 0);
@@ -174,7 +186,7 @@ function createTaskStore() {
     }
   }
 
-  function applyTagFilter(result: Task[]): Task[] {
+  function applyTagViewFilter(result: Task[]): Task[] {
     if (filterTags.length === 0) return result;
     const matchingParentIds = new Set<string>();
     for (const t of tasks) {
@@ -187,6 +199,13 @@ function createTaskStore() {
         filterTags.every((tag) => t.tags?.includes(tag)) ||
         matchingParentIds.has(t.id),
     );
+  }
+
+  function applyOverlayFilters(result: Task[]): Task[] {
+    if (filterPriority) {
+      result = result.filter((t) => (t.priority ?? "") === filterPriority);
+    }
+    return result;
   }
 
   let filtered = $derived.by(() => {
@@ -202,20 +221,30 @@ function createTaskStore() {
       return result;
     }
 
-    if (smartList === "done") {
+    if (filterTags.length > 0) {
+      // Tag view: show all non-done tasks matching tags (no date filter)
+      result = result.filter((t) => t.status !== "done");
+      result = applyTagViewFilter(result);
+    } else if (smartList === "done") {
       result = result.filter((t) => t.status === "done" && applyDateFilter(t));
     } else {
       result = result.filter((t) => t.status !== "done" && applyDateFilter(t));
     }
 
-    result = applyTagFilter(result);
+    result = applyOverlayFilters(result);
     return [...result].sort(sortTasks);
   });
 
   let completedFiltered = $derived.by(() => {
     if (smartList === "done" || search) return [];
-    let result = tasks.filter((t) => t.status === "done" && applyDateFilter(t));
-    result = applyTagFilter(result);
+    let result: Task[];
+    if (filterTags.length > 0) {
+      result = tasks.filter((t) => t.status === "done");
+      result = applyTagViewFilter(result);
+    } else {
+      result = tasks.filter((t) => t.status === "done" && applyDateFilter(t));
+    }
+    result = applyOverlayFilters(result);
     return [...result].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   });
 
@@ -260,6 +289,8 @@ function createTaskStore() {
   let topLevelCompletedFiltered = $derived.by(() => {
     return completedFiltered.filter((t) => !t.parentId);
   });
+
+  let hasActiveFilters = $derived(filterPriority !== "");
 
   async function load() {
     loading = true;
@@ -327,6 +358,11 @@ function createTaskStore() {
     return update(id, { status } as Partial<Task>);
   }
 
+  function clearFilters() {
+    filterPriority = "";
+    persistPrefs();
+  }
+
   return {
     get tasks() {
       return tasks;
@@ -345,6 +381,7 @@ function createTaskStore() {
     },
     set smartList(v: SmartList) {
       smartList = v;
+      filterTags = [];
       persistPrefs();
     },
     get filterTags() {
@@ -352,6 +389,10 @@ function createTaskStore() {
     },
     set filterTags(v: string[]) {
       filterTags = v;
+      persistPrefs();
+    },
+    selectTag(tag: string) {
+      filterTags = [tag];
       persistPrefs();
     },
     toggleTag(tag: string, multi = false) {
@@ -364,6 +405,17 @@ function createTaskStore() {
       }
       persistPrefs();
     },
+    get filterPriority() {
+      return filterPriority;
+    },
+    set filterPriority(v: string) {
+      filterPriority = v;
+      persistPrefs();
+    },
+    get hasActiveFilters() {
+      return hasActiveFilters;
+    },
+    clearFilters,
     get view() {
       return view;
     },

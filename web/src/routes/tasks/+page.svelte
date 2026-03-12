@@ -25,6 +25,8 @@ import {
   FiClock,
   FiBell,
   FiMoreHorizontal,
+  FiFilter,
+  FiFlag,
 } from "svelte-icons-pack/fi";
 import TaskContextMenu from "$lib/components/TaskContextMenu.svelte";
 import DatePicker from "$lib/components/DatePicker.svelte";
@@ -124,6 +126,7 @@ const SWIPE_THRESHOLD = 80;
 const SWIPE_MAX = 120;
 
 let moreMenuOpen = $state(false);
+let filterOpen = $state(false);
 let completedExpanded = $state(false);
 
 onMount(async () => {
@@ -173,7 +176,12 @@ const smartLists: { key: SmartList; label: string; icon: typeof FiSun }[] = [
   { key: "done", label: "Completed", icon: FiCheck },
 ];
 
-function smartListLabel(): string {
+function viewLabel(): string {
+  if (taskStore.filterTags.length > 0) {
+    return taskStore.filterTags
+      .map((t) => (t.includes("::") ? t.split("::").pop() : t))
+      .join(", ");
+  }
   return smartLists.find((s) => s.key === taskStore.smartList)?.label ?? "All";
 }
 
@@ -402,12 +410,7 @@ function checkboxBorderColor(task: Task): string {
   return "border-border-light text-transparent hover:border-text-muted hover:text-text-muted/50";
 }
 
-function checkboxDoneColor(task: Task): string {
-  if (task.priority === "high") return "border-error/50 bg-error/50 text-white";
-  if (task.priority === "medium")
-    return "border-warning/50 bg-warning/50 text-white";
-  if (task.priority === "low")
-    return "border-text-muted/50 bg-text-muted/50 text-white";
+function checkboxDoneColor(): string {
   return "border-text-muted/40 bg-text-muted/40 text-white";
 }
 
@@ -1007,7 +1010,7 @@ let kanbanCols = $derived(
                 onclick={(e) => { e.stopPropagation(); sub.status === "done" ? taskStore.update(sub.id, { status: "todo" }) : taskStore.complete(sub.id); }}
                 onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); sub.status === "done" ? taskStore.update(sub.id, { status: "todo" }) : taskStore.complete(sub.id); } }}
                 class="flex {mobile ? 'h-5 w-5' : 'h-4 w-4'} shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors
-                  {sub.status === 'done' ? checkboxDoneColor(sub) : checkboxBorderColor(sub)}"
+                  {sub.status === 'done' ? checkboxDoneColor() : checkboxBorderColor(sub)}"
               >
                 <Icon src={FiCheck} size={mobile ? "10" : "9"} />
               </span>
@@ -1078,15 +1081,15 @@ let kanbanCols = $derived(
         <button
           onclick={() => { taskStore.smartList = item.key; taskStore.search = ""; showSearch = false; showSidebar = false; }}
           class="group flex items-center gap-2.5 rounded-lg px-2.5 py-1.75 text-[13px] transition-colors
-            {taskStore.smartList === item.key && !taskStore.search ? 'bg-accent/10 text-accent font-medium' : 'text-text-secondary hover:bg-overlay-light hover:text-text-primary'}"
+            {taskStore.smartList === item.key && taskStore.filterTags.length === 0 && !taskStore.search ? 'bg-accent/10 text-accent font-medium' : 'text-text-secondary hover:bg-overlay-light hover:text-text-primary'}"
         >
           <Icon
             src={item.icon}
             size="15"
-            className="shrink-0 {taskStore.smartList === item.key && !taskStore.search ? 'text-accent' : 'text-text-muted group-hover:text-text-secondary'}"
+            className="shrink-0 {taskStore.smartList === item.key && taskStore.filterTags.length === 0 && !taskStore.search ? 'text-accent' : 'text-text-muted group-hover:text-text-secondary'}"
           />
           <span class="flex-1 text-left">{item.label}</span>
-          <span class="min-w-5 text-right text-[11px] tabular-nums {taskStore.smartList === item.key && !taskStore.search ? 'text-accent/70' : 'text-text-muted'}">
+          <span class="min-w-5 text-right text-[11px] tabular-nums {taskStore.smartList === item.key && taskStore.filterTags.length === 0 && !taskStore.search ? 'text-accent/70' : 'text-text-muted'}">
             {taskStore.counts[item.key]}
           </span>
         </button>
@@ -1099,7 +1102,10 @@ let kanbanCols = $derived(
         <TagTree
           tags={taskStore.allTags}
           filterTags={taskStore.filterTags}
-          ontoggle={(tag, multi) => taskStore.toggleTag(tag, multi)}
+          ontoggle={(tag, multi) => {
+            if (multi) taskStore.toggleTag(tag, true);
+            else taskStore.selectTag(tag);
+          }}
           onopencolorpicker={openColorPicker}
         />
       </div>
@@ -1121,7 +1127,7 @@ let kanbanCols = $derived(
         onclick={() => (showSidebar = !showSidebar)}
         class="flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-text-primary hover:bg-overlay-light"
       >
-        {smartListLabel()}
+        {viewLabel()}
         <Icon src={FiChevronRight} size="14" className="text-text-muted rotate-90" />
       </button>
       <div class="ml-auto flex items-center gap-1">
@@ -1130,6 +1136,16 @@ let kanbanCols = $derived(
           class="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-overlay-light hover:text-text-secondary"
         >
           <Icon src={FiSearch} size="16" />
+        </button>
+        <button
+          onclick={() => (filterOpen = !filterOpen)}
+          class="relative flex h-8 w-8 items-center justify-center rounded-lg transition-colors
+            {taskStore.hasActiveFilters ? 'text-accent' : 'text-text-muted hover:bg-overlay-light hover:text-text-secondary'}"
+        >
+          <Icon src={FiFilter} size="16" />
+          {#if taskStore.hasActiveFilters}
+            <span class="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-accent"></span>
+          {/if}
         </button>
         <button
           onclick={() => (taskStore.view = taskStore.view === "list" ? "kanban" : "list")}
@@ -1169,26 +1185,73 @@ let kanbanCols = $derived(
 
     <!-- Desktop header -->
     <div class="hidden shrink-0 items-center gap-2 border-b border-border px-5 py-3 md:flex">
-      <h1 class="text-[15px] font-semibold text-text-primary">{smartListLabel()}</h1>
-      {#each taskStore.filterTags as tag}
-        {@const tc = tagColorStore.get(tag)}
-        {@const tagLabel = tag.includes("::") ? tag.split("::").pop() : tag}
-        <span class="flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] {tc ? '' : 'bg-accent/10 text-accent'}"
-          style={tc ? `background:${tc}18;color:${tc}` : ""}
-        >
-          {#if tc}
-            <span class="h-1.5 w-1.5 rounded-full" style="background:{tc}"></span>
-          {:else}
-            <Icon src={FiTag} size="10" />
-          {/if}
-          {tagLabel}
-          <button onclick={() => taskStore.toggleTag(tag)} class="ml-0.5 hover:text-text-primary">
-            <Icon src={FiX} size="10" />
-          </button>
-        </span>
-      {/each}
+      <h1 class="flex items-center gap-2 text-[15px] font-semibold text-text-primary">
+        {#if taskStore.filterTags.length > 0}
+          <Icon src={FiTag} size="14" className="text-accent" />
+        {/if}
+        {viewLabel()}
+      </h1>
+      {#if taskStore.hasActiveFilters}
+        {#if taskStore.filterPriority}
+          <span class="flex items-center gap-1 rounded-full bg-overlay-light px-2 py-0.5 text-[11px] text-text-secondary">
+            <Icon src={FiFlag} size="10" />
+            {taskStore.filterPriority}
+            <button onclick={() => (taskStore.filterPriority = "")} class="ml-0.5 hover:text-text-primary">
+              <Icon src={FiX} size="10" />
+            </button>
+          </span>
+        {/if}
+      {/if}
       <span class="text-[12px] text-text-muted">{taskStore.filtered.length} tasks</span>
       <div class="ml-auto flex items-center gap-1.5">
+        <!-- Filter dropdown -->
+        <Popover.Root bind:open={filterOpen}>
+          <Popover.Trigger
+            class="relative flex h-8 w-8 items-center justify-center rounded-lg transition-colors
+              {taskStore.hasActiveFilters ? 'text-accent bg-accent/10 hover:bg-accent/15' : 'text-text-muted hover:bg-overlay-light hover:text-text-secondary'}"
+            title="Filters"
+          >
+            <Icon src={FiFilter} size="15" />
+            {#if taskStore.hasActiveFilters}
+              <span class="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-accent"></span>
+            {/if}
+          </Popover.Trigger>
+          <Popover.Content
+            class="z-50 w-56 rounded-xl border border-border bg-bg-secondary p-3 shadow-elevated backdrop-blur-sm"
+            sideOffset={4}
+            align="end"
+          >
+            <div class="flex flex-col gap-3">
+              <!-- Priority filter -->
+              <div>
+                <span class="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Priority</span>
+                <div class="mt-1.5 flex flex-wrap gap-1">
+                  {#each [{ value: "high", label: "High", color: "text-error" }, { value: "medium", label: "Medium", color: "text-warning" }, { value: "low", label: "Low", color: "text-accent" }] as p}
+                    {@const active = taskStore.filterPriority === p.value}
+                    <button
+                      onclick={() => { taskStore.filterPriority = active ? "" : p.value; }}
+                      class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] transition-colors
+                        {active ? 'bg-accent/10 text-accent font-medium' : 'text-text-secondary hover:bg-overlay-light'}"
+                    >
+                      <Icon src={FiFlag} size="12" className={active ? 'text-accent' : p.color} />
+                      {p.label}
+                    </button>
+                  {/each}
+                </div>
+              </div>
+
+              {#if taskStore.hasActiveFilters}
+                <button
+                  onclick={() => { taskStore.clearFilters(); filterOpen = false; }}
+                  class="flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[12px] text-text-muted transition-colors hover:bg-overlay-light hover:text-text-secondary"
+                >
+                  <Icon src={FiX} size="12" />
+                  Clear filters
+                </button>
+              {/if}
+            </div>
+          </Popover.Content>
+        </Popover.Root>
         <button
           onclick={() => (taskStore.view = taskStore.view === "list" ? "kanban" : "list")}
           class="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-overlay-light hover:text-text-secondary"
@@ -1294,7 +1357,7 @@ let kanbanCols = $derived(
                           }
                         }}
                         class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
-                          {task.status === 'done' ? checkboxDoneColor(task) : checkboxBorderColor(task)}"
+                          {task.status === 'done' ? checkboxDoneColor() : checkboxBorderColor(task)}"
                       >
                         <Icon src={FiCheck} size="11" />
                       </span>
@@ -1409,7 +1472,7 @@ let kanbanCols = $derived(
                               }
                             }}
                             class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
-                              {sub.status === 'done' ? checkboxDoneColor(sub) : checkboxBorderColor(sub)}"
+                              {sub.status === 'done' ? checkboxDoneColor() : checkboxBorderColor(sub)}"
                           >
                             <Icon src={FiCheck} size="9" />
                           </span>
@@ -1501,7 +1564,7 @@ let kanbanCols = $derived(
                                 }
                               }}
                               class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
-                                {checkboxDoneColor(task)}"
+                                {checkboxDoneColor()}"
                             >
                               <Icon src={FiCheck} size="11" />
                             </span>
@@ -1574,7 +1637,7 @@ let kanbanCols = $derived(
                                     }
                                   }}
                                   class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
-                                    {sub.status === 'done' ? checkboxDoneColor(sub) : checkboxBorderColor(sub)}"
+                                    {sub.status === 'done' ? checkboxDoneColor() : checkboxBorderColor(sub)}"
                                 >
                                   <Icon src={FiCheck} size="9" />
                                 </span>
@@ -1782,12 +1845,12 @@ let kanbanCols = $derived(
         <button
           onclick={() => { taskStore.smartList = item.key; taskStore.search = ""; showSearch = false; showSidebar = false; }}
           class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[14px] transition-colors
-            {taskStore.smartList === item.key && !taskStore.search ? 'bg-accent/10 text-accent font-medium' : 'text-text-secondary hover:bg-overlay-light'}"
+            {taskStore.smartList === item.key && taskStore.filterTags.length === 0 && !taskStore.search ? 'bg-accent/10 text-accent font-medium' : 'text-text-secondary hover:bg-overlay-light'}"
         >
           <Icon
             src={item.icon}
             size="17"
-            className={taskStore.smartList === item.key && !taskStore.search ? 'text-accent' : 'text-text-muted'}
+            className={taskStore.smartList === item.key && taskStore.filterTags.length === 0 && !taskStore.search ? 'text-accent' : 'text-text-muted'}
           />
           <span class="flex-1 text-left">{item.label}</span>
           <span class="text-[12px] tabular-nums text-text-muted">{taskStore.counts[item.key]}</span>
@@ -1797,13 +1860,19 @@ let kanbanCols = $derived(
       {#if taskStore.allTags.length > 0}
         <span class="px-2 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-widest text-text-muted">Tags</span>
         {#each taskStore.allTags as tag}
+          {@const tagLabel = tag.includes("::") ? tag.split("::").pop() : tag}
+          {@const tc = tagColorStore.get(tag)}
           <button
-            onclick={() => { taskStore.toggleTag(tag); showSidebar = false; }}
+            onclick={() => { taskStore.selectTag(tag); showSidebar = false; }}
             class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[14px] transition-colors
               {taskStore.filterTags.includes(tag) ? 'bg-accent/10 text-accent' : 'text-text-secondary hover:bg-overlay-light'}"
           >
-            <Icon src={FiTag} size="14" className={taskStore.filterTags.includes(tag) ? 'text-accent' : 'text-text-muted'} />
-            <span>{tag}</span>
+            {#if tc}
+              <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:{tc}"></span>
+            {:else}
+              <Icon src={FiTag} size="14" className={taskStore.filterTags.includes(tag) ? 'text-accent' : 'text-text-muted'} />
+            {/if}
+            <span>{tagLabel}</span>
           </button>
         {/each}
       {/if}
