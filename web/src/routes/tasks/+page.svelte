@@ -1015,10 +1015,10 @@ let kanbanCols = $derived(
                 aria-checked={sub.status === "done"}
                 onclick={(e) => { e.stopPropagation(); sub.status === "done" ? taskStore.update(sub.id, { status: "todo" }) : taskStore.complete(sub.id); }}
                 onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); sub.status === "done" ? taskStore.update(sub.id, { status: "todo" }) : taskStore.complete(sub.id); } }}
-                class="flex {mobile ? 'h-5 w-5' : 'h-4 w-4'} shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors
+                class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors
                   {sub.status === 'done' ? checkboxDoneColor() : checkboxBorderColor(sub)}"
               >
-                <Icon src={FiCheck} size={mobile ? "10" : "9"} />
+                <Icon src={FiCheck} size="9" />
               </span>
               <span class="truncate {mobile ? 'text-[14px]' : 'text-[12px]'} {sub.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}">
                 {sub.title}
@@ -1362,10 +1362,10 @@ let kanbanCols = $derived(
                               : taskStore.complete(task.id);
                           }
                         }}
-                        class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
+                        class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
                           {task.status === 'done' ? checkboxDoneColor() : checkboxBorderColor(task)}"
                       >
-                        <Icon src={FiCheck} size="11" />
+                        <Icon src={FiCheck} size="9" />
                       </span>
 
                       <span class="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -1569,10 +1569,10 @@ let kanbanCols = $derived(
                                   taskStore.update(task.id, { status: "todo" });
                                 }
                               }}
-                              class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
+                              class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
                                 {checkboxDoneColor()}"
                             >
-                              <Icon src={FiCheck} size="11" />
+                              <Icon src={FiCheck} size="9" />
                             </span>
 
                             <span class="flex min-w-0 flex-1 flex-col gap-0.5">
