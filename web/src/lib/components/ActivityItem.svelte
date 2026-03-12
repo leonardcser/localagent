@@ -54,5 +54,15 @@ function label(t: string): string {
 	<span class="ml-auto pl-2 text-[10px] text-text-muted/50 font-mono shrink-0">{formatTimestamp(timestamp)}</span>
 </button>
 {#if expanded && detail}
-	<pre class="ml-12 mb-0.5 px-2 py-1 text-[10px] font-mono text-text-muted bg-bg-tertiary rounded overflow-x-auto whitespace-pre-wrap break-all">{JSON.stringify(detail, null, 2)}</pre>
+	<div class="ml-12 mb-0.5 flex flex-col gap-1">
+		{#if detail.params}
+			<pre class="px-2 py-1 text-[10px] font-mono text-text-muted bg-bg-tertiary rounded overflow-x-auto whitespace-pre-wrap break-all">{typeof detail.params === "string" ? detail.params : JSON.stringify(detail.params, null, 2)}</pre>
+		{/if}
+		{#if detail.result != null}
+			<pre class="px-2 py-1 text-[10px] font-mono text-text-muted bg-bg-tertiary rounded overflow-x-auto whitespace-pre-wrap break-words">{String(detail.result)}</pre>
+		{/if}
+		{#if !detail.params && detail.result == null}
+			<pre class="px-2 py-1 text-[10px] font-mono text-text-muted bg-bg-tertiary rounded overflow-x-auto whitespace-pre-wrap break-all">{JSON.stringify(detail, null, 2)}</pre>
+		{/if}
+	</div>
 {/if}
