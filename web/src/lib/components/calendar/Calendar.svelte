@@ -105,33 +105,33 @@ let events = $derived.by(() => {
 </script>
 
 <div class="flex h-full flex-col bg-bg">
-	<CalendarHeader
-		{indexColWidth}
-		date={currentDate}
-		{view}
-		{numCols}
-		{viewStart}
-		{navigate}
-		{goToToday}
-		setView={(v) => (view = v)}
-	/>
-	<div class="flex flex-1 overflow-hidden">
-		<CalendarBody
-			{events}
-			{indexColWidth}
-			{rowHeight}
-			{viewStart}
-			{numCols}
-			onViewTask={openTaskDetail}
-		/>
-		{#if detailPanelOpen}
-			<TaskDetailPanel
-				task={detailPanelMode === "edit" ? detailTask : null}
-				parentId={addParentId}
-				onClose={closeDetail}
-				onSelectTask={(t) => openTaskDetail(t.id)}
-				onAddSubtask={openAddTask}
-			/>
-		{/if}
-	</div>
+  <CalendarHeader
+    {indexColWidth}
+    date={currentDate}
+    {view}
+    {numCols}
+    {viewStart}
+    {navigate}
+    {goToToday}
+    setView={(v) => (view = v)}
+  />
+  <div class="flex flex-1 overflow-hidden">
+    <CalendarBody
+      {events}
+      {indexColWidth}
+      {rowHeight}
+      {viewStart}
+      {numCols}
+      onViewTask={openTaskDetail}
+    />
+    {#if detailPanelOpen}
+      <TaskDetailPanel
+        task={detailPanelMode === "edit" ? detailTask : null}
+        parentId={addParentId}
+        onClose={closeDetail}
+        onSelectTask={(t) => openTaskDetail(t.id)}
+        onAddSubtask={openAddTask}
+      />
+    {/if}
+  </div>
 </div>

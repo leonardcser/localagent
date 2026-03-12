@@ -113,21 +113,21 @@ function handleMouseUp() {
 </script>
 
 {#if disabled}
-	<div class={className} {style}>
-		{@render children()}
-	</div>
+  <div class={className} {style}>
+    {@render children()}
+  </div>
 {:else}
-	<button
-		class={cn(
-			className,
-			"w-full cursor-pointer",
-			isDragging && "z-10 cursor-grabbing",
-		)}
-		style="transform: translate({realLeft}px, {realTop}px); {style}"
-		onmousedown={handleMouseDown}
-	>
-		{@render children()}
-	</button>
+  <button
+    class={cn(
+      className,
+      "w-full cursor-pointer",
+      isDragging && "z-10 cursor-grabbing",
+    )}
+    style="transform: translate({realLeft}px, {realTop}px); {style}"
+    onmousedown={handleMouseDown}
+  >
+    {@render children()}
+  </button>
 {/if}
 
 <svelte:window onmouseup={handleMouseUp} onmousemove={handleMouseMove} />

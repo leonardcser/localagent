@@ -44,25 +44,25 @@ function label(t: string): string {
 </script>
 
 <button
-	class="flex w-full items-baseline py-px text-left cursor-pointer bg-transparent border-none font-[inherit]"
-	onclick={() => { if (onclick) { onclick(); } else if (detail && onToggleExpand) { onToggleExpand(); } }}
+  class="flex w-full items-baseline py-px text-left cursor-pointer bg-transparent border-none font-[inherit]"
+  onclick={() => { if (onclick) { onclick(); } else if (detail && onToggleExpand) { onToggleExpand(); } }}
 >
-	<span class={cn("text-[10px] font-bold font-mono tracking-wide shrink-0 w-12", labelColor(event_type))}>{label(event_type)}</span>
-	<span class={cn("text-[11px] leading-4.5 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap", isToolError() ? "text-error/80" : "text-text-muted")} title={message}>
-		{message}
-	</span>
-	<span class="ml-auto pl-2 text-[10px] text-text-muted/50 font-mono shrink-0">{formatTimestamp(timestamp)}</span>
+  <span class={cn("text-[10px] font-bold font-mono tracking-wide shrink-0 w-12", labelColor(event_type))}>{label(event_type)}</span>
+  <span class={cn("text-[11px] leading-4.5 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap", isToolError() ? "text-error/80" : "text-text-muted")} title={message}>
+    {message}
+  </span>
+  <span class="ml-auto pl-2 text-[10px] text-text-muted/50 font-mono shrink-0">{formatTimestamp(timestamp)}</span>
 </button>
 {#if expanded && detail}
-	<div class="ml-12 mb-0.5 flex flex-col gap-1">
-		{#if detail.params}
-			<pre class="px-2 py-1 text-[10px] font-mono text-text-muted bg-bg-tertiary rounded overflow-x-auto whitespace-pre-wrap break-all">{typeof detail.params === "string" ? detail.params : JSON.stringify(detail.params, null, 2)}</pre>
-		{/if}
-		{#if detail.result != null}
-			<pre class="px-2 py-1 text-[10px] font-mono text-text-muted bg-bg-tertiary rounded overflow-x-auto whitespace-pre-wrap break-words">{String(detail.result)}</pre>
-		{/if}
-		{#if !detail.params && detail.result == null}
-			<pre class="px-2 py-1 text-[10px] font-mono text-text-muted bg-bg-tertiary rounded overflow-x-auto whitespace-pre-wrap break-all">{JSON.stringify(detail, null, 2)}</pre>
-		{/if}
-	</div>
+  <div class="ml-12 mb-0.5 flex flex-col gap-1">
+    {#if detail.params}
+      <pre class="px-2 py-1 text-[10px] font-mono text-text-muted bg-bg-tertiary rounded overflow-x-auto whitespace-pre-wrap break-all">{typeof detail.params === "string" ? detail.params : JSON.stringify(detail.params, null, 2)}</pre>
+    {/if}
+    {#if detail.result != null}
+      <pre class="px-2 py-1 text-[10px] font-mono text-text-muted bg-bg-tertiary rounded overflow-x-auto whitespace-pre-wrap break-words">{String(detail.result)}</pre>
+    {/if}
+    {#if !detail.params && detail.result == null}
+      <pre class="px-2 py-1 text-[10px] font-mono text-text-muted bg-bg-tertiary rounded overflow-x-auto whitespace-pre-wrap break-all">{JSON.stringify(detail, null, 2)}</pre>
+    {/if}
+  </div>
 {/if}

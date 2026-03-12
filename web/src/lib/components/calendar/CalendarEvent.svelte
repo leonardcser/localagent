@@ -132,83 +132,83 @@ function handleEventMouseUp() {
 />
 
 <div
-	class="absolute"
-	data-calendar-event
-	style="
-		top: {top + yOffset}px;
-		left: {leftPx}px;
-		height: {displayHeight}px;
-		width: {overlapWidth}px;
-	"
-	role="presentation"
-	onclick={(e) => e.stopPropagation()}
-	onmousedown={handleEventMouseDown}
+  class="absolute"
+  data-calendar-event
+  style="
+    top: {top + yOffset}px;
+    left: {leftPx}px;
+    height: {displayHeight}px;
+    width: {overlapWidth}px;
+  "
+  role="presentation"
+  onclick={(e) => e.stopPropagation()}
+  onmousedown={handleEventMouseDown}
 >
-	<ContextMenu.Root>
-		<ContextMenu.Trigger class="block h-full w-full">
-			<Draggable
-				bind:this={draggableRef}
-				class="relative h-full w-full"
-				bounds={{
-					top: -top,
-					bottom: rowHeight * 24 - top - baseHeight,
-					left: -colLeftPx,
-					right: calendarWidth - colLeftPx - overlapWidth,
-				}}
-				grid={[colWidth, rowHeight / 4]}
-				disabled={!event.draggable || resizing}
-				onDragEnd={onDragEnd ?? null}
-				onclick={null}
-			>
-				<div
-					class="h-full rounded-sm border-l-2 px-1.5 pt-0.5 pb-1 text-left text-[11px] backdrop-blur-sm select-none overflow-hidden"
-					style="background-color: color-mix(in srgb, {event.color} 15%, transparent); border-color: {event.color}; color: {event.color}"
-				>
-					{#if durationMin >= 60}
-						<div class="truncate opacity-70">{formatTime(start)}</div>
-					{/if}
-					<div class="truncate font-semibold">{event.title}</div>
-					{#if event.note && durationMin >= 45}
-						<div class="truncate opacity-70">{event.note}</div>
-					{/if}
+  <ContextMenu.Root>
+    <ContextMenu.Trigger class="block h-full w-full">
+      <Draggable
+        bind:this={draggableRef}
+        class="relative h-full w-full"
+        bounds={{
+          top: -top,
+          bottom: rowHeight * 24 - top - baseHeight,
+          left: -colLeftPx,
+          right: calendarWidth - colLeftPx - overlapWidth,
+        }}
+        grid={[colWidth, rowHeight / 4]}
+        disabled={!event.draggable || resizing}
+        onDragEnd={onDragEnd ?? null}
+        onclick={null}
+      >
+        <div
+          class="h-full rounded-sm border-l-2 px-1.5 pt-0.5 pb-1 text-left text-[11px] backdrop-blur-sm select-none overflow-hidden"
+          style="background-color: color-mix(in srgb, {event.color} 15%, transparent); border-color: {event.color}; color: {event.color}"
+        >
+          {#if durationMin >= 60}
+            <div class="truncate opacity-70">{formatTime(start)}</div>
+          {/if}
+          <div class="truncate font-semibold">{event.title}</div>
+          {#if event.note && durationMin >= 45}
+            <div class="truncate opacity-70">{event.note}</div>
+          {/if}
 
-					<!-- Resize handle -->
-					{#if event.draggable && onResize}
-						<div
-							class="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize"
-							role="presentation"
-							onmousedown={startResize}
-						></div>
-					{/if}
-				</div>
-			</Draggable>
-		</ContextMenu.Trigger>
+          <!-- Resize handle -->
+          {#if event.draggable && onResize}
+            <div
+              class="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize"
+              role="presentation"
+              onmousedown={startResize}
+            ></div>
+          {/if}
+        </div>
+      </Draggable>
+    </ContextMenu.Trigger>
 
-		<ContextMenu.Portal>
-			<ContextMenu.Content
-				class="z-50 min-w-[140px] rounded-lg border border-border bg-bg-secondary p-1 shadow-elevated"
-			>
-				{#if onViewTask}
-					<ContextMenu.Item
-						class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary outline-none hover:bg-overlay-light hover:text-text-primary"
-						onSelect={() => onViewTask(event.taskId)}
-					>
-						<Icon src={FiExternalLink} size="12" className="text-text-muted" />
-						Edit task
-					</ContextMenu.Item>
-				{/if}
+    <ContextMenu.Portal>
+      <ContextMenu.Content
+        class="z-50 min-w-[140px] rounded-lg border border-border bg-bg-secondary p-1 shadow-elevated"
+      >
+        {#if onViewTask}
+          <ContextMenu.Item
+            class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary outline-none hover:bg-overlay-light hover:text-text-primary"
+            onSelect={() => onViewTask(event.taskId)}
+          >
+            <Icon src={FiExternalLink} size="12" className="text-text-muted" />
+            Edit task
+          </ContextMenu.Item>
+        {/if}
 
-				{#if event.blockId && onDelete}
-					<ContextMenu.Separator class="my-1 border-t border-border" />
-					<ContextMenu.Item
-						class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-error outline-none hover:bg-error/10"
-						onSelect={onDelete}
-					>
-						<Icon src={FiTrash2} size="12" />
-						Delete block
-					</ContextMenu.Item>
-				{/if}
-			</ContextMenu.Content>
-		</ContextMenu.Portal>
-	</ContextMenu.Root>
+        {#if event.blockId && onDelete}
+          <ContextMenu.Separator class="my-1 border-t border-border" />
+          <ContextMenu.Item
+            class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-error outline-none hover:bg-error/10"
+            onSelect={onDelete}
+          >
+            <Icon src={FiTrash2} size="12" />
+            Delete block
+          </ContextMenu.Item>
+        {/if}
+      </ContextMenu.Content>
+    </ContextMenu.Portal>
+  </ContextMenu.Root>
 </div>

@@ -103,115 +103,115 @@ function formatDisplay(v: string): string {
 </script>
 
 <Popover.Root bind:open onOpenChange={(o) => { if (o) syncTime(); }}>
-	<Popover.Trigger
-		class="flex items-center gap-1.5 rounded-lg border border-border bg-bg-tertiary px-2 py-1 text-[12px] text-text-primary outline-none hover:border-border-light focus:border-accent"
-	>
-		<Icon src={FiCalendar} size="12" className="text-text-muted" />
-		{#if value}
-			<span>{formatDisplay(value)}</span>
-			<button
-				type="button"
-				class="ml-0.5 rounded p-0.5 text-text-muted hover:text-text-secondary"
-				onclick={(e) => {
-					e.stopPropagation();
-					clear();
-				}}
-			>
-				<Icon src={FiX} size="10" />
-			</button>
-		{:else}
-			<span class="text-text-muted">No date</span>
-		{/if}
-	</Popover.Trigger>
+  <Popover.Trigger
+    class="flex items-center gap-1.5 rounded-lg border border-border bg-bg-tertiary px-2 py-1 text-[12px] text-text-primary outline-none hover:border-border-light focus:border-accent"
+  >
+    <Icon src={FiCalendar} size="12" className="text-text-muted" />
+    {#if value}
+      <span>{formatDisplay(value)}</span>
+      <button
+        type="button"
+        class="ml-0.5 rounded p-0.5 text-text-muted hover:text-text-secondary"
+        onclick={(e) => {
+          e.stopPropagation();
+          clear();
+        }}
+      >
+        <Icon src={FiX} size="10" />
+      </button>
+    {:else}
+      <span class="text-text-muted">No date</span>
+    {/if}
+  </Popover.Trigger>
 
-	<Popover.Portal>
-		<Popover.Content
-			side="bottom"
-			align="end"
-			sideOffset={4}
-			class="z-50 rounded-lg border border-border bg-bg-secondary p-2 shadow-elevated"
-		>
-			<Calendar.Root
-				type="single"
-				value={calendarValue}
-				onValueChange={handleDateSelect}
-				weekdayFormat="short"
-				fixedWeeks
-				class="w-full"
-			>
-				{#snippet children({ months, weekdays })}
-					<Calendar.Header class="flex items-center justify-between px-1 pb-2">
-						<Calendar.PrevButton
-							class="flex h-6 w-6 items-center justify-center rounded-md text-text-muted hover:bg-overlay-light hover:text-text-secondary"
-						>
-							<Icon src={FiChevronLeft} size="14" />
-						</Calendar.PrevButton>
-						<Calendar.Heading
-							class="text-[12px] font-medium text-text-primary"
-						/>
-						<Calendar.NextButton
-							class="flex h-6 w-6 items-center justify-center rounded-md text-text-muted hover:bg-overlay-light hover:text-text-secondary"
-						>
-							<Icon src={FiChevronRight} size="14" />
-						</Calendar.NextButton>
-					</Calendar.Header>
+  <Popover.Portal>
+    <Popover.Content
+      side="bottom"
+      align="end"
+      sideOffset={4}
+      class="z-50 rounded-lg border border-border bg-bg-secondary p-2 shadow-elevated"
+    >
+      <Calendar.Root
+        type="single"
+        value={calendarValue}
+        onValueChange={handleDateSelect}
+        weekdayFormat="short"
+        fixedWeeks
+        class="w-full"
+      >
+        {#snippet children({ months, weekdays })}
+          <Calendar.Header class="flex items-center justify-between px-1 pb-2">
+            <Calendar.PrevButton
+              class="flex h-6 w-6 items-center justify-center rounded-md text-text-muted hover:bg-overlay-light hover:text-text-secondary"
+            >
+              <Icon src={FiChevronLeft} size="14" />
+            </Calendar.PrevButton>
+            <Calendar.Heading
+              class="text-[12px] font-medium text-text-primary"
+            />
+            <Calendar.NextButton
+              class="flex h-6 w-6 items-center justify-center rounded-md text-text-muted hover:bg-overlay-light hover:text-text-secondary"
+            >
+              <Icon src={FiChevronRight} size="14" />
+            </Calendar.NextButton>
+          </Calendar.Header>
 
-					{#each months as month}
-						<Calendar.Grid class="w-full border-collapse">
-							<Calendar.GridHead>
-								<Calendar.GridRow class="flex w-full">
-									{#each weekdays as day}
-										<Calendar.HeadCell
-											class="flex-1 pb-1 text-center text-[10px] text-text-muted"
-										>
-											{day.slice(0, 2)}
-										</Calendar.HeadCell>
-									{/each}
-								</Calendar.GridRow>
-							</Calendar.GridHead>
-							<Calendar.GridBody>
-								{#each month.weeks as week}
-									<Calendar.GridRow class="flex w-full">
-										{#each week as date}
-											<Calendar.Cell
-												{date}
-												month={month.value}
-												class="flex-1 p-0 text-center"
-											>
-												<Calendar.Day
-													class="inline-flex h-7 w-7 items-center justify-center rounded-md text-[11px] text-text-secondary outline-none hover:bg-overlay-light data-[selected]:bg-accent data-[selected]:text-white data-[today]:font-semibold data-[today]:text-accent data-[selected]:data-[today]:text-white data-[outside-month]:text-text-muted/30 data-[disabled]:text-text-muted/30"
-												>
-													{date.day}
-												</Calendar.Day>
-											</Calendar.Cell>
-										{/each}
-									</Calendar.GridRow>
-								{/each}
-							</Calendar.GridBody>
-						</Calendar.Grid>
-					{/each}
-				{/snippet}
-			</Calendar.Root>
+          {#each months as month}
+            <Calendar.Grid class="w-full border-collapse">
+              <Calendar.GridHead>
+                <Calendar.GridRow class="flex w-full">
+                  {#each weekdays as day}
+                    <Calendar.HeadCell
+                      class="flex-1 pb-1 text-center text-[10px] text-text-muted"
+                    >
+                      {day.slice(0, 2)}
+                    </Calendar.HeadCell>
+                  {/each}
+                </Calendar.GridRow>
+              </Calendar.GridHead>
+              <Calendar.GridBody>
+                {#each month.weeks as week}
+                  <Calendar.GridRow class="flex w-full">
+                    {#each week as date}
+                      <Calendar.Cell
+                        {date}
+                        month={month.value}
+                        class="flex-1 p-0 text-center"
+                      >
+                        <Calendar.Day
+                          class="inline-flex h-7 w-7 items-center justify-center rounded-md text-[11px] text-text-secondary outline-none hover:bg-overlay-light data-[selected]:bg-accent data-[selected]:text-white data-[today]:font-semibold data-[today]:text-accent data-[selected]:data-[today]:text-white data-[outside-month]:text-text-muted/30 data-[disabled]:text-text-muted/30"
+                        >
+                          {date.day}
+                        </Calendar.Day>
+                      </Calendar.Cell>
+                    {/each}
+                  </Calendar.GridRow>
+                {/each}
+              </Calendar.GridBody>
+            </Calendar.Grid>
+          {/each}
+        {/snippet}
+      </Calendar.Root>
 
-			<!-- Time input -->
-			<div class="mt-2 flex items-center gap-2 border-t border-border pt-2">
-				<Icon src={FiClock} size="12" className="text-text-muted" />
-				<input
-					type="time"
-					value={timeValue}
-					onchange={handleTimeChange}
-					class="flex-1 rounded-md border border-border bg-bg-tertiary px-2 py-1 text-[11px] text-text-primary outline-none focus:border-accent"
-				/>
-				{#if timeValue}
-					<button
-						type="button"
-						class="rounded p-0.5 text-text-muted hover:text-text-secondary"
-						onclick={clearTime}
-					>
-						<Icon src={FiX} size="10" />
-					</button>
-				{/if}
-			</div>
-		</Popover.Content>
-	</Popover.Portal>
+      <!-- Time input -->
+      <div class="mt-2 flex items-center gap-2 border-t border-border pt-2">
+        <Icon src={FiClock} size="12" className="text-text-muted" />
+        <input
+          type="time"
+          value={timeValue}
+          onchange={handleTimeChange}
+          class="flex-1 rounded-md border border-border bg-bg-tertiary px-2 py-1 text-[11px] text-text-primary outline-none focus:border-accent"
+        />
+        {#if timeValue}
+          <button
+            type="button"
+            class="rounded p-0.5 text-text-muted hover:text-text-secondary"
+            onclick={clearTime}
+          >
+            <Icon src={FiX} size="10" />
+          </button>
+        {/if}
+      </div>
+    </Popover.Content>
+  </Popover.Portal>
 </Popover.Root>

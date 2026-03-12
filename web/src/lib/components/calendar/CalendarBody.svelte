@@ -250,199 +250,199 @@ let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col">
-	<!-- All-day events row -->
-	{#if dayEvents.length > 0}
-		<div
-			class="grid shrink-0 auto-rows-min border-b border-border"
-			style="padding-left: {indexColWidth}px; grid-template-columns: repeat({numCols}, 1fr)"
-		>
-			{#each dayEventsByCol as col, colI}
-				<div class="min-h-[28px] border-r border-border/50 px-0.5 py-0.5">
-					{#each col as evt}
-						<CalendarDayEvent
-							event={evt}
-							{colWidth}
-							onMove={(delta) => handleAllDayMove(evt, colI, delta)}
-							onViewTask={onViewTask}
-						/>
-					{/each}
-				</div>
-			{/each}
-		</div>
-	{/if}
+  <!-- All-day events row -->
+  {#if dayEvents.length > 0}
+    <div
+      class="grid shrink-0 auto-rows-min border-b border-border"
+      style="padding-left: {indexColWidth}px; grid-template-columns: repeat({numCols}, 1fr)"
+    >
+      {#each dayEventsByCol as col, colI}
+        <div class="min-h-[28px] border-r border-border/50 px-0.5 py-0.5">
+          {#each col as evt}
+            <CalendarDayEvent
+              event={evt}
+              {colWidth}
+              onMove={(delta) => handleAllDayMove(evt, colI, delta)}
+              onViewTask={onViewTask}
+            />
+          {/each}
+        </div>
+      {/each}
+    </div>
+  {/if}
 
-	<!-- Scrollable time grid -->
-	<div
-		class="flex min-h-0 flex-1 items-start overflow-auto"
-		bind:this={scrollableRef}
-		onscroll={handleScroll}
-	>
-		<!-- Hour labels -->
-		<div class="shrink-0" style="width: {indexColWidth}px">
-			{#each Array.from({ length: 25 }) as _, hour}
-				<div
-					class="flex items-center justify-center text-[10px] text-text-muted"
-					style="height: {rowHeight}px"
-				>
-					{formatHour(hour)}
-				</div>
-			{/each}
-		</div>
+  <!-- Scrollable time grid -->
+  <div
+    class="flex min-h-0 flex-1 items-start overflow-auto"
+    bind:this={scrollableRef}
+    onscroll={handleScroll}
+  >
+    <!-- Hour labels -->
+    <div class="shrink-0" style="width: {indexColWidth}px">
+      {#each Array.from({ length: 25 }) as _, hour}
+        <div
+          class="flex items-center justify-center text-[10px] text-text-muted"
+          style="height: {rowHeight}px"
+        >
+          {formatHour(hour)}
+        </div>
+      {/each}
+    </div>
 
-		<!-- Grid -->
-		<div
-			class="relative grid flex-1 cursor-crosshair select-none"
-			role="presentation"
-			style="grid-template-columns: repeat({numCols}, 1fr)"
-			bind:this={calendarBodyRef}
-			onmousedown={handleGridMousedown}
-			onkeydown={() => {}}
-		>
-			<CalendarTime {rowHeight} yOffset={rowStartOffset} {viewStart} {numCols} />
+    <!-- Grid -->
+    <div
+      class="relative grid flex-1 cursor-crosshair select-none"
+      role="presentation"
+      style="grid-template-columns: repeat({numCols}, 1fr)"
+      bind:this={calendarBodyRef}
+      onmousedown={handleGridMousedown}
+      onkeydown={() => {}}
+    >
+      <CalendarTime {rowHeight} yOffset={rowStartOffset} {viewStart} {numCols} />
 
-			{#each eventsWithOverlap as event}
-				<CalendarEventComp
-					{event}
-					{calendarWidth}
-					{rowHeight}
-					yOffset={rowStartOffset}
-					{viewStart}
-					{numCols}
-					onDragEnd={(d) => handleDragEnd(event, d)}
-					onResize={(newEnd) => handleResize(event, newEnd)}
-					onDelete={event.blockId ? () => blockStore.remove(event.blockId!) : undefined}
-					onViewTask={onViewTask}
-				/>
-			{/each}
+      {#each eventsWithOverlap as event}
+        <CalendarEventComp
+          {event}
+          {calendarWidth}
+          {rowHeight}
+          yOffset={rowStartOffset}
+          {viewStart}
+          {numCols}
+          onDragEnd={(d) => handleDragEnd(event, d)}
+          onResize={(newEnd) => handleResize(event, newEnd)}
+          onDelete={event.blockId ? () => blockStore.remove(event.blockId!) : undefined}
+          onViewTask={onViewTask}
+        />
+      {/each}
 
-			<!-- Drag preview block -->
-			{#if dragPreview && didDrag}
-				{@const previewStartMin = Math.min(dragPreview.anchorMinutes, dragPreview.currentMinutes)}
-				{@const previewEndMin = Math.max(dragPreview.anchorMinutes, dragPreview.currentMinutes)}
-				{@const topPx = rowStartOffset + (previewStartMin / 60) * rowHeight}
-				{@const heightPx = Math.max(rowHeight / 4, ((previewEndMin - previewStartMin) / 60) * rowHeight)}
-				<div
-					class="pointer-events-none absolute z-20 rounded-md border border-accent/60 bg-accent/20"
-					style="
-						left: calc({dragPreview.col} * (100% / {numCols}) + 2px);
-						width: calc(100% / {numCols} - 4px);
-						top: {topPx}px;
-						height: {heightPx}px;
-					"
-				>
-					<span class="block px-1.5 pt-0.5 text-[10px] font-medium text-accent">
-						{Math.floor(previewStartMin / 60).toString().padStart(2, "0")}:{(previewStartMin % 60).toString().padStart(2, "0")}
-						–
-						{Math.floor(previewEndMin / 60).toString().padStart(2, "0")}:{(previewEndMin % 60).toString().padStart(2, "0")}
-					</span>
-				</div>
-			{/if}
+      <!-- Drag preview block -->
+      {#if dragPreview && didDrag}
+        {@const previewStartMin = Math.min(dragPreview.anchorMinutes, dragPreview.currentMinutes)}
+        {@const previewEndMin = Math.max(dragPreview.anchorMinutes, dragPreview.currentMinutes)}
+        {@const topPx = rowStartOffset + (previewStartMin / 60) * rowHeight}
+        {@const heightPx = Math.max(rowHeight / 4, ((previewEndMin - previewStartMin) / 60) * rowHeight)}
+        <div
+          class="pointer-events-none absolute z-20 rounded-md border border-accent/60 bg-accent/20"
+          style="
+            left: calc({dragPreview.col} * (100% / {numCols}) + 2px);
+            width: calc(100% / {numCols} - 4px);
+            top: {topPx}px;
+            height: {heightPx}px;
+          "
+        >
+          <span class="block px-1.5 pt-0.5 text-[10px] font-medium text-accent">
+            {Math.floor(previewStartMin / 60).toString().padStart(2, "0")}:{(previewStartMin % 60).toString().padStart(2, "0")}
+            –
+            {Math.floor(previewEndMin / 60).toString().padStart(2, "0")}:{(previewEndMin % 60).toString().padStart(2, "0")}
+          </span>
+        </div>
+      {/if}
 
-			<!-- Half-row top padding -->
-			{#each Array.from({ length: numCols }) as _}
-				<div
-					class="border-b border-r border-border/50"
-					style="height: {rowStartOffset}px"
-				></div>
-			{/each}
+      <!-- Half-row top padding -->
+      {#each Array.from({ length: numCols }) as _}
+        <div
+          class="border-b border-r border-border/50"
+          style="height: {rowStartOffset}px"
+        ></div>
+      {/each}
 
-			<!-- Hour cells -->
-			{#each Array.from({ length: 24 }) as _}
-				{#each Array.from({ length: numCols }) as _}
-					<div class="border-b border-r border-border/50" style="height: {rowHeight}px"></div>
-				{/each}
-			{/each}
-		</div>
-	</div>
+      <!-- Hour cells -->
+      {#each Array.from({ length: 24 }) as _}
+        {#each Array.from({ length: numCols }) as _}
+          <div class="border-b border-r border-border/50" style="height: {rowHeight}px"></div>
+        {/each}
+      {/each}
+    </div>
+  </div>
 </div>
 
 <!-- Create block modal -->
 {#if createState}
-	<div
-		class="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]"
-		role="presentation"
-		onclick={() => (createState = null)}
-		onkeydown={() => {}}
-	></div>
-	<div
-		class="fixed left-1/2 top-1/2 z-50 w-72 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-bg-secondary p-4 shadow-elevated"
-	>
-		<div class="mb-3 flex items-center justify-between">
-			<span class="text-[13px] font-semibold text-text-primary">Add time block</span>
-			<button onclick={() => (createState = null)} class="text-text-muted hover:text-text-secondary">
-				<Icon src={FiX} size="14" />
-			</button>
-		</div>
+  <div
+    class="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]"
+    role="presentation"
+    onclick={() => (createState = null)}
+    onkeydown={() => {}}
+  ></div>
+  <div
+    class="fixed left-1/2 top-1/2 z-50 w-72 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-bg-secondary p-4 shadow-elevated"
+  >
+    <div class="mb-3 flex items-center justify-between">
+      <span class="text-[13px] font-semibold text-text-primary">Add time block</span>
+      <button onclick={() => (createState = null)} class="text-text-muted hover:text-text-secondary">
+        <Icon src={FiX} size="14" />
+      </button>
+    </div>
 
-		<div class="mb-3 rounded-lg bg-bg-tertiary px-3 py-2 text-[12px] text-text-secondary">
-			{new Date(createState.startMs).toLocaleDateString(undefined, {
-				weekday: "short",
-				month: "short",
-				day: "numeric",
-			})}
-			<span class="mx-1 text-text-muted">·</span>
-			<input
-				type="time"
-				value={msToTimeStr(createState.startMs)}
-				onchange={(e) => {
-					if (!createState) return;
-					const [h, m] = (e.target as HTMLInputElement).value.split(":").map(Number);
-					const d = new Date(createState.startMs);
-					d.setHours(h, m, 0, 0);
-					const dur = createState.endMs - createState.startMs;
-					createState.startMs = d.getTime();
-					createState.endMs = d.getTime() + dur;
-				}}
-				class="rounded border border-border bg-transparent px-1 text-[12px] text-text-primary outline-none focus:border-accent"
-			/>
-			<span class="mx-1 text-text-muted">–</span>
-			<input
-				type="time"
-				value={msToTimeStr(createState.endMs)}
-				onchange={(e) => {
-					if (!createState) return;
-					const [h, m] = (e.target as HTMLInputElement).value.split(":").map(Number);
-					const d = new Date(createState.endMs);
-					d.setHours(h, m, 0, 0);
-					createState.endMs = d.getTime();
-				}}
-				class="rounded border border-border bg-transparent px-1 text-[12px] text-text-primary outline-none focus:border-accent"
-			/>
-		</div>
+    <div class="mb-3 rounded-lg bg-bg-tertiary px-3 py-2 text-[12px] text-text-secondary">
+      {new Date(createState.startMs).toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      })}
+      <span class="mx-1 text-text-muted">·</span>
+      <input
+        type="time"
+        value={msToTimeStr(createState.startMs)}
+        onchange={(e) => {
+          if (!createState) return;
+          const [h, m] = (e.target as HTMLInputElement).value.split(":").map(Number);
+          const d = new Date(createState.startMs);
+          d.setHours(h, m, 0, 0);
+          const dur = createState.endMs - createState.startMs;
+          createState.startMs = d.getTime();
+          createState.endMs = d.getTime() + dur;
+        }}
+        class="rounded border border-border bg-transparent px-1 text-[12px] text-text-primary outline-none focus:border-accent"
+      />
+      <span class="mx-1 text-text-muted">–</span>
+      <input
+        type="time"
+        value={msToTimeStr(createState.endMs)}
+        onchange={(e) => {
+          if (!createState) return;
+          const [h, m] = (e.target as HTMLInputElement).value.split(":").map(Number);
+          const d = new Date(createState.endMs);
+          d.setHours(h, m, 0, 0);
+          createState.endMs = d.getTime();
+        }}
+        class="rounded border border-border bg-transparent px-1 text-[12px] text-text-primary outline-none focus:border-accent"
+      />
+    </div>
 
-		<div class="mb-3">
-			<label for="create-block-task" class="mb-1 block text-[11px] text-text-muted">Task</label>
-			<select
-				id="create-block-task"
-				bind:value={createState.taskId}
-				class="w-full rounded-lg border border-border bg-bg-tertiary px-2 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
-			>
-				<option value="">Select a task…</option>
-				{#each activeTasks as task}
-					<option value={task.id}>{task.title}</option>
-				{/each}
-			</select>
-		</div>
+    <div class="mb-3">
+      <label for="create-block-task" class="mb-1 block text-[11px] text-text-muted">Task</label>
+      <select
+        id="create-block-task"
+        bind:value={createState.taskId}
+        class="w-full rounded-lg border border-border bg-bg-tertiary px-2 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
+      >
+        <option value="">Select a task…</option>
+        {#each activeTasks as task}
+          <option value={task.id}>{task.title}</option>
+        {/each}
+      </select>
+    </div>
 
-		<div class="mb-4">
-			<label for="create-block-note" class="mb-1 block text-[11px] text-text-muted"
-				>Note (optional)</label
-			>
-			<input
-				id="create-block-note"
-				type="text"
-				bind:value={createState.note}
-				placeholder="e.g. deep work session"
-				class="w-full rounded-lg border border-border bg-bg-tertiary px-2 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
-			/>
-		</div>
+    <div class="mb-4">
+      <label for="create-block-note" class="mb-1 block text-[11px] text-text-muted"
+        >Note (optional)</label
+      >
+      <input
+        id="create-block-note"
+        type="text"
+        bind:value={createState.note}
+        placeholder="e.g. deep work session"
+        class="w-full rounded-lg border border-border bg-bg-tertiary px-2 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
+      />
+    </div>
 
-		<button
-			onclick={submitCreate}
-			disabled={!createState.taskId}
-			class="w-full rounded-lg bg-accent py-1.5 text-[12px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-		>
-			Add block
-		</button>
-	</div>
+    <button
+      onclick={submitCreate}
+      disabled={!createState.taskId}
+      class="w-full rounded-lg bg-accent py-1.5 text-[12px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      Add block
+    </button>
+  </div>
 {/if}

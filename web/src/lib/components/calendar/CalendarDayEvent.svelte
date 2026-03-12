@@ -64,42 +64,42 @@ function handleUp() {
 <svelte:window onmousemove={handleMove} onmouseup={handleUp} />
 
 <ContextMenu.Root>
-	<ContextMenu.Trigger class="block mb-0.5">
-		<div
-			class="truncate rounded-sm border-l-2 px-1.5 py-0.5 text-[11px] font-semibold select-none transition-opacity"
-			class:cursor-grabbing={dragging}
-			class:cursor-pointer={!dragging}
-			class:opacity-60={dragging}
-			style="
-				background-color: color-mix(in srgb, {event.color} 15%, transparent);
-				border-color: {event.color};
-				color: {event.color};
-				transform: translateX({deltaX}px);
-				position: relative;
-				z-index: {dragging ? 20 : 'auto'};
-			"
-			role="button"
-			tabindex="0"
-			onmousedown={handleMouseDown}
-			onkeydown={() => {}}
-		>
-			{event.title}
-		</div>
-	</ContextMenu.Trigger>
+  <ContextMenu.Trigger class="block mb-0.5">
+    <div
+      class="truncate rounded-sm border-l-2 px-1.5 py-0.5 text-[11px] font-semibold select-none transition-opacity"
+      class:cursor-grabbing={dragging}
+      class:cursor-pointer={!dragging}
+      class:opacity-60={dragging}
+      style="
+        background-color: color-mix(in srgb, {event.color} 15%, transparent);
+        border-color: {event.color};
+        color: {event.color};
+        transform: translateX({deltaX}px);
+        position: relative;
+        z-index: {dragging ? 20 : 'auto'};
+      "
+      role="button"
+      tabindex="0"
+      onmousedown={handleMouseDown}
+      onkeydown={() => {}}
+    >
+      {event.title}
+    </div>
+  </ContextMenu.Trigger>
 
-	<ContextMenu.Portal>
-		<ContextMenu.Content
-			class="z-50 min-w-[140px] rounded-lg border border-border bg-bg-secondary p-1 shadow-elevated"
-		>
-			{#if onViewTask}
-				<ContextMenu.Item
-					class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary outline-none hover:bg-overlay-light hover:text-text-primary"
-					onSelect={() => onViewTask(event.taskId)}
-				>
-					<Icon src={FiExternalLink} size="12" className="text-text-muted" />
-					Edit task
-				</ContextMenu.Item>
-			{/if}
-		</ContextMenu.Content>
-	</ContextMenu.Portal>
+  <ContextMenu.Portal>
+    <ContextMenu.Content
+      class="z-50 min-w-[140px] rounded-lg border border-border bg-bg-secondary p-1 shadow-elevated"
+    >
+      {#if onViewTask}
+        <ContextMenu.Item
+          class="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary outline-none hover:bg-overlay-light hover:text-text-primary"
+          onSelect={() => onViewTask(event.taskId)}
+        >
+          <Icon src={FiExternalLink} size="12" className="text-text-muted" />
+          Edit task
+        </ContextMenu.Item>
+      {/if}
+    </ContextMenu.Content>
+  </ContextMenu.Portal>
 </ContextMenu.Root>

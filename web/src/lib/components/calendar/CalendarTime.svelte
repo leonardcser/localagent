@@ -40,19 +40,19 @@ function formatTime(d: Date): string {
 </script>
 
 {#if dayIndex >= 0}
-	<div
-		class="pointer-events-none absolute left-0 z-20 flex w-full items-center"
-		style="top: {top}px; height: 1.5px; background: var(--color-error)"
-	>
-		<div
-			class="absolute rounded-full"
-			style="left: calc({dayIndex} * 100% / {numCols} - 4px); width: 8px; height: 8px; background: var(--color-error)"
-		></div>
-		<div
-			class="absolute rounded-sm px-1 text-[10px] font-medium backdrop-blur-sm"
-			style="left: -48px; color: var(--color-error)"
-		>
-			{formatTime(now)}
-		</div>
-	</div>
+  <div
+    class="pointer-events-none absolute left-0 z-20 flex w-full items-center"
+    style="top: {top}px; height: 1.5px; background: var(--color-error)"
+  >
+    <div
+      class="absolute rounded-full"
+      style="left: calc({dayIndex} * 100% / {numCols} - 4px); width: 8px; height: 8px; background: var(--color-error)"
+    ></div>
+    <div
+      class="absolute rounded-sm px-1 text-[10px] font-medium backdrop-blur-sm"
+      style="left: -48px; color: var(--color-error)"
+    >
+      {formatTime(now)}
+    </div>
+  </div>
 {/if}

@@ -1,58 +1,58 @@
 <!doctype html>
 <html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-		<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
-		<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-		<meta name="apple-mobile-web-app-capable" content="yes" />
-		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-		<meta name="apple-mobile-web-app-title" content="localagent" />
-		<link rel="manifest" href="/manifest.json" />
-		<title>localagent</title>
-		<style>
-			html { background-color: #000; }
-			@media (prefers-color-scheme: light) {
-				html { background-color: #fff; }
-			}
-			#app-loader {
-				position: fixed;
-				inset: 0;
-				display: flex;
-				align-items: center;
-				justify-content: center;
-				z-index: 9999;
-			}
-			#app-loader .spinner {
-				width: 24px;
-				height: 24px;
-				border: 2px solid rgba(255,255,255,0.15);
-				border-top-color: rgba(255,255,255,0.6);
-				border-radius: 50%;
-				animation: spin 0.7s linear infinite;
-			}
-			@media (prefers-color-scheme: light) {
-				#app-loader .spinner {
-					border-color: rgba(0,0,0,0.1);
-					border-top-color: rgba(0,0,0,0.5);
-				}
-			}
-			@keyframes spin {
-				to { transform: rotate(360deg); }
-			}
-		</style>
-		%sveltekit.head%
-	</head>
-	<body data-sveltekit-preload-data="hover">
-		<div id="app-loader"><div class="spinner"></div></div>
-		<script>
-			window.addEventListener("vite:preloadError", function() {
-				window.location.reload();
-			});
-			window.addEventListener("pageshow", function(e) {
-				if (e.persisted) window.location.reload();
-			});
-		</script>
-		<div style="display: contents">%sveltekit.body%</div>
-	</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="localagent" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>localagent</title>
+    <style>
+      html { background-color: #000; }
+      @media (prefers-color-scheme: light) {
+        html { background-color: #fff; }
+      }
+      #app-loader {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+      #app-loader .spinner {
+        width: 24px;
+        height: 24px;
+        border: 2px solid rgba(255,255,255,0.15);
+        border-top-color: rgba(255,255,255,0.6);
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+      }
+      @media (prefers-color-scheme: light) {
+        #app-loader .spinner {
+          border-color: rgba(0,0,0,0.1);
+          border-top-color: rgba(0,0,0,0.5);
+        }
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div id="app-loader"><div class="spinner"></div></div>
+    <script>
+      window.addEventListener("vite:preloadError", function() {
+        window.location.reload();
+      });
+      window.addEventListener("pageshow", function(e) {
+        if (e.persisted) window.location.reload();
+      });
+    </script>
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
 </html>

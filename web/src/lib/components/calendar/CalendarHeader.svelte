@@ -107,86 +107,86 @@ const views: { key: CalendarView; label: string }[] = [
 
 <!-- Top bar -->
 <div class="flex h-11 items-center justify-between border-b border-border bg-bg-secondary px-3 gap-2">
-	<div class="flex items-center gap-0.5">
-		<button
-			onclick={() => navigate(-1)}
-			class="flex h-7 w-7 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-overlay-light"
-		>
-			<Icon src={FiChevronLeft} size="16" />
-		</button>
-		<button
-			onclick={() => navigate(1)}
-			class="flex h-7 w-7 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-overlay-light"
-		>
-			<Icon src={FiChevronRight} size="16" />
-		</button>
-		<button
-			onclick={goToToday}
-			class={cn(
-				"ml-1 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors",
-				isCurrentPeriod
-					? "bg-accent text-white"
-					: "bg-overlay-light text-text-secondary hover:bg-overlay-medium",
-			)}
-		>
-			Today
-		</button>
-	</div>
+  <div class="flex items-center gap-0.5">
+    <button
+      onclick={() => navigate(-1)}
+      class="flex h-7 w-7 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-overlay-light"
+    >
+      <Icon src={FiChevronLeft} size="16" />
+    </button>
+    <button
+      onclick={() => navigate(1)}
+      class="flex h-7 w-7 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-overlay-light"
+    >
+      <Icon src={FiChevronRight} size="16" />
+    </button>
+    <button
+      onclick={goToToday}
+      class={cn(
+        "ml-1 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors",
+        isCurrentPeriod
+          ? "bg-accent text-white"
+          : "bg-overlay-light text-text-secondary hover:bg-overlay-medium",
+      )}
+    >
+      Today
+    </button>
+  </div>
 
-	<span class="flex-1 text-center text-[13px] font-semibold text-text-primary truncate">
-		{headerTitle()}
-	</span>
+  <span class="flex-1 text-center text-[13px] font-semibold text-text-primary truncate">
+    {headerTitle()}
+  </span>
 
-	<!-- View switcher -->
-	<div class="flex items-center rounded-lg border border-border bg-bg-tertiary p-0.5">
-		{#each views as v}
-			<button
-				onclick={() => setView(v.key)}
-				class={cn(
-					"rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors",
-					view === v.key
-						? "bg-accent text-white"
-						: "text-text-muted hover:text-text-secondary",
-				)}
-			>
-				{v.label}
-			</button>
-		{/each}
-	</div>
+  <!-- View switcher -->
+  <div class="flex items-center rounded-lg border border-border bg-bg-tertiary p-0.5">
+    {#each views as v}
+      <button
+        onclick={() => setView(v.key)}
+        class={cn(
+          "rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors",
+          view === v.key
+            ? "bg-accent text-white"
+            : "text-text-muted hover:text-text-secondary",
+        )}
+      >
+        {v.label}
+      </button>
+    {/each}
+  </div>
 </div>
 
 <!-- Day headers -->
 <div class="flex border-b border-border bg-bg-secondary py-1">
-	<div
-		class="flex items-center justify-center text-[11px] font-medium text-accent shrink-0"
-		style="width: {indexColWidth}px"
-	>
-		{#if view === "week"}
-			W{getISOWeek(viewStart)}
-		{:else}
-			&nbsp;
-		{/if}
-	</div>
-	<div
-		class="grid flex-1"
-		style="grid-template-columns: repeat({numCols}, 1fr)"
-	>
-		{#each Array.from({ length: numCols }) as _, i}
-			{@const day = addDays(viewStart, i)}
-			{@const isToday = isSameDay(day, today)}
-			<div
-				class="flex items-center justify-center gap-1 text-center text-[12px] font-semibold text-text-secondary"
-			>
-				<span>{weekdayShort((day.getDay() + 6) % 7)}</span>
-				<span
-					class={cn(
-						"flex h-5 w-5 items-center justify-center rounded-full text-[11px]",
-						isToday && "bg-accent text-white",
-					)}
-				>
-					{day.getDate()}
-				</span>
-			</div>
-		{/each}
-	</div>
+  <div
+    class="flex items-center justify-center text-[11px] font-medium text-accent shrink-0"
+    style="width: {indexColWidth}px"
+  >
+    {#if view === "week"}
+      W{getISOWeek(viewStart)}
+    {:else}
+      &nbsp;
+    {/if}
+  </div>
+  <div
+    class="grid flex-1"
+    style="grid-template-columns: repeat({numCols}, 1fr)"
+  >
+    {#each Array.from({ length: numCols }) as _, i}
+      {@const day = addDays(viewStart, i)}
+      {@const isToday = isSameDay(day, today)}
+      <div
+        class="flex items-center justify-center gap-1 text-center text-[12px] font-semibold text-text-secondary"
+      >
+        <span>{weekdayShort((day.getDay() + 6) % 7)}</span>
+        <span
+          class={cn(
+            "flex h-5 w-5 items-center justify-center rounded-full text-[11px]",
+            isToday && "bg-accent text-white",
+          )}
+        >
+          {day.getDate()}
+        </span>
+      </div>
+    {/each}
+  </div>
 </div>

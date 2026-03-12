@@ -172,50 +172,50 @@ onDestroy(() => {
 </script>
 
 <div class="relative mx-auto flex h-full w-full max-w-3xl flex-col">
-	<div
-		bind:this={messagesEl}
-		onscroll={handleScroll}
-		class="messages-scroll flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4 [-webkit-overflow-scrolling:touch]"
-	>
-		{#each groups as group (group.id)}
-			{#if group.kind === "message"}
-				<ChatMessage role={group.role} content={group.content} timestamp={group.timestamp} media={group.media} queued={group.queued} />
-			{:else}
-				<ActivityGroup
-				items={group.items}
-				expanded={chat.isGroupExpanded(group.items[0].timestamp)}
-				onToggle={() => chat.toggleGroupExpanded(group.items[0].timestamp)}
-				isItemExpanded={chat.isGroupExpanded}
-				toggleItemExpanded={chat.toggleGroupExpanded}
-			/>
-			{/if}
-		{/each}
-		{#if chat.loading}
-			<LoadingBubble />
-		{/if}
-		{#if chat.timeline.length === 0 && !chat.loading}
-			<div class="flex h-full flex-col items-center justify-center gap-2">
-				<span class="text-[13px] text-text-muted">Send a message to start.</span>
-			</div>
-		{/if}
-	</div>
+  <div
+    bind:this={messagesEl}
+    onscroll={handleScroll}
+    class="messages-scroll flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4 [-webkit-overflow-scrolling:touch]"
+  >
+    {#each groups as group (group.id)}
+      {#if group.kind === "message"}
+        <ChatMessage role={group.role} content={group.content} timestamp={group.timestamp} media={group.media} queued={group.queued} />
+      {:else}
+        <ActivityGroup
+        items={group.items}
+        expanded={chat.isGroupExpanded(group.items[0].timestamp)}
+        onToggle={() => chat.toggleGroupExpanded(group.items[0].timestamp)}
+        isItemExpanded={chat.isGroupExpanded}
+        toggleItemExpanded={chat.toggleGroupExpanded}
+      />
+      {/if}
+    {/each}
+    {#if chat.loading}
+      <LoadingBubble />
+    {/if}
+    {#if chat.timeline.length === 0 && !chat.loading}
+      <div class="flex h-full flex-col items-center justify-center gap-2">
+        <span class="text-[13px] text-text-muted">Send a message to start.</span>
+      </div>
+    {/if}
+  </div>
 
-	{#if !isAtBottom}
-		<button
-			class="absolute bottom-20 inset-x-0 mx-auto z-10 flex items-center justify-center w-9 h-9 rounded-full border border-border-light bg-bg-secondary text-text-secondary cursor-pointer shadow-elevated transition-[background,color] duration-150 hover:bg-surface hover:text-text-primary"
-			onclick={scrollToBottom}
-			title="Scroll to bottom"
-		>
-			<Icon src={FiChevronDown} size="18" />
-		</button>
-	{/if}
+  {#if !isAtBottom}
+    <button
+      class="absolute bottom-20 inset-x-0 mx-auto z-10 flex items-center justify-center w-9 h-9 rounded-full border border-border-light bg-bg-secondary text-text-secondary cursor-pointer shadow-elevated transition-[background,color] duration-150 hover:bg-surface hover:text-text-primary"
+      onclick={scrollToBottom}
+      title="Scroll to bottom"
+    >
+      <Icon src={FiChevronDown} size="18" />
+    </button>
+  {/if}
 
-	<InputArea />
-	{#if chat.dragging}
-		<DropOverlay />
-	{/if}
+  <InputArea />
+  {#if chat.dragging}
+    <DropOverlay />
+  {/if}
 </div>
 
 {#if voice.active}
-	<VoiceOverlay />
+  <VoiceOverlay />
 {/if}
