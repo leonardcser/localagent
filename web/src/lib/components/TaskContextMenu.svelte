@@ -399,46 +399,44 @@ const statuses = [
 			</ContextMenu.Sub>
 
 			<!-- Reminders -->
-			{#if task.due}
-				<ContextMenu.Sub>
-					<ContextMenu.SubTrigger
-						class="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary outline-none data-[highlighted]:bg-overlay-light data-[highlighted]:text-text-primary data-[state=open]:bg-overlay-light"
-					>
-						<span class="flex items-center gap-2.5">
-							<Icon src={FiBell} size="14" />
-							Reminders
-							{#if (task.reminders ?? []).length > 0}
-								<span class="rounded-full bg-accent/15 px-1.5 text-[10px] text-accent">{(task.reminders ?? []).length}</span>
-							{/if}
-						</span>
-						<Icon src={FiChevronRight} size="12" className="text-text-muted" />
-					</ContextMenu.SubTrigger>
-					<ContextMenu.SubContent
-						class="z-50 min-w-40 rounded-lg border border-border bg-bg-secondary p-1 shadow-elevated"
-						sideOffset={4}
-					>
-						{#each [{ key: "15m", label: "15 minutes before" }, { key: "30m", label: "30 minutes before" }, { key: "1h", label: "1 hour before" }, { key: "2h", label: "2 hours before" }, { key: "1d", label: "1 day before" }, { key: "2d", label: "2 days before" }, { key: "1w", label: "1 week before" }] as opt}
-							{@const isTimeBased = !["1d", "2d", "1w"].includes(opt.key)}
-							{@const hasTime = task.due?.includes("T") ?? false}
-							{#if !isTimeBased || hasTime}
-								<ContextMenu.Item
-									class="flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary outline-none data-[highlighted]:bg-overlay-light data-[highlighted]:text-text-primary"
-									onSelect={(e) => { e.preventDefault(); toggleReminder(opt.key); }}
+			<ContextMenu.Sub>
+				<ContextMenu.SubTrigger
+					class="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary outline-none data-[highlighted]:bg-overlay-light data-[highlighted]:text-text-primary data-[state=open]:bg-overlay-light"
+				>
+					<span class="flex items-center gap-2.5">
+						<Icon src={FiBell} size="14" />
+						Reminders
+						{#if (task.reminders ?? []).length > 0}
+							<span class="rounded-full bg-accent/15 px-1.5 text-[10px] text-accent">{(task.reminders ?? []).length}</span>
+						{/if}
+					</span>
+					<Icon src={FiChevronRight} size="12" className="text-text-muted" />
+				</ContextMenu.SubTrigger>
+				<ContextMenu.SubContent
+					class="z-50 min-w-40 rounded-lg border border-border bg-bg-secondary p-1 shadow-elevated"
+					sideOffset={4}
+				>
+					{#each [{ key: "15m", label: "15 minutes before" }, { key: "30m", label: "30 minutes before" }, { key: "1h", label: "1 hour before" }, { key: "2h", label: "2 hours before" }, { key: "1d", label: "1 day before" }, { key: "2d", label: "2 days before" }, { key: "1w", label: "1 week before" }] as opt}
+						{@const isTimeBased = !["1d", "2d", "1w"].includes(opt.key)}
+						{@const hasTime = task.due?.includes("T") ?? false}
+						{#if !isTimeBased || hasTime}
+							<ContextMenu.Item
+								class="flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] text-text-secondary outline-none data-[highlighted]:bg-overlay-light data-[highlighted]:text-text-primary"
+								onSelect={(e) => { e.preventDefault(); toggleReminder(opt.key); }}
+							>
+								<span
+									class="flex h-3.5 w-3.5 items-center justify-center rounded border {(task.reminders ?? []).includes(opt.key) ? 'border-accent bg-accent' : 'border-border-light'}"
 								>
-									<span
-										class="flex h-3.5 w-3.5 items-center justify-center rounded border {(task.reminders ?? []).includes(opt.key) ? 'border-accent bg-accent' : 'border-border-light'}"
-									>
-										{#if (task.reminders ?? []).includes(opt.key)}
-											<Icon src={FiCheck} size="8" className="text-white" />
-										{/if}
-									</span>
-									{opt.label}
-								</ContextMenu.Item>
-							{/if}
-						{/each}
-					</ContextMenu.SubContent>
-				</ContextMenu.Sub>
-			{/if}
+									{#if (task.reminders ?? []).includes(opt.key)}
+										<Icon src={FiCheck} size="8" className="text-white" />
+									{/if}
+								</span>
+								{opt.label}
+							</ContextMenu.Item>
+						{/if}
+					{/each}
+				</ContextMenu.SubContent>
+			</ContextMenu.Sub>
 
 			<ContextMenu.Separator class="mx-1 my-1 h-px bg-border" />
 

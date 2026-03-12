@@ -53,6 +53,27 @@ let quickAddFocused = $state(false);
 let showSidebar = $state(false);
 let showSearch = $state(false);
 let colorPickerTag = $state<string | null>(null);
+let colorPickerPos = $state<{ x: number; y: number }>({ x: 0, y: 0 });
+
+function openColorPicker(e: MouseEvent, tag: string) {
+  e.stopPropagation();
+  if (colorPickerTag === tag) {
+    colorPickerTag = null;
+    return;
+  }
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  colorPickerPos = { x: rect.right + 4, y: rect.top };
+  colorPickerTag = tag;
+}
+
+function closeColorPicker(e: MouseEvent) {
+  if (
+    colorPickerTag &&
+    !(e.target as HTMLElement).closest("[data-color-picker]")
+  ) {
+    colorPickerTag = null;
+  }
+}
 
 let dragOverCol = $state<string | null>(null);
 let draggingId = $state<string | null>(null);
@@ -689,40 +710,38 @@ const priorityOptions = [
 			</div>
 
 			<!-- Reminders -->
-			{#if panelDue}
-				<div class="flex items-center justify-between {py} border-b border-border/50">
-					<span class="flex items-center {gap} {szLabel} text-text-secondary">
-						<Icon src={FiBell} size={iconSz} className="text-text-muted" />
-						Reminders
-					</span>
-					<div class="flex flex-wrap justify-end gap-1">
-						{#each [{ key: "15m", label: "15m" }, { key: "30m", label: "30m" }, { key: "1h", label: "1h" }, { key: "2h", label: "2h" }, { key: "1d", label: "1d" }, { key: "2d", label: "2d" }, { key: "1w", label: "1w" }] as opt}
-							{@const active = panelReminders.includes(opt.key)}
-							{@const isTimeBased = !["1d", "2d", "1w"].includes(opt.key)}
-							{@const hasTime = panelDue.includes("T")}
-							{#if !isTimeBased || hasTime}
-								<button
-									type="button"
-									class="rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors
-										{active
-											? 'border-accent bg-accent/15 text-accent'
-											: 'border-border bg-bg-tertiary text-text-muted hover:border-border-light hover:text-text-secondary'}"
-									onclick={() => {
-										if (active) {
-											panelReminders = panelReminders.filter((r) => r !== opt.key);
-										} else {
-											panelReminders = [...panelReminders, opt.key];
-										}
-										autoSave({ reminders: panelReminders } as Partial<Task>);
-									}}
-								>
-									{opt.label}
-								</button>
-							{/if}
-						{/each}
-					</div>
+			<div class="flex items-center justify-between {py} border-b border-border/50">
+				<span class="flex items-center {gap} {szLabel} text-text-secondary">
+					<Icon src={FiBell} size={iconSz} className="text-text-muted" />
+					Reminders
+				</span>
+				<div class="flex flex-wrap justify-end gap-1">
+					{#each [{ key: "15m", label: "15m" }, { key: "30m", label: "30m" }, { key: "1h", label: "1h" }, { key: "2h", label: "2h" }, { key: "1d", label: "1d" }, { key: "2d", label: "2d" }, { key: "1w", label: "1w" }] as opt}
+						{@const active = panelReminders.includes(opt.key)}
+						{@const isTimeBased = !["1d", "2d", "1w"].includes(opt.key)}
+						{@const hasTime = panelDue.includes("T")}
+						{#if !isTimeBased || hasTime}
+							<button
+								type="button"
+								class="rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors
+									{active
+										? 'border-accent bg-accent/15 text-accent'
+										: 'border-border bg-bg-tertiary text-text-muted hover:border-border-light hover:text-text-secondary'}"
+								onclick={() => {
+									if (active) {
+										panelReminders = panelReminders.filter((r) => r !== opt.key);
+									} else {
+										panelReminders = [...panelReminders, opt.key];
+									}
+									autoSave({ reminders: panelReminders } as Partial<Task>);
+								}}
+							>
+								{opt.label}
+							</button>
+						{/if}
+					{/each}
 				</div>
-			{/if}
+			</div>
 
 			<!-- Recurrence -->
 			<div class="flex items-center justify-between {py} border-b border-border/50">
@@ -888,7 +907,8 @@ const priorityOptions = [
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="flex h-full">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="flex h-full" onclick={closeColorPicker}>
 	<!-- Desktop sidebar -->
 	<div class="hidden w-52 shrink-0 flex-col border-r border-border bg-bg md:flex">
 		<div class="px-3 pt-3 pb-1">
@@ -966,35 +986,13 @@ const priorityOptions = [
 							{/if}
 							<span>{tag}</span>
 						</button>
-						<div class="relative">
-							<button
-								onclick={(e) => { e.stopPropagation(); colorPickerTag = colorPickerTag === tag ? null : tag; }}
-								class="mr-1 flex h-5 w-5 items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-100 hover:bg-overlay-light"
-								title="Set color"
-							>
-								<span class="h-2 w-2 rounded-full {tc ? '' : 'border border-text-muted/40'}" style={tc ? `background:${tc}` : ""}></span>
-							</button>
-							{#if colorPickerTag === tag}
-								<div class="absolute right-0 top-full z-50 mt-1 grid grid-cols-5 gap-1 rounded-lg border border-border bg-bg-secondary p-2 shadow-elevated">
-									{#each tagColorStore.palette as color}
-										<button
-											onclick={(e) => { e.stopPropagation(); tagColorStore.set(tag, color); colorPickerTag = null; }}
-											class="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 {tc === color ? 'border-white' : 'border-transparent'}"
-											style="background:{color}"
-										></button>
-									{/each}
-									{#if tc}
-										<button
-											onclick={(e) => { e.stopPropagation(); tagColorStore.remove(tag); colorPickerTag = null; }}
-											class="flex h-5 w-5 items-center justify-center rounded-full border border-border text-text-muted hover:border-border-light hover:text-text-secondary"
-											title="Remove color"
-										>
-											<Icon src={FiX} size="10" />
-										</button>
-									{/if}
-								</div>
-							{/if}
-						</div>
+						<button
+							onclick={(e) => openColorPicker(e, tag)}
+							class="mr-1 flex h-5 w-5 items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-100 hover:bg-overlay-light"
+							title="Set color"
+						>
+							<span class="h-2 w-2 rounded-full {tc ? '' : 'border border-text-muted/40'}" style={tc ? `background:${tc}` : ""}></span>
+						</button>
 					</div>
 				{/each}
 			</div>
@@ -1617,6 +1615,34 @@ const priorityOptions = [
 				</div>
 				{@render detailPanel(true)}
 			</div>
+		{/if}
+	</div>
+{/if}
+
+{#if colorPickerTag}
+	{@const tc = tagColorStore.get(colorPickerTag)}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		data-color-picker
+		class="fixed z-[100] grid grid-cols-5 gap-1.5 rounded-lg border border-border bg-bg-secondary p-2 shadow-elevated"
+		style="left:{colorPickerPos.x}px;top:{colorPickerPos.y}px"
+		onclick={(e) => e.stopPropagation()}
+	>
+		{#each tagColorStore.palette as color}
+			<button
+				onclick={() => { tagColorStore.set(colorPickerTag!, color); colorPickerTag = null; }}
+				class="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 {tc === color ? 'border-white' : 'border-transparent'}"
+				style="background:{color}"
+			></button>
+		{/each}
+		{#if tc}
+			<button
+				onclick={() => { tagColorStore.remove(colorPickerTag!); colorPickerTag = null; }}
+				class="flex h-5 w-5 items-center justify-center rounded-full border border-border text-text-muted hover:border-border-light hover:text-text-secondary"
+				title="Remove color"
+			>
+				<Icon src={FiX} size="10" />
+			</button>
 		{/if}
 	</div>
 {/if}
