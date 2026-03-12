@@ -90,11 +90,7 @@ let displayHeight = $derived(
 );
 
 function formatTime(d: Date): string {
-  return d.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
 let draggableRef = $state<{ reset: () => void }>();
@@ -165,7 +161,7 @@ function handleEventMouseUp() {
 				onclick={null}
 			>
 				<div
-					class="h-full rounded-sm border-l-2 px-1.5 pt-0.5 pb-1 text-[11px] backdrop-blur-sm select-none overflow-hidden"
+					class="h-full rounded-sm border-l-2 px-1.5 pt-0.5 pb-1 text-left text-[11px] backdrop-blur-sm select-none overflow-hidden"
 					style="background-color: color-mix(in srgb, {event.color} 15%, transparent); border-color: {event.color}; color: {event.color}"
 				>
 					{#if durationMin >= 60}
@@ -180,7 +176,6 @@ function handleEventMouseUp() {
 					{#if event.draggable && onResize}
 						<div
 							class="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize"
-							style="background: linear-gradient(to bottom, transparent, color-mix(in srgb, {event.color} 40%, transparent))"
 							role="presentation"
 							onmousedown={startResize}
 						></div>

@@ -31,6 +31,7 @@ import RecurrencePicker from "$lib/components/RecurrencePicker.svelte";
 import BlockPicker from "$lib/components/BlockPicker.svelte";
 import { blockStore } from "$lib/stores/block.svelte";
 import { tagColorStore } from "$lib/stores/tagColor.svelte";
+import { formatTime24 } from "$lib/utils";
 import type { Block } from "$lib/api";
 
 let panelOpen = $state(false);
@@ -973,8 +974,8 @@ const priorityOptions = [
 						<span class="{mobile ? 'text-[13px]' : 'text-[11px]'} text-text-secondary">
 							<Icon src={FiClock} size="11" className="inline-block text-text-muted mr-1" />
 							{new Date(block.startAtMs).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-							{new Date(block.startAtMs).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}
-							– {new Date(block.endAtMs).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}
+							{formatTime24(new Date(block.startAtMs))}
+							– {formatTime24(new Date(block.endAtMs))}
 						</span>
 						<button
 							onclick={() => blockStore.remove(block.id)}

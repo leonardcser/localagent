@@ -35,11 +35,7 @@ onMount(() => {
 });
 
 function formatTime(d: Date): string {
-  return d.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 </script>
 

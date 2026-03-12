@@ -36,5 +36,9 @@ export function nowTimestamp(): string {
 export function formatTimestamp(ts: string): string {
   const d = new Date(ts);
   if (isNaN(d.getTime())) return ts;
-  return d.toLocaleTimeString(undefined, { hour12: false });
+  return formatTime24(d);
+}
+
+export function formatTime24(d: Date): string {
+  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
