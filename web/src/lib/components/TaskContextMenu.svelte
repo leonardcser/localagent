@@ -100,30 +100,35 @@ function dueDate(): string | undefined {
 const priorityFlags: {
   value: string;
   color: string;
+  hoverColor: string;
   activeColor: string;
   label: string;
 }[] = [
   {
     value: "high",
     color: "text-text-muted/40",
+    hoverColor: "hover:text-error",
     activeColor: "text-error",
     label: "High",
   },
   {
     value: "medium",
     color: "text-text-muted/40",
+    hoverColor: "hover:text-warning",
     activeColor: "text-warning",
     label: "Medium",
   },
   {
     value: "low",
     color: "text-text-muted/40",
+    hoverColor: "hover:text-accent",
     activeColor: "text-accent",
     label: "Low",
   },
   {
     value: "",
     color: "text-text-muted/40",
+    hoverColor: "hover:text-text-secondary",
     activeColor: "text-text-muted/40",
     label: "None",
   },
@@ -291,7 +296,7 @@ const dateOptions: {
 					{@const isActive = (task.priority ?? "") === p.value}
 					<button
 						class="flex h-8 w-8 items-center justify-center rounded-lg transition-colors
-							{isActive ? p.activeColor + ' bg-overlay-light' : p.color + ' hover:bg-overlay-light'}"
+							{isActive ? p.activeColor + ' bg-overlay-light' : p.color + ' ' + p.hoverColor + ' hover:bg-overlay-light'}"
 						title={p.label}
 						onclick={(e) => { e.preventDefault(); setPriority(p.value); }}
 					>

@@ -134,6 +134,19 @@ const SWIPE_MAX = 120;
 let moreMenuOpen = $state(false);
 let filterOpen = $state(false);
 let completedExpanded = $state(false);
+let completingIds = $state(new Set<string>());
+
+async function animateComplete(id: string) {
+  completingIds = new Set([...completingIds, id]);
+  // Let the checkbox fill animation play, then slide out
+  await new Promise((r) => setTimeout(r, 400));
+  completingIds = new Set([...completingIds].filter((x) => x !== id));
+  taskStore.complete(id);
+}
+
+async function animateUncomplete(id: string) {
+  await taskStore.update(id, { status: "todo" });
+}
 
 onMount(async () => {
   await taskStore.load();
@@ -228,7 +241,7 @@ async function handleTouchEnd() {
   if (swipeX >= SWIPE_THRESHOLD) {
     swipeX = 0;
     swipeTaskId = null;
-    await taskStore.complete(id);
+    await animateComplete(id);
   } else {
     swipeX = 0;
     swipeTaskId = null;
@@ -1013,14 +1026,14 @@ let kanbanCols = $derived(
                 role="checkbox"
                 tabindex="-1"
                 aria-checked={sub.status === "done"}
-                onclick={(e) => { e.stopPropagation(); sub.status === "done" ? taskStore.update(sub.id, { status: "todo" }) : taskStore.complete(sub.id); }}
-                onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); sub.status === "done" ? taskStore.update(sub.id, { status: "todo" }) : taskStore.complete(sub.id); } }}
-                class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors
-                  {sub.status === 'done' ? checkboxDoneColor() : checkboxBorderColor(sub)}"
+                onclick={(e) => { e.stopPropagation(); sub.status === "done" ? animateUncomplete(sub.id) : animateComplete(sub.id); }}
+                onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); sub.status === "done" ? animateUncomplete(sub.id) : animateComplete(sub.id); } }}
+                class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-all duration-200
+                  {completingIds.has(sub.id) ? 'border-success bg-success text-white scale-110' : sub.status === 'done' ? checkboxDoneColor() : checkboxBorderColor(sub)}"
               >
                 <Icon src={FiCheck} size="9" />
               </span>
-              <span class="truncate {mobile ? 'text-[14px]' : 'text-[12px]'} {sub.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}">
+              <span class="truncate transition-colors duration-200 {mobile ? 'text-[14px]' : 'text-[12px]'} {completingIds.has(sub.id) || sub.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}">
                 {sub.title}
               </span>
             </button>
@@ -1314,8 +1327,9 @@ let kanbanCols = $derived(
                 {@const subtasks = taskStore.subtasksOf(task.id)}
                 {@const hasChildren = subtasks.length > 0}
                 {@const isExpanded = expandedParents.has(task.id)}
+                {@const isCompleting = completingIds.has(task.id)}
                 <div role="listitem"
-                  class="relative overflow-hidden {draggingId === task.id ? 'opacity-40' : ''}"
+                  class="relative overflow-hidden transition-all duration-300 {draggingId === task.id ? 'opacity-40' : ''} {isCompleting ? 'max-h-0 opacity-0 scale-y-95' : 'max-h-40'}"
                   draggable="true"
                   ondragstart={(e) => handleDragStart(e, task.id)}
                   ondragend={handleDragEnd}
@@ -1350,20 +1364,20 @@ let kanbanCols = $derived(
                         onclick={(e) => {
                           e.stopPropagation();
                           task.status === "done"
-                            ? taskStore.update(task.id, { status: "todo" })
-                            : taskStore.complete(task.id);
+                            ? animateUncomplete(task.id)
+                            : animateComplete(task.id);
                         }}
                         onkeydown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
                             e.stopPropagation();
                             task.status === "done"
-                              ? taskStore.update(task.id, { status: "todo" })
-                              : taskStore.complete(task.id);
+                              ? animateUncomplete(task.id)
+                              : animateComplete(task.id);
                           }
                         }}
-                        class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
-                          {task.status === 'done' ? checkboxDoneColor() : checkboxBorderColor(task)}"
+                        class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-all duration-200
+                          {isCompleting ? 'border-success bg-success text-white scale-110' : task.status === 'done' ? checkboxDoneColor() : checkboxBorderColor(task)}"
                       >
                         <Icon src={FiCheck} size="9" />
                       </span>
@@ -1371,7 +1385,7 @@ let kanbanCols = $derived(
                       <span class="flex min-w-0 flex-1 flex-col gap-0.5">
                         <span class="flex items-center gap-1.5">
                           <span
-                            class="truncate text-[13px] {task.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}"
+                            class="truncate text-[13px] transition-colors duration-200 {isCompleting || task.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}"
                           >
                             {task.title}
                           </span>
@@ -1428,8 +1442,9 @@ let kanbanCols = $derived(
                 {#if hasChildren && isExpanded}
                   {@const sortedSubtasks = subtasks}
                   {#each sortedSubtasks as sub (sub.id)}
+                    {@const isSubCompleting = completingIds.has(sub.id)}
                     <div role="listitem"
-                      class="relative overflow-hidden {draggingId === sub.id ? 'opacity-40' : ''}"
+                      class="relative overflow-hidden transition-all duration-300 {draggingId === sub.id ? 'opacity-40' : ''} {isSubCompleting ? 'max-h-0 opacity-0 scale-y-95' : 'max-h-40'}"
                       draggable="true"
                       ondragstart={(e) => handleDragStart(e, sub.id)}
                       ondragend={handleDragEnd}
@@ -1465,20 +1480,20 @@ let kanbanCols = $derived(
                             onclick={(e) => {
                               e.stopPropagation();
                               sub.status === "done"
-                                ? taskStore.update(sub.id, { status: "todo" })
-                                : taskStore.complete(sub.id);
+                                ? animateUncomplete(sub.id)
+                                : animateComplete(sub.id);
                             }}
                             onkeydown={(e) => {
                               if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 sub.status === "done"
-                                  ? taskStore.update(sub.id, { status: "todo" })
-                                  : taskStore.complete(sub.id);
+                                  ? animateUncomplete(sub.id)
+                                  : animateComplete(sub.id);
                               }
                             }}
-                            class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
-                              {sub.status === 'done' ? checkboxDoneColor() : checkboxBorderColor(sub)}"
+                            class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-all duration-200
+                              {isSubCompleting ? 'border-success bg-success text-white scale-110' : sub.status === 'done' ? checkboxDoneColor() : checkboxBorderColor(sub)}"
                           >
                             <Icon src={FiCheck} size="9" />
                           </span>
@@ -1486,7 +1501,7 @@ let kanbanCols = $derived(
                           <span class="flex min-w-0 flex-1 flex-col gap-0.5">
                             <span class="flex items-center gap-1.5">
                               <span
-                                class="truncate text-[12px] {sub.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}"
+                                class="truncate text-[12px] transition-colors duration-200 {isSubCompleting || sub.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}"
                               >
                                 {sub.title}
                               </span>
@@ -1560,13 +1575,13 @@ let kanbanCols = $derived(
                               aria-checked={true}
                               onclick={(e) => {
                                 e.stopPropagation();
-                                taskStore.update(task.id, { status: "todo" });
+                                animateUncomplete(task.id);
                               }}
                               onkeydown={(e) => {
                                 if (e.key === "Enter" || e.key === " ") {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  taskStore.update(task.id, { status: "todo" });
+                                  animateUncomplete(task.id);
                                 }
                               }}
                               class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
@@ -1630,16 +1645,16 @@ let kanbanCols = $derived(
                                   onclick={(e) => {
                                     e.stopPropagation();
                                     sub.status === "done"
-                                      ? taskStore.update(sub.id, { status: "todo" })
-                                      : taskStore.complete(sub.id);
+                                      ? animateUncomplete(sub.id)
+                                      : animateComplete(sub.id);
                                   }}
                                   onkeydown={(e) => {
                                     if (e.key === "Enter" || e.key === " ") {
                                       e.preventDefault();
                                       e.stopPropagation();
                                       sub.status === "done"
-                                        ? taskStore.update(sub.id, { status: "todo" })
-                                        : taskStore.complete(sub.id);
+                                        ? animateUncomplete(sub.id)
+                                        : animateComplete(sub.id);
                                     }
                                   }}
                                   class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100

@@ -315,10 +315,30 @@ function createTaskStore() {
   }
 
   async function complete(id: string) {
+    const task = tasks.find((t) => t.id === id);
+    // Optimistic: mark as done immediately
+    tasks = tasks.map((t) =>
+      t.id === id ? { ...t, status: "done", doneAtMs: Date.now() } : t,
+    );
     const completed = await completeTask(id);
     if (completed) {
       tasks = tasks.map((t) => (t.id === id ? completed : t));
-      await load();
+      // Recurring tasks create a new occurrence on the backend — fetch it
+      if (task?.recurrence) {
+        const fresh = await getTasks();
+        // Merge: keep optimistic state for known tasks, add any new ones
+        const known = new Set(tasks.map((t) => t.id));
+        for (const t of fresh) {
+          if (!known.has(t.id)) {
+            tasks = [...tasks, t];
+          }
+        }
+      }
+    } else {
+      // Revert on failure
+      if (task) {
+        tasks = tasks.map((t) => (t.id === id ? task : t));
+      }
     }
     return completed;
   }
