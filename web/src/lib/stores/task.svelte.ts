@@ -90,7 +90,6 @@ function createTaskStore() {
   let allTags = $derived.by(() => {
     const set = new Set<string>();
     for (const t of tasks) {
-      if (t.status === "done") continue;
       for (const tag of t.tags ?? []) set.add(tag);
     }
     return [...set].sort();
