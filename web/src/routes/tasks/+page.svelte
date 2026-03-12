@@ -23,12 +23,14 @@ import {
   FiAlertCircle,
   FiRepeat,
   FiClock,
+  FiBell,
 } from "svelte-icons-pack/fi";
 import TaskContextMenu from "$lib/components/TaskContextMenu.svelte";
 import DatePicker from "$lib/components/DatePicker.svelte";
 import RecurrencePicker from "$lib/components/RecurrencePicker.svelte";
 import BlockPicker from "$lib/components/BlockPicker.svelte";
 import { blockStore } from "$lib/stores/block.svelte";
+import { tagColorStore } from "$lib/stores/tagColor.svelte";
 import type { Block } from "$lib/api";
 
 let panelOpen = $state(false);
@@ -40,6 +42,7 @@ let panelDue = $state("");
 let panelTags = $state("");
 let panelStatus = $state("todo");
 let panelRecurrence = $state("");
+let panelReminders = $state<string[]>([]);
 let panelParentId = $state("");
 
 let expandedParents = $state(new Set<string>());
@@ -49,6 +52,7 @@ let quickAddFocused = $state(false);
 
 let showSidebar = $state(false);
 let showSearch = $state(false);
+let colorPickerTag = $state<string | null>(null);
 
 let dragOverCol = $state<string | null>(null);
 let draggingId = $state<string | null>(null);
@@ -152,6 +156,7 @@ function openAdd(parentId = "") {
   panelPriority = "";
   panelDue = "";
   panelRecurrence = "";
+  panelReminders = [];
   panelTags = "";
   panelStatus = "todo";
   panelParentId = parentId;
@@ -166,6 +171,7 @@ function openDetail(task: Task) {
   panelPriority = task.priority ?? "";
   panelDue = task.due ?? "";
   panelRecurrence = task.recurrence ?? "";
+  panelReminders = task.reminders ?? [];
   panelTags = task.tags?.join(", ") ?? "";
   panelStatus = task.status;
   panelParentId = task.parentId ?? "";
@@ -230,6 +236,7 @@ async function handleAddSubmit(e: SubmitEvent) {
     priority: panelPriority || undefined,
     due: panelDue || undefined,
     recurrence: panelRecurrence || undefined,
+    reminders: panelReminders.length > 0 ? panelReminders : undefined,
     tags: parseTags(panelTags),
     status: panelStatus,
     parentId: panelParentId || undefined,
@@ -681,6 +688,42 @@ const priorityOptions = [
 				/>
 			</div>
 
+			<!-- Reminders -->
+			{#if panelDue}
+				<div class="flex items-center justify-between {py} border-b border-border/50">
+					<span class="flex items-center {gap} {szLabel} text-text-secondary">
+						<Icon src={FiBell} size={iconSz} className="text-text-muted" />
+						Reminders
+					</span>
+					<div class="flex flex-wrap justify-end gap-1">
+						{#each [{ key: "15m", label: "15m" }, { key: "30m", label: "30m" }, { key: "1h", label: "1h" }, { key: "2h", label: "2h" }, { key: "1d", label: "1d" }, { key: "2d", label: "2d" }, { key: "1w", label: "1w" }] as opt}
+							{@const active = panelReminders.includes(opt.key)}
+							{@const isTimeBased = !["1d", "2d", "1w"].includes(opt.key)}
+							{@const hasTime = panelDue.includes("T")}
+							{#if !isTimeBased || hasTime}
+								<button
+									type="button"
+									class="rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors
+										{active
+											? 'border-accent bg-accent/15 text-accent'
+											: 'border-border bg-bg-tertiary text-text-muted hover:border-border-light hover:text-text-secondary'}"
+									onclick={() => {
+										if (active) {
+											panelReminders = panelReminders.filter((r) => r !== opt.key);
+										} else {
+											panelReminders = [...panelReminders, opt.key];
+										}
+										autoSave({ reminders: panelReminders } as Partial<Task>);
+									}}
+								>
+									{opt.label}
+								</button>
+							{/if}
+						{/each}
+					</div>
+				</div>
+			{/if}
+
 			<!-- Recurrence -->
 			<div class="flex items-center justify-between {py} border-b border-border/50">
 				<span class="flex items-center {gap} {szLabel} text-text-secondary">
@@ -908,14 +951,51 @@ const priorityOptions = [
 			<div class="flex flex-col px-1.5 py-2 border-t border-border">
 				<span class="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-text-muted">Tags</span>
 				{#each taskStore.allTags as tag}
-					<button
-						onclick={() => taskStore.toggleTag(tag)}
-						class="flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors
-							{taskStore.filterTags.includes(tag) ? 'bg-accent/10 text-accent' : 'text-text-secondary hover:bg-overlay-light hover:text-text-primary'}"
-					>
-						<Icon src={FiTag} size="13" className="shrink-0 {taskStore.filterTags.includes(tag) ? 'text-accent' : 'text-text-muted'}" />
-						<span>{tag}</span>
-					</button>
+					{@const tc = tagColorStore.get(tag)}
+					<div class="group flex items-center rounded-lg transition-colors
+						{taskStore.filterTags.includes(tag) ? 'bg-accent/10' : 'hover:bg-overlay-light'}">
+						<button
+							onclick={() => taskStore.toggleTag(tag)}
+							class="flex flex-1 items-center gap-2.5 px-2.5 py-1.5 text-[13px] transition-colors
+								{taskStore.filterTags.includes(tag) ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}"
+						>
+							{#if tc}
+								<span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:{tc}"></span>
+							{:else}
+								<Icon src={FiTag} size="13" className="shrink-0 {taskStore.filterTags.includes(tag) ? 'text-accent' : 'text-text-muted'}" />
+							{/if}
+							<span>{tag}</span>
+						</button>
+						<div class="relative">
+							<button
+								onclick={(e) => { e.stopPropagation(); colorPickerTag = colorPickerTag === tag ? null : tag; }}
+								class="mr-1 flex h-5 w-5 items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-100 hover:bg-overlay-light"
+								title="Set color"
+							>
+								<span class="h-2 w-2 rounded-full {tc ? '' : 'border border-text-muted/40'}" style={tc ? `background:${tc}` : ""}></span>
+							</button>
+							{#if colorPickerTag === tag}
+								<div class="absolute right-0 top-full z-50 mt-1 grid grid-cols-5 gap-1 rounded-lg border border-border bg-bg-secondary p-2 shadow-elevated">
+									{#each tagColorStore.palette as color}
+										<button
+											onclick={(e) => { e.stopPropagation(); tagColorStore.set(tag, color); colorPickerTag = null; }}
+											class="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 {tc === color ? 'border-white' : 'border-transparent'}"
+											style="background:{color}"
+										></button>
+									{/each}
+									{#if tc}
+										<button
+											onclick={(e) => { e.stopPropagation(); tagColorStore.remove(tag); colorPickerTag = null; }}
+											class="flex h-5 w-5 items-center justify-center rounded-full border border-border text-text-muted hover:border-border-light hover:text-text-secondary"
+											title="Remove color"
+										>
+											<Icon src={FiX} size="10" />
+										</button>
+									{/if}
+								</div>
+							{/if}
+						</div>
+					</div>
 				{/each}
 			</div>
 		{/if}
@@ -979,8 +1059,15 @@ const priorityOptions = [
 		<div class="hidden shrink-0 items-center gap-2 border-b border-border px-5 py-3 md:flex">
 			<h1 class="text-[15px] font-semibold text-text-primary">{smartListLabel()}</h1>
 			{#each taskStore.filterTags as tag}
-				<span class="flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-[11px] text-accent">
-					<Icon src={FiTag} size="10" />
+				{@const tc = tagColorStore.get(tag)}
+				<span class="flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] {tc ? '' : 'bg-accent/10 text-accent'}"
+					style={tc ? `background:${tc}18;color:${tc}` : ""}
+				>
+					{#if tc}
+						<span class="h-1.5 w-1.5 rounded-full" style="background:{tc}"></span>
+					{:else}
+						<Icon src={FiTag} size="10" />
+					{/if}
 					{tag}
 					<button onclick={() => taskStore.toggleTag(tag)} class="ml-0.5 hover:text-text-primary">
 						<Icon src={FiX} size="10" />
@@ -1133,8 +1220,13 @@ const priorityOptions = [
 													{/if}
 													{#if task.tags && task.tags.length > 0}
 														{#each task.tags as tag}
+															{@const tc = tagColorStore.get(tag)}
 															<span class="flex items-center gap-0.5 text-[11px] text-text-muted">
-																<Icon src={FiTag} size="9" />
+																{#if tc}
+																	<span class="h-1.5 w-1.5 rounded-full" style="background:{tc}"></span>
+																{:else}
+																	<Icon src={FiTag} size="9" />
+																{/if}
 																{tag}
 															</span>
 														{/each}
@@ -1333,7 +1425,12 @@ const priorityOptions = [
 												{/if}
 												{#if task.tags && task.tags.length > 0}
 													{#each task.tags as tag}
-														<span class="rounded-full bg-overlay-light px-1.5 py-0.5 text-[10px] text-text-muted">{tag}</span>
+														{@const tc = tagColorStore.get(tag)}
+														<span class="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px]"
+															style={tc ? `background:${tc}20;color:${tc}` : ""}
+															class:bg-overlay-light={!tc}
+															class:text-text-muted={!tc}
+														>{tag}</span>
 													{/each}
 												{/if}
 											</div>
