@@ -627,39 +627,24 @@ const priorityOptions = [
 		{@const expanded = expandedTagGroups.has(node.label)}
 		<div class="group flex items-center rounded-lg transition-colors
 			{active ? 'bg-accent/10' : 'hover:bg-overlay-light'}">
-			{#if hasChildren}
-				<button
-					onclick={() => toggleTagGroup(node.label)}
-					class="flex shrink-0 items-center justify-center py-1.5 transition-colors"
-					style="padding-left:{10 + depth * 14}px"
-				>
-					<Icon src={FiChevronRight} size="11" className="shrink-0 transition-transform {expanded ? 'rotate-90' : ''} {active ? 'text-accent' : 'text-text-muted'}" />
-				</button>
-				<button
-					onclick={() => toggleTagNode(node)}
-					class="flex flex-1 items-center gap-2 py-1.5 text-[13px] transition-colors
-						{active ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}"
-				>
-					{#if tc}
-						<span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:{tc}"></span>
-					{/if}
-					<span>{node.label}</span>
-				</button>
-			{:else}
-				<button
-					onclick={() => { if (node.fullTag) taskStore.toggleTag(node.fullTag); }}
-					class="flex flex-1 items-center gap-2 py-1.5 text-[13px] transition-colors
-						{active ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}"
-					style="padding-left:{10 + depth * 14}px"
-				>
-					{#if tc}
-						<span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:{tc}"></span>
-					{:else}
-						<Icon src={FiTag} size="12" className="shrink-0 {active ? 'text-accent' : 'text-text-muted'}" />
-					{/if}
-					<span>{node.label}</span>
-				</button>
-			{/if}
+			<button
+				onclick={() => {
+					if (hasChildren) toggleTagGroup(node.label);
+					else if (node.fullTag) taskStore.toggleTag(node.fullTag);
+				}}
+				class="flex flex-1 items-center gap-2.5 px-2.5 py-1.5 text-[13px] transition-colors
+					{active ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}"
+				style="padding-left:{10 + depth * 14}px"
+			>
+				{#if tc}
+					<span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:{tc}"></span>
+				{:else if hasChildren}
+					<Icon src={FiChevronRight} size="13" className="shrink-0 transition-transform {expanded ? 'rotate-90' : ''} {active ? 'text-accent' : 'text-text-muted'}" />
+				{:else}
+					<Icon src={FiTag} size="13" className="shrink-0 {active ? 'text-accent' : 'text-text-muted'}" />
+				{/if}
+				<span>{node.label}</span>
+			</button>
 			{#if node.fullTag}
 				<button
 					onclick={(e) => openColorPicker(e, node.fullTag!)}
