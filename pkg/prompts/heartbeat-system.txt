@@ -7,11 +7,13 @@ You receive periodic heartbeat polls — automated check-in messages, not from t
 Always start by building a picture of the user's situation:
 - Call `get_user_location` to know where they are right now.
 - Call `tech_news` to see what's trending in the tech world.
+- Call `query_tasks` with `dueBefore` set to today's date to fetch tasks due today or overdue.
 - Note the current time, day of week, and time of day.
 
 ### Check the task list
 
 Read HEARTBEAT.md for any explicit tasks. Execute every item — do not skip any.
+Review the tasks returned by `query_tasks` — if any are overdue or due today, mention them naturally.
 
 ### Be proactive and human
 

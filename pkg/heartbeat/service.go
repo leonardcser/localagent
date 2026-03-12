@@ -1,7 +1,6 @@
 package heartbeat
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,7 +13,6 @@ import (
 	"localagent/pkg/logger"
 	"localagent/pkg/prompts"
 	"localagent/pkg/state"
-	"localagent/pkg/todo"
 	"localagent/pkg/tools"
 )
 
@@ -39,16 +37,15 @@ type HeartbeatHandler func(prompt, channel, chatID string, isCronEvent bool) *to
 
 // HeartbeatService manages periodic heartbeat checks
 type HeartbeatService struct {
-	workspace   string
-	bus         *bus.MessageBus
-	state       *state.Manager
-	handler     HeartbeatHandler
-	todoService *todo.TodoService
-	eventQueue  *EventQueue
-	interval    time.Duration
-	enabled     bool
-	mu          sync.RWMutex
-	stopChan    chan struct{}
+	workspace  string
+	bus        *bus.MessageBus
+	state      *state.Manager
+	handler    HeartbeatHandler
+	eventQueue *EventQueue
+	interval   time.Duration
+	enabled    bool
+	mu         sync.RWMutex
+	stopChan   chan struct{}
 
 	// Active hours gating
 	activeHours *ActiveHours
@@ -89,13 +86,6 @@ func (hs *HeartbeatService) SetHandler(handler HeartbeatHandler) {
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
 	hs.handler = handler
-}
-
-// SetTodoService sets the todo service for injecting today's tasks into heartbeat prompts.
-func (hs *HeartbeatService) SetTodoService(ts *todo.TodoService) {
-	hs.mu.Lock()
-	defer hs.mu.Unlock()
-	hs.todoService = ts
 }
 
 // SetEventQueue sets the event queue for receiving cron events.
@@ -394,22 +384,8 @@ func (hs *HeartbeatService) buildPrompt() heartbeatPrompt {
 
 	now := time.Now()
 	tz, _ := now.Zone()
-	todayStr := now.Format("2006-01-02")
-
-	var taskSection string
-	hs.mu.RLock()
-	ts := hs.todoService
-	hs.mu.RUnlock()
-	if ts != nil {
-		tasks := ts.QueryTasks(todo.TaskQuery{DueBefore: todayStr})
-		if len(tasks) > 0 {
-			data, _ := json.Marshal(tasks)
-			taskSection = fmt.Sprintf("\n\nToday's tasks (due on or before %s):\n%s", todayStr, string(data))
-		}
-	}
-
 	return heartbeatPrompt{
-		text: fmt.Sprintf("%s%s\n\nCurrent time: %s (%s)", prompts.Heartbeat, taskSection, now.Format("2006-01-02 15:04:05"), tz),
+		text: fmt.Sprintf("%s\n\nCurrent time: %s (%s)", prompts.Heartbeat, now.Format("2006-01-02 15:04:05"), tz),
 	}
 }
 
