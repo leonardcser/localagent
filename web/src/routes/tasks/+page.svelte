@@ -68,11 +68,17 @@ let sidebarWidth = $state(208); // w-52 = 13rem = 208px
 let panelWidth = $state(320); // w-80 = 20rem = 320px
 let resizing = $state<"sidebar" | "panel" | null>(null);
 
+let containerEl = $state<HTMLElement | null>(null);
+
 function startResize(which: "sidebar" | "panel") {
   resizing = which;
+  const offsetLeft = containerEl?.getBoundingClientRect().left ?? 0;
   const onMove = (e: MouseEvent) => {
     if (which === "sidebar") {
-      sidebarWidth = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, e.clientX));
+      sidebarWidth = Math.min(
+        SIDEBAR_MAX,
+        Math.max(SIDEBAR_MIN, e.clientX - offsetLeft),
+      );
     } else {
       panelWidth = Math.min(
         PANEL_MAX,
@@ -1037,7 +1043,7 @@ let kanbanCols = $derived(
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
-<div class="flex h-full {resizing ? 'select-none' : ''}" onclick={closeColorPicker}>
+<div bind:this={containerEl} class="flex h-full {resizing ? 'select-none' : ''}" onclick={closeColorPicker}>
   <!-- Desktop sidebar -->
   <div class="hidden shrink-0 flex-col border-r border-border bg-bg md:flex" style="width:{sidebarWidth}px">
     <div class="px-3 pt-3 pb-1">
