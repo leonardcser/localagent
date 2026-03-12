@@ -358,11 +358,13 @@ function createTaskStore() {
       filterTags = v;
       persistPrefs();
     },
-    toggleTag(tag: string) {
+    toggleTag(tag: string, multi = false) {
       if (filterTags.includes(tag)) {
         filterTags = filterTags.filter((t) => t !== tag);
-      } else {
+      } else if (multi) {
         filterTags = [...filterTags, tag];
+      } else {
+        filterTags = [tag];
       }
       persistPrefs();
     },

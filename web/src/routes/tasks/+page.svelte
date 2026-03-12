@@ -608,9 +608,9 @@ const priorityOptions = [
 		<div class="group flex items-center rounded-lg transition-colors
 			{active ? 'bg-accent/10' : 'hover:bg-overlay-light'}">
 			<button
-				onclick={() => {
+				onclick={(e) => {
 					if (hasChildren) toggleTagGroup(node.path);
-					else if (node.fullTag) taskStore.toggleTag(node.fullTag);
+					else if (node.fullTag) taskStore.toggleTag(node.fullTag, e.metaKey || e.ctrlKey);
 				}}
 				class="flex flex-1 items-center gap-2.5 px-2.5 py-1.5 text-[13px] transition-colors
 					{active ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}"
