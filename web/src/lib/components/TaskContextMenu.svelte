@@ -416,8 +416,8 @@ const statuses = [
 					class="z-50 min-w-40 rounded-lg border border-border bg-bg-secondary p-1 shadow-elevated"
 					sideOffset={4}
 				>
-					{#each [{ key: "15m", label: "15 minutes before" }, { key: "30m", label: "30 minutes before" }, { key: "1h", label: "1 hour before" }, { key: "2h", label: "2 hours before" }, { key: "1d", label: "1 day before" }, { key: "2d", label: "2 days before" }, { key: "1w", label: "1 week before" }] as opt}
-						{@const isTimeBased = !["1d", "2d", "1w"].includes(opt.key)}
+					{#each [{ key: "0", label: "At due date" }, { key: "15m", label: "15 minutes before" }, { key: "30m", label: "30 minutes before" }, { key: "1h", label: "1 hour before" }, { key: "2h", label: "2 hours before" }, { key: "1d", label: "1 day before" }, { key: "2d", label: "2 days before" }, { key: "1w", label: "1 week before" }] as opt}
+						{@const isTimeBased = !["0", "1d", "2d", "1w"].includes(opt.key)}
 						{@const hasTime = task.due?.includes("T") ?? false}
 						{#if !isTimeBased || hasTime}
 							<ContextMenu.Item

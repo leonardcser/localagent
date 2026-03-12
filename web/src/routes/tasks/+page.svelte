@@ -716,9 +716,9 @@ const priorityOptions = [
 					Reminders
 				</span>
 				<div class="flex flex-wrap justify-end gap-1">
-					{#each [{ key: "15m", label: "15m" }, { key: "30m", label: "30m" }, { key: "1h", label: "1h" }, { key: "2h", label: "2h" }, { key: "1d", label: "1d" }, { key: "2d", label: "2d" }, { key: "1w", label: "1w" }] as opt}
+					{#each [{ key: "0", label: "At due" }, { key: "15m", label: "15m" }, { key: "30m", label: "30m" }, { key: "1h", label: "1h" }, { key: "2h", label: "2h" }, { key: "1d", label: "1d" }, { key: "2d", label: "2d" }, { key: "1w", label: "1w" }] as opt}
 						{@const active = panelReminders.includes(opt.key)}
-						{@const isTimeBased = !["1d", "2d", "1w"].includes(opt.key)}
+						{@const isTimeBased = !["0", "1d", "2d", "1w"].includes(opt.key)}
 						{@const hasTime = panelDue.includes("T")}
 						{#if !isTimeBased || hasTime}
 							<button
