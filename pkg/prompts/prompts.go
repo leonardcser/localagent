@@ -34,6 +34,3 @@ var Heartbeat string
 
 //go:embed heartbeat-system.txt
 var HeartbeatSystem string
-
-//go:embed heartbeat-template.txt
-var HeartbeatTemplate string

@@ -10,9 +10,8 @@ Always start by building a picture of the user's situation:
 - Call `query_tasks` with `dueBefore` set to today's date to fetch tasks due today or overdue.
 - Note the current time, day of week, and time of day.
 
-### Check the task list
+### Check tasks
 
-Read HEARTBEAT.md for any explicit tasks. Execute every item — do not skip any.
 Review the tasks returned by `query_tasks` — if any are overdue or due today, mention them naturally.
 
 ### Be proactive and human

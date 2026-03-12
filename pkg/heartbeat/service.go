@@ -187,10 +187,6 @@ func (hs *HeartbeatService) executeHeartbeat() {
 	logger.Debug("heartbeat: executing")
 
 	hp := hs.buildPrompt()
-	if hp.text == "" {
-		logger.Info("heartbeat: no prompt (HEARTBEAT.md empty or missing)")
-		return
-	}
 
 	// Active hours gate: skip periodic heartbeats outside the window.
 	// Cron events always go through regardless of active hours.
@@ -293,32 +289,6 @@ func StripHeartbeatToken(raw string) (text string, shouldSkip bool) {
 	return stripped, false
 }
 
-// isHeartbeatContentEffectivelyEmpty returns true if the content is only
-// whitespace, markdown headers, or empty list items — meaning there are no
-// real tasks for the heartbeat to process.
-func isHeartbeatContentEffectivelyEmpty(content string) bool {
-	for _, line := range strings.Split(content, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		if strings.HasPrefix(line, "#") {
-			continue
-		}
-		if line == "-" || line == "*" || line == "+" {
-			continue
-		}
-		if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") || strings.HasPrefix(line, "+ ") {
-			rest := strings.TrimSpace(line[2:])
-			if rest == "" {
-				continue
-			}
-		}
-		return false
-	}
-	return true
-}
-
 // RequestWakeNow triggers an immediate heartbeat with the given event text.
 func (hs *HeartbeatService) RequestWakeNow(text string) {
 	hs.mu.RLock()
@@ -342,22 +312,8 @@ type heartbeatPrompt struct {
 	chatID      string
 }
 
-// buildPrompt builds the heartbeat prompt from HEARTBEAT.md and pending events.
+// buildPrompt builds the heartbeat prompt from pending events or the static heartbeat prompt.
 func (hs *HeartbeatService) buildPrompt() heartbeatPrompt {
-	heartbeatPath := filepath.Join(hs.workspace, "HEARTBEAT.md")
-
-	var staticContent string
-	data, err := os.ReadFile(heartbeatPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			hs.createDefaultHeartbeatTemplate()
-		} else {
-			hs.logError("Error reading HEARTBEAT.md: %v", err)
-		}
-	} else {
-		staticContent = strings.TrimSpace(string(data))
-	}
-
 	hs.mu.RLock()
 	eq := hs.eventQueue
 	hs.mu.RUnlock()
@@ -376,10 +332,6 @@ func (hs *HeartbeatService) buildPrompt() heartbeatPrompt {
 			channel:     events[0].Channel,
 			chatID:      events[0].ChatID,
 		}
-	}
-
-	if staticContent == "" || isHeartbeatContentEffectivelyEmpty(staticContent) {
-		return heartbeatPrompt{}
 	}
 
 	now := time.Now()
@@ -403,19 +355,6 @@ func (hs *HeartbeatService) buildCronEventPrompt(events []Event) string {
 	tz, _ := now.Zone()
 	return fmt.Sprintf("A scheduled reminder has been triggered. The reminder content is:\n\n%s\n\nPlease relay this reminder to the user in a helpful and friendly way.\n\nCurrent time: %s (%s)",
 		content.String(), now.Format("2006-01-02 15:04:05"), tz)
-}
-
-// createDefaultHeartbeatTemplate creates the default HEARTBEAT.md file
-func (hs *HeartbeatService) createDefaultHeartbeatTemplate() {
-	heartbeatPath := filepath.Join(hs.workspace, "HEARTBEAT.md")
-
-	defaultContent := prompts.HeartbeatTemplate
-
-	if err := os.WriteFile(heartbeatPath, []byte(defaultContent), 0644); err != nil {
-		hs.logError("Failed to create default HEARTBEAT.md: %v", err)
-	} else {
-		hs.logInfo("Created default HEARTBEAT.md template")
-	}
 }
 
 // --- Active hours ---
