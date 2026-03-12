@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"localagent/pkg/todo"
 )
@@ -12,44 +13,125 @@ type baseTodoTool struct {
 	service *todo.TodoService
 }
 
-// --- list_tasks ---
+// --- query_tasks ---
 
-type ListTasksTool struct{ baseTodoTool }
+type QueryTasksTool struct{ baseTodoTool }
 
-func NewListTasksTool(service *todo.TodoService) *ListTasksTool {
-	return &ListTasksTool{baseTodoTool{service}}
+func NewQueryTasksTool(service *todo.TodoService) *QueryTasksTool {
+	return &QueryTasksTool{baseTodoTool{service}}
 }
 
-func (t *ListTasksTool) Name() string        { return "list_tasks" }
-func (t *ListTasksTool) Description() string { return "List personal tasks/todos. Optionally filter by status or tag." }
+func (t *QueryTasksTool) Name() string { return "query_tasks" }
+func (t *QueryTasksTool) Description() string {
+	return "Query tasks with rich filtering. Also retrieves blocks and links when requested. Use with no params to list all active tasks."
+}
 
-func (t *ListTasksTool) Parameters() map[string]any {
+func (t *QueryTasksTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
+			"id": map[string]any{
+				"type":        "string",
+				"description": "Get a single task by ID. When set, other filters are ignored.",
+			},
 			"status": map[string]any{
 				"type":        "string",
 				"enum":        []string{"todo", "doing", "done"},
 				"description": "Filter by status.",
 			},
+			"priority": map[string]any{
+				"type":        "string",
+				"enum":        []string{"low", "medium", "high"},
+				"description": "Filter by priority.",
+			},
 			"tag": map[string]any{
 				"type":        "string",
 				"description": "Filter by tag.",
+			},
+			"parentId": map[string]any{
+				"type":        "string",
+				"description": "Filter by parent task ID. Use 'none' for top-level tasks only.",
+			},
+			"search": map[string]any{
+				"type":        "string",
+				"description": "Search in title and description (case-insensitive).",
+			},
+			"dueAfter": map[string]any{
+				"type":        "string",
+				"description": "Only tasks with due date >= this (YYYY-MM-DD).",
+			},
+			"dueBefore": map[string]any{
+				"type":        "string",
+				"description": "Only tasks with due date <= this (YYYY-MM-DD).",
+			},
+			"limit": map[string]any{
+				"type":        "number",
+				"description": "Max number of results.",
+			},
+			"include": map[string]any{
+				"type":        "array",
+				"items":       map[string]any{"type": "string", "enum": []string{"blocks", "links"}},
+				"description": "Include related entities: 'blocks' (time blocks) and/or 'links' (saved links).",
 			},
 		},
 	}
 }
 
-func (t *ListTasksTool) Execute(_ context.Context, args map[string]any) *ToolResult {
-	status, _ := args["status"].(string)
-	tag, _ := args["tag"].(string)
+type queryResult struct {
+	Tasks  []todo.Task  `json:"tasks"`
+	Blocks []todo.Block `json:"blocks,omitempty"`
+	Links  []todo.Link  `json:"links,omitempty"`
+}
 
-	tasks := t.service.ListTasks(status, tag)
-	if len(tasks) == 0 {
-		return SilentResult("No tasks found")
+func (t *QueryTasksTool) Execute(_ context.Context, args map[string]any) *ToolResult {
+	q := todo.TaskQuery{}
+
+	if v, ok := args["id"].(string); ok {
+		q.ID = v
+	}
+	if v, ok := args["status"].(string); ok {
+		q.Status = v
+	}
+	if v, ok := args["priority"].(string); ok {
+		q.Priority = v
+	}
+	if v, ok := args["tag"].(string); ok {
+		q.Tag = v
+	}
+	if v, ok := args["parentId"].(string); ok {
+		q.ParentID = v
+	}
+	if v, ok := args["search"].(string); ok {
+		q.Search = v
+	}
+	if v, ok := args["dueAfter"].(string); ok {
+		q.DueAfter = v
+	}
+	if v, ok := args["dueBefore"].(string); ok {
+		q.DueBefore = v
+	}
+	if v, ok := args["limit"].(float64); ok {
+		q.Limit = int(v)
 	}
 
-	data, _ := json.MarshalIndent(tasks, "", "  ")
+	tasks := t.service.QueryTasks(q)
+
+	result := queryResult{Tasks: tasks}
+	if result.Tasks == nil {
+		result.Tasks = []todo.Task{}
+	}
+
+	includes := toStringSliceFromAny(args["include"])
+	for _, inc := range includes {
+		switch inc {
+		case "blocks":
+			result.Blocks = t.service.ListBlocks("", 0, 0)
+		case "links":
+			result.Links = t.service.ListLinks("")
+		}
+	}
+
+	data, _ := json.MarshalIndent(result, "", "  ")
 	return SilentResult(string(data))
 }
 
@@ -138,71 +220,131 @@ func (t *AddTaskTool) Execute(_ context.Context, args map[string]any) *ToolResul
 	return SilentResult(string(data))
 }
 
-// --- update_task ---
+// --- modify_tasks ---
 
-type UpdateTaskTool struct{ baseTodoTool }
+type ModifyTasksTool struct{ baseTodoTool }
 
-func NewUpdateTaskTool(service *todo.TodoService) *UpdateTaskTool {
-	return &UpdateTaskTool{baseTodoTool{service}}
+func NewModifyTasksTool(service *todo.TodoService) *ModifyTasksTool {
+	return &ModifyTasksTool{baseTodoTool{service}}
 }
 
-func (t *UpdateTaskTool) Name() string        { return "update_task" }
-func (t *UpdateTaskTool) Description() string { return "Update an existing task's fields." }
+func (t *ModifyTasksTool) Name() string { return "modify_tasks" }
+func (t *ModifyTasksTool) Description() string {
+	return "Batch update, complete, or delete tasks. Operates on one or more task IDs."
+}
 
-func (t *UpdateTaskTool) Parameters() map[string]any {
+func (t *ModifyTasksTool) Parameters() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"taskId": map[string]any{
+			"taskIds": map[string]any{
+				"type":        "array",
+				"items":       map[string]any{"type": "string"},
+				"description": "Task IDs to modify.",
+			},
+			"action": map[string]any{
 				"type":        "string",
-				"description": "Task ID to update.",
+				"enum":        []string{"update", "complete", "delete"},
+				"description": "Action to perform. 'update' applies the patch fields below. 'complete' marks tasks as done. 'delete' removes tasks.",
 			},
 			"title": map[string]any{
 				"type":        "string",
-				"description": "New title.",
+				"description": "New title (action=update).",
 			},
 			"description": map[string]any{
 				"type":        "string",
-				"description": "New description.",
+				"description": "New description (action=update).",
 			},
 			"priority": map[string]any{
 				"type":        "string",
 				"enum":        []string{"low", "medium", "high"},
-				"description": "New priority.",
+				"description": "New priority (action=update).",
 			},
 			"due": map[string]any{
 				"type":        "string",
-				"description": "New due date as YYYY-MM-DD.",
+				"description": "New due date as YYYY-MM-DD (action=update).",
 			},
 			"recurrence": map[string]any{
 				"type":        "string",
-				"description": "RFC 5545 RRULE string, e.g. 'FREQ=DAILY', 'FREQ=WEEKLY;BYDAY=MO,WE,FR'.",
+				"description": "New recurrence RRULE (action=update).",
 			},
 			"status": map[string]any{
 				"type":        "string",
 				"enum":        []string{"todo", "doing", "done"},
-				"description": "New status.",
+				"description": "New status (action=update).",
 			},
 			"tags": map[string]any{
 				"type":        "array",
 				"items":       map[string]any{"type": "string"},
-				"description": "New tags.",
+				"description": "New tags (action=update).",
 			},
 			"parentId": map[string]any{
 				"type":        "string",
-				"description": "New parent task ID (empty string to remove parent).",
+				"description": "New parent task ID, empty string to remove parent (action=update).",
 			},
 		},
-		"required": []string{"taskId"},
+		"required": []string{"taskIds", "action"},
 	}
 }
 
-func (t *UpdateTaskTool) Execute(_ context.Context, args map[string]any) *ToolResult {
-	taskID, ok := args["taskId"].(string)
-	if !ok || taskID == "" {
-		return ErrorResult("'taskId' is required")
+type modifyResult struct {
+	Action    string      `json:"action"`
+	Succeeded int         `json:"succeeded"`
+	Failed    int         `json:"failed"`
+	Errors    []string    `json:"errors,omitempty"`
+	Tasks     []todo.Task `json:"tasks,omitempty"`
+}
+
+func (t *ModifyTasksTool) Execute(_ context.Context, args map[string]any) *ToolResult {
+	ids := toStringSliceFromAny(args["taskIds"])
+	if len(ids) == 0 {
+		return ErrorResult("'taskIds' is required and must not be empty")
 	}
 
+	action, _ := args["action"].(string)
+
+	var result modifyResult
+	result.Action = action
+
+	switch action {
+	case "complete":
+		tasks, errs := t.service.BatchComplete(ids)
+		result.Tasks = tasks
+		result.Succeeded = len(tasks)
+		result.Errors = errs
+		result.Failed = len(errs)
+
+	case "delete":
+		deleted, errs := t.service.BatchDelete(ids)
+		result.Succeeded = len(deleted)
+		result.Errors = errs
+		result.Failed = len(errs)
+
+	case "update":
+		patch := buildPatch(args)
+		if len(patch) == 0 {
+			return ErrorResult("no fields to update — provide at least one of: title, description, priority, due, recurrence, status, tags, parentId")
+		}
+		tasks, errs := t.service.BatchUpdate(ids, patch)
+		result.Tasks = tasks
+		result.Succeeded = len(tasks)
+		result.Errors = errs
+		result.Failed = len(errs)
+
+	default:
+		return ErrorResult(fmt.Sprintf("unknown action: %s (use 'update', 'complete', or 'delete')", action))
+	}
+
+	data, _ := json.MarshalIndent(result, "", "  ")
+	if result.Failed > 0 {
+		r := NewToolResult(string(data))
+		r.ForUser = strings.Join(result.Errors, "; ")
+		return r
+	}
+	return SilentResult(string(data))
+}
+
+func buildPatch(args map[string]any) map[string]any {
 	patch := make(map[string]any)
 	for _, key := range []string{"title", "description", "priority", "due", "recurrence", "status", "parentId"} {
 		if v, ok := args[key]; ok {
@@ -212,94 +354,7 @@ func (t *UpdateTaskTool) Execute(_ context.Context, args map[string]any) *ToolRe
 	if v, ok := args["tags"]; ok {
 		patch["tags"] = v
 	}
-
-	if len(patch) == 0 {
-		return ErrorResult("no fields to update")
-	}
-
-	task, err := t.service.UpdateTask(taskID, patch)
-	if err != nil {
-		return ErrorResult(fmt.Sprintf("error updating task: %v", err))
-	}
-
-	data, _ := json.MarshalIndent(task, "", "  ")
-	return SilentResult(string(data))
-}
-
-// --- complete_task ---
-
-type CompleteTaskTool struct{ baseTodoTool }
-
-func NewCompleteTaskTool(service *todo.TodoService) *CompleteTaskTool {
-	return &CompleteTaskTool{baseTodoTool{service}}
-}
-
-func (t *CompleteTaskTool) Name() string { return "complete_task" }
-func (t *CompleteTaskTool) Description() string {
-	return "Mark a task as done. Recurring tasks auto-create the next instance."
-}
-
-func (t *CompleteTaskTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"taskId": map[string]any{
-				"type":        "string",
-				"description": "Task ID to complete.",
-			},
-		},
-		"required": []string{"taskId"},
-	}
-}
-
-func (t *CompleteTaskTool) Execute(_ context.Context, args map[string]any) *ToolResult {
-	taskID, ok := args["taskId"].(string)
-	if !ok || taskID == "" {
-		return ErrorResult("'taskId' is required")
-	}
-
-	task, err := t.service.CompleteTask(taskID)
-	if err != nil {
-		return ErrorResult(fmt.Sprintf("error completing task: %v", err))
-	}
-
-	return SilentResult(fmt.Sprintf("Task completed: %s (id: %s)", task.Title, task.ID))
-}
-
-// --- remove_task ---
-
-type RemoveTaskTool struct{ baseTodoTool }
-
-func NewRemoveTaskTool(service *todo.TodoService) *RemoveTaskTool {
-	return &RemoveTaskTool{baseTodoTool{service}}
-}
-
-func (t *RemoveTaskTool) Name() string        { return "remove_task" }
-func (t *RemoveTaskTool) Description() string { return "Delete a task." }
-
-func (t *RemoveTaskTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"taskId": map[string]any{
-				"type":        "string",
-				"description": "Task ID to remove.",
-			},
-		},
-		"required": []string{"taskId"},
-	}
-}
-
-func (t *RemoveTaskTool) Execute(_ context.Context, args map[string]any) *ToolResult {
-	taskID, ok := args["taskId"].(string)
-	if !ok || taskID == "" {
-		return ErrorResult("'taskId' is required")
-	}
-
-	if t.service.RemoveTask(taskID) {
-		return SilentResult(fmt.Sprintf("Task removed: %s", taskID))
-	}
-	return ErrorResult(fmt.Sprintf("task %s not found", taskID))
+	return patch
 }
 
 func toStringSliceFromAny(v any) []string {

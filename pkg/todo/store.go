@@ -63,13 +63,36 @@ func (s *TodoService) notifyLink(evt LinkEvent)              { if s.linkListener
 // Load is a no-op for SQLite (kept for backward compat).
 func (s *TodoService) Load() error { return nil }
 
-func (s *TodoService) ListTasks(status string, tag string) []Task {
+// TaskQuery holds filter parameters for querying tasks.
+type TaskQuery struct {
+	ID       string // exact match by ID
+	Status   string // filter by status
+	Priority string // filter by priority
+	Tag      string // filter by tag (any single tag)
+	ParentID string // filter by parent ID ("none" = top-level only)
+	Search   string // full-text search in title + description
+	DueAfter string // due >= this date (YYYY-MM-DD)
+	DueBefore string // due <= this date (YYYY-MM-DD)
+	Limit    int    // max results (0 = unlimited)
+}
+
+// QueryTasks returns tasks matching the given filters.
+func (s *TodoService) QueryTasks(q TaskQuery) []Task {
 	ctx := context.Background()
+
+	// Single task lookup by ID
+	if q.ID != "" {
+		t := s.getTask(q.ID)
+		if t == nil {
+			return nil
+		}
+		return []Task{*t}
+	}
+
 	var rows []dbq.Task
 	var err error
-
-	if status != "" {
-		rows, err = s.q.ListTasksByStatus(ctx, status)
+	if q.Status != "" {
+		rows, err = s.q.ListTasksByStatus(ctx, q.Status)
 	} else {
 		rows, err = s.q.ListTasks(ctx)
 	}
@@ -77,15 +100,102 @@ func (s *TodoService) ListTasks(status string, tag string) []Task {
 		return nil
 	}
 
+	search := strings.ToLower(q.Search)
 	var tasks []Task
 	for _, r := range rows {
 		t := dbTaskToTask(r)
-		if tag != "" && !slices.Contains(t.Tags, tag) {
+
+		if q.Tag != "" && !slices.Contains(t.Tags, q.Tag) {
 			continue
 		}
+		if q.Priority != "" && t.Priority != q.Priority {
+			continue
+		}
+		if q.ParentID == "none" && t.ParentID != "" {
+			continue
+		} else if q.ParentID != "" && q.ParentID != "none" && t.ParentID != q.ParentID {
+			continue
+		}
+		if search != "" {
+			if !strings.Contains(strings.ToLower(t.Title), search) &&
+				!strings.Contains(strings.ToLower(t.Description), search) {
+				continue
+			}
+		}
+		if q.DueAfter != "" && (t.Due == "" || dueDatePart(t.Due) < q.DueAfter) {
+			continue
+		}
+		if q.DueBefore != "" && (t.Due == "" || dueDatePart(t.Due) > q.DueBefore) {
+			continue
+		}
+
 		tasks = append(tasks, t)
+		if q.Limit > 0 && len(tasks) >= q.Limit {
+			break
+		}
 	}
 	return tasks
+}
+
+// GetTask returns a single task by ID.
+func (s *TodoService) GetTask(id string) *Task {
+	return s.getTask(id)
+}
+
+// ListTasks returns tasks, optionally filtered by status and tag.
+func (s *TodoService) ListTasks(status string, tag string) []Task {
+	return s.QueryTasks(TaskQuery{Status: status, Tag: tag})
+}
+
+// BatchComplete completes multiple tasks by ID. Returns completed tasks and any errors.
+func (s *TodoService) BatchComplete(ids []string) ([]Task, []string) {
+	var completed []Task
+	var errors []string
+	for _, id := range ids {
+		t, err := s.CompleteTask(id)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("%s: %v", id, err))
+		} else {
+			completed = append(completed, *t)
+		}
+	}
+	return completed, errors
+}
+
+// BatchUpdate applies the same patch to multiple tasks. Returns updated tasks and any errors.
+func (s *TodoService) BatchUpdate(ids []string, patch map[string]any) ([]Task, []string) {
+	var updated []Task
+	var errors []string
+	for _, id := range ids {
+		t, err := s.UpdateTask(id, patch)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("%s: %v", id, err))
+		} else {
+			updated = append(updated, *t)
+		}
+	}
+	return updated, errors
+}
+
+// BatchDelete removes multiple tasks by ID. Returns deleted IDs and any errors.
+func (s *TodoService) BatchDelete(ids []string) ([]string, []string) {
+	var deleted []string
+	var errors []string
+	for _, id := range ids {
+		if s.RemoveTask(id) {
+			deleted = append(deleted, id)
+		} else {
+			errors = append(errors, fmt.Sprintf("%s: not found", id))
+		}
+	}
+	return deleted, errors
+}
+
+func dueDatePart(due string) string {
+	if strings.Contains(due, "T") {
+		return strings.SplitN(due, "T", 2)[0]
+	}
+	return due
 }
 
 func (s *TodoService) AddTask(task Task) (*Task, error) {

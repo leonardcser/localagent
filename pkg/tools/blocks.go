@@ -8,51 +8,6 @@ import (
 	"localagent/pkg/todo"
 )
 
-// --- list_blocks ---
-
-type ListBlocksTool struct{ baseTodoTool }
-
-func NewListBlocksTool(service *todo.TodoService) *ListBlocksTool {
-	return &ListBlocksTool{baseTodoTool{service}}
-}
-
-func (t *ListBlocksTool) Name() string        { return "list_blocks" }
-func (t *ListBlocksTool) Description() string { return "List time blocks. Optionally filter by task ID or time range." }
-
-func (t *ListBlocksTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"taskId": map[string]any{
-				"type":        "string",
-				"description": "Filter by task ID.",
-			},
-			"startAfter": map[string]any{
-				"type":        "number",
-				"description": "Only blocks ending after this unix ms timestamp.",
-			},
-			"endBefore": map[string]any{
-				"type":        "number",
-				"description": "Only blocks starting before this unix ms timestamp.",
-			},
-		},
-	}
-}
-
-func (t *ListBlocksTool) Execute(_ context.Context, args map[string]any) *ToolResult {
-	taskID, _ := args["taskId"].(string)
-	startAfter, _ := args["startAfter"].(float64)
-	endBefore, _ := args["endBefore"].(float64)
-
-	blocks := t.service.ListBlocks(taskID, int64(startAfter), int64(endBefore))
-	if len(blocks) == 0 {
-		return SilentResult("No blocks found")
-	}
-
-	data, _ := json.MarshalIndent(blocks, "", "  ")
-	return SilentResult(string(data))
-}
-
 // --- add_block ---
 
 type AddBlockTool struct{ baseTodoTool }

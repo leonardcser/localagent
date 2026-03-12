@@ -88,20 +88,16 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 	registry.Register(tools.NewStockTool(yf))
 	registry.Register(tools.NewCurrencyTool(yf))
 
-	// Task tools
-	registry.Register(tools.NewListTasksTool(todoService))
+	// Task tools (query, add, modify cover all CRUD + batch operations)
+	registry.Register(tools.NewQueryTasksTool(todoService))
 	registry.Register(tools.NewAddTaskTool(todoService))
-	registry.Register(tools.NewUpdateTaskTool(todoService))
-	registry.Register(tools.NewCompleteTaskTool(todoService))
-	registry.Register(tools.NewRemoveTaskTool(todoService))
+	registry.Register(tools.NewModifyTasksTool(todoService))
 
 	// Block tools
-	registry.Register(tools.NewListBlocksTool(todoService))
 	registry.Register(tools.NewAddBlockTool(todoService))
 	registry.Register(tools.NewRemoveBlockTool(todoService))
 
 	// Link tools
-	registry.Register(tools.NewListLinksTool(todoService))
 	registry.Register(tools.NewAddLinkTool(todoService))
 	registry.Register(tools.NewRemoveLinkTool(todoService))
 

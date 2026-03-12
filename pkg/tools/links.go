@@ -8,39 +8,6 @@ import (
 	"localagent/pkg/todo"
 )
 
-// --- list_links ---
-
-type ListLinksTool struct{ baseTodoTool }
-
-func NewListLinksTool(service *todo.TodoService) *ListLinksTool {
-	return &ListLinksTool{baseTodoTool{service}}
-}
-
-func (t *ListLinksTool) Name() string        { return "list_links" }
-func (t *ListLinksTool) Description() string { return "List saved links. Optionally filter by tag." }
-
-func (t *ListLinksTool) Parameters() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"tag": map[string]any{
-				"type":        "string",
-				"description": "Filter links by tag.",
-			},
-		},
-	}
-}
-
-func (t *ListLinksTool) Execute(_ context.Context, args map[string]any) *ToolResult {
-	tag, _ := args["tag"].(string)
-	links := t.service.ListLinks(tag)
-	if len(links) == 0 {
-		return SilentResult("No links found")
-	}
-	data, _ := json.MarshalIndent(links, "", "  ")
-	return SilentResult(string(data))
-}
-
 // --- add_link ---
 
 type AddLinkTool struct{ baseTodoTool }

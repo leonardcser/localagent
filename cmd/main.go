@@ -234,6 +234,7 @@ func gatewayCmd() {
 	)
 	heartbeatService.SetBus(msgBus)
 	heartbeatService.SetEventQueue(eventQueue)
+	heartbeatService.SetTodoService(agentLoop.GetTodoService())
 	if ah := cfg.Heartbeat.ActiveHours; ah != nil {
 		heartbeatService.SetActiveHours(&heartbeat.ActiveHours{
 			Start:    ah.Start,
