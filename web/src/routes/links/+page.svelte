@@ -262,6 +262,8 @@ async function copyUrl(url: string) {
   {/each}
 {/snippet}
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
 <div class="flex h-full overflow-hidden" onclick={closeColorPicker}>
   <!-- Desktop sidebar -->
   <aside class="hidden w-52 shrink-0 flex-col border-r border-border bg-bg md:flex">
@@ -948,6 +950,7 @@ async function copyUrl(url: string) {
 {#if colorPickerTag}
   {@const tc = tagColorStore.get(colorPickerTag)}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div
     data-color-picker
     class="fixed z-[100] grid grid-cols-5 gap-1.5 rounded-lg border border-border bg-bg-secondary p-2 shadow-elevated"
@@ -959,6 +962,7 @@ async function copyUrl(url: string) {
         onclick={() => { tagColorStore.set(colorPickerTag!, color); colorPickerTag = null; }}
         class="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 {tc === color ? 'border-white' : 'border-transparent'}"
         style="background:{color}"
+        title={color}
       ></button>
     {/each}
     {#if tc}
