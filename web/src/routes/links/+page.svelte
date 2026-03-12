@@ -18,6 +18,8 @@ import {
   FiEdit2,
   FiCopy,
 } from "svelte-icons-pack/fi";
+import TagTree from "$lib/components/TagTree.svelte";
+import TagColorPicker from "$lib/components/TagColorPicker.svelte";
 
 // --- State ---
 let searchQuery = $state("");
@@ -36,47 +38,6 @@ function openColorPicker(e: MouseEvent, tag: string) {
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
   colorPickerPos = { x: rect.right + 4, y: rect.top };
   colorPickerTag = tag;
-}
-
-interface TagNode {
-  label: string;
-  path: string;
-  fullTag: string | null;
-  children: TagNode[];
-}
-
-let tagTree = $derived.by(() => {
-  const root: TagNode[] = [];
-  for (const tag of linkStore.allTags) {
-    const parts = tag.split("::");
-    let level = root;
-    let path = "";
-    for (let i = 0; i < parts.length; i++) {
-      path = path ? `${path}::${parts[i]}` : parts[i];
-      let node = level.find((n) => n.label === parts[i]);
-      if (!node) {
-        node = { label: parts[i], path, fullTag: null, children: [] };
-        level.push(node);
-      }
-      if (i === parts.length - 1) node.fullTag = tag;
-      level = node.children;
-    }
-  }
-  return root;
-});
-
-function isTagActive(node: TagNode): boolean {
-  if (node.fullTag && linkStore.filterTags.includes(node.fullTag)) return true;
-  return node.children.some((c) => isTagActive(c));
-}
-
-let expandedTagGroups = $state(new Set<string>());
-
-function toggleTagGroup(path: string) {
-  const next = new Set(expandedTagGroups);
-  if (next.has(path)) next.delete(path);
-  else next.add(path);
-  expandedTagGroups = next;
 }
 
 function closeColorPicker(e: MouseEvent) {
@@ -220,47 +181,6 @@ async function copyUrl(url: string) {
 }
 </script>
 
-{#snippet tagTreeNodes(nodes: TagNode[], depth: number)}
-  {#each nodes as node}
-    {@const active = isTagActive(node)}
-    {@const tc = node.fullTag ? tagColorStore.get(node.fullTag) : null}
-    {@const hasChildren = node.children.length > 0}
-    {@const expanded = expandedTagGroups.has(node.path)}
-    <div class="group flex items-center rounded-lg transition-colors
-      {active ? 'bg-accent/10' : 'hover:bg-overlay-light'}">
-      <button
-        onclick={(e) => {
-          if (hasChildren) toggleTagGroup(node.path);
-          else if (node.fullTag) linkStore.toggleTag(node.fullTag, e.metaKey || e.ctrlKey);
-        }}
-        class="flex flex-1 items-center gap-2.5 px-2.5 py-1.5 text-[13px] transition-colors
-          {active ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}"
-        style="padding-left:{10 + depth * 14}px"
-      >
-        {#if tc}
-          <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:{tc}"></span>
-        {:else if hasChildren}
-          <Icon src={FiChevronRight} size="13" className="shrink-0 transition-transform {expanded ? 'rotate-90' : ''} {active ? 'text-accent' : 'text-text-muted'}" />
-        {:else}
-          <Icon src={FiTag} size="13" className="shrink-0 {active ? 'text-accent' : 'text-text-muted'}" />
-        {/if}
-        <span>{node.label}</span>
-      </button>
-      {#if node.fullTag}
-        <button
-          onclick={(e) => openColorPicker(e, node.fullTag!)}
-          class="mr-1 flex h-5 w-5 items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-100 hover:bg-overlay-light"
-          title="Set color"
-        >
-          <span class="h-2 w-2 rounded-full {tc ? '' : 'border border-text-muted/40'}" style={tc ? `background:${tc}` : ""}></span>
-        </button>
-      {/if}
-    </div>
-    {#if hasChildren && expanded}
-      {@render tagTreeNodes(node.children, depth + 1)}
-    {/if}
-  {/each}
-{/snippet}
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -298,7 +218,12 @@ async function copyUrl(url: string) {
           class="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-text-muted"
           >Tags</span
         >
-        {@render tagTreeNodes(tagTree, 0)}
+        <TagTree
+          tags={linkStore.allTags}
+          filterTags={linkStore.filterTags}
+          ontoggle={(tag, multi) => linkStore.toggleTag(tag, multi)}
+          onopencolorpicker={openColorPicker}
+        />
       </div>
     {/if}
   </aside>
@@ -340,7 +265,12 @@ async function copyUrl(url: string) {
           <Icon src={FiLink} size="14" />
           All links
         </button>
-        {@render tagTreeNodes(tagTree, 0)}
+        <TagTree
+          tags={linkStore.allTags}
+          filterTags={linkStore.filterTags}
+          ontoggle={(tag, multi) => linkStore.toggleTag(tag, multi)}
+          onopencolorpicker={openColorPicker}
+        />
       </div>
     </aside>
   {/if}
@@ -948,31 +878,9 @@ async function copyUrl(url: string) {
 </div>
 
 {#if colorPickerTag}
-  {@const tc = tagColorStore.get(colorPickerTag)}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <div
-    data-color-picker
-    class="fixed z-[100] grid grid-cols-5 gap-1.5 rounded-lg border border-border bg-bg-secondary p-2 shadow-elevated"
-    style="left:{colorPickerPos.x}px;top:{colorPickerPos.y}px"
-    onclick={(e) => e.stopPropagation()}
-  >
-    {#each tagColorStore.palette as color}
-      <button
-        onclick={() => { tagColorStore.set(colorPickerTag!, color); colorPickerTag = null; }}
-        class="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 {tc === color ? 'border-white' : 'border-transparent'}"
-        style="background:{color}"
-        title={color}
-      ></button>
-    {/each}
-    {#if tc}
-      <button
-        onclick={() => { tagColorStore.remove(colorPickerTag!); colorPickerTag = null; }}
-        class="flex h-5 w-5 items-center justify-center rounded-full border border-border text-text-muted hover:border-border-light hover:text-text-secondary"
-        title="Remove color"
-      >
-        <Icon src={FiX} size="10" />
-      </button>
-    {/if}
-  </div>
+  <TagColorPicker
+    tag={colorPickerTag}
+    position={colorPickerPos}
+    onclose={() => (colorPickerTag = null)}
+  />
 {/if}

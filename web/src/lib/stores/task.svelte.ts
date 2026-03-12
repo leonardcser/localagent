@@ -205,9 +205,7 @@ function createTaskStore() {
     if (smartList === "done") {
       result = result.filter((t) => t.status === "done" && applyDateFilter(t));
     } else {
-      result = result.filter(
-        (t) => t.status !== "done" && applyDateFilter(t),
-      );
+      result = result.filter((t) => t.status !== "done" && applyDateFilter(t));
     }
 
     result = applyTagFilter(result);
@@ -216,9 +214,7 @@ function createTaskStore() {
 
   let completedFiltered = $derived.by(() => {
     if (smartList === "done" || search) return [];
-    let result = tasks.filter(
-      (t) => t.status === "done" && applyDateFilter(t),
-    );
+    let result = tasks.filter((t) => t.status === "done" && applyDateFilter(t));
     result = applyTagFilter(result);
     return [...result].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   });
