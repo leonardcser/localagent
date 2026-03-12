@@ -136,6 +136,147 @@ let filterOpen = $state(false);
 let completedExpanded = $state(false);
 let completingIds = $state(new Set<string>());
 
+// Multi-select
+let selectedIds = $state(new Set<string>());
+let lastClickedId = $state<string | null>(null);
+
+function handleTaskClick(task: Task, e: MouseEvent) {
+  if (e.shiftKey && lastClickedId) {
+    // Range select
+    const list = taskStore.topLevelFiltered;
+    const lastIdx = list.findIndex((t) => t.id === lastClickedId);
+    const curIdx = list.findIndex((t) => t.id === task.id);
+    if (lastIdx >= 0 && curIdx >= 0) {
+      const [from, to] =
+        lastIdx < curIdx ? [lastIdx, curIdx] : [curIdx, lastIdx];
+      const next = new Set(selectedIds);
+      for (let i = from; i <= to; i++) next.add(list[i].id);
+      selectedIds = next;
+    }
+  } else if (e.metaKey || e.ctrlKey) {
+    // Toggle select
+    const next = new Set(selectedIds);
+    if (next.has(task.id)) next.delete(task.id);
+    else next.add(task.id);
+    selectedIds = next;
+    lastClickedId = task.id;
+  } else {
+    // Normal click — open detail, clear selection
+    selectedIds = new Set();
+    lastClickedId = task.id;
+    openDetail(task);
+    return;
+  }
+}
+
+function clearSelection() {
+  selectedIds = new Set();
+}
+
+function getSelectedTasks(): Task[] {
+  return taskStore.tasks.filter((t) => selectedIds.has(t.id));
+}
+
+// Sidebar drag-drop
+let sidebarDropTarget = $state<string | null>(null);
+
+function smartListToDue(key: SmartList): string | null | undefined {
+  const today = new Date().toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const next7 = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  switch (key) {
+    case "today":
+      return today;
+    case "tomorrow":
+      return tomorrow;
+    case "next7":
+      return next7;
+    case "inbox":
+      return null; // clear due date
+    default:
+      return undefined; // no-op
+  }
+}
+
+async function handleSidebarDrop(e: DragEvent, target: string) {
+  e.preventDefault();
+  sidebarDropTarget = null;
+  const draggedId = e.dataTransfer?.getData("text/plain");
+  if (!draggedId) return;
+
+  const ids = selectedIds.has(draggedId) ? [...selectedIds] : [draggedId];
+
+  // Check if target is a smart list or a tag
+  const smartListKeys = smartLists.map((s) => s.key);
+  if (smartListKeys.includes(target as SmartList)) {
+    const key = target as SmartList;
+    if (key === "done") {
+      for (const id of ids) await taskStore.complete(id);
+    } else {
+      const due = smartListToDue(key);
+      if (due !== undefined) {
+        for (const id of ids)
+          await taskStore.update(id, { due } as Partial<Task>);
+      }
+    }
+  } else {
+    // Tag drop — add tag to tasks
+    for (const id of ids) {
+      const task = taskStore.tasks.find((t) => t.id === id);
+      if (task) {
+        const tags = [...(task.tags ?? [])];
+        if (!tags.includes(target)) {
+          tags.push(target);
+          await taskStore.update(id, { tags } as Partial<Task>);
+        }
+      }
+    }
+  }
+  selectedIds = new Set();
+}
+
+function handleSidebarDragOver(e: DragEvent, target: string) {
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+  sidebarDropTarget = target;
+}
+
+function handleSidebarDragLeave(e: DragEvent, target: string) {
+  const el = e.currentTarget as HTMLElement;
+  const related = e.relatedTarget as Node | null;
+  if (related && el.contains(related)) return;
+  if (sidebarDropTarget === target) sidebarDropTarget = null;
+}
+
+// Batch operations for multi-select context menu
+async function batchSetDue(due: string | undefined) {
+  for (const id of selectedIds) {
+    await taskStore.update(id, { due } as Partial<Task>);
+  }
+  selectedIds = new Set();
+}
+
+async function batchSetPriority(priority: string) {
+  for (const id of selectedIds) {
+    await taskStore.update(id, { priority: priority || null } as Partial<Task>);
+  }
+  selectedIds = new Set();
+}
+
+async function batchComplete() {
+  for (const id of selectedIds) {
+    await animateComplete(id);
+  }
+  selectedIds = new Set();
+}
+
+async function batchDelete() {
+  for (const id of selectedIds) {
+    await taskStore.remove(id);
+  }
+  selectedIds = new Set();
+}
+
 async function animateComplete(id: string) {
   completingIds = new Set([...completingIds, id]);
   // Let the checkbox fill animation play, then slide out
@@ -563,6 +704,10 @@ function handleDragStart(e: DragEvent, id: string) {
   if (!e.dataTransfer) return;
   e.dataTransfer.setData("text/plain", id);
   e.dataTransfer.effectAllowed = "move";
+  // If dragging a selected task, drag all selected; otherwise just this one
+  if (!selectedIds.has(id)) {
+    selectedIds = new Set();
+  }
   draggingId = id;
 
   const el = e.currentTarget as HTMLElement;
@@ -616,6 +761,10 @@ function isInputFocused(e: KeyboardEvent): boolean {
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === "Escape") {
+    if (selectedIds.size > 0) {
+      clearSelection();
+      return;
+    }
     if (panelOpen) {
       closePanel();
       return;
@@ -698,7 +847,7 @@ let kanbanCols = $derived(
       bind:value={panelTitle}
       placeholder="Task title"
       class="bg-transparent {mobile ? 'text-[17px] font-semibold' : 'text-[15px] font-medium'} text-text-primary placeholder:text-text-muted outline-none"
-      onblur={() => {
+      oninput={() => {
         if (panelTitle.trim()) debouncedAutoSave({ title: panelTitle.trim() });
       }}
     />
@@ -708,7 +857,7 @@ let kanbanCols = $derived(
       placeholder="Add notes..."
       rows={mobile ? 4 : 3}
       class="resize-none bg-transparent {mobile ? 'text-[14px]' : 'text-[13px]'} text-text-secondary placeholder:text-text-muted outline-none"
-      onblur={() => debouncedAutoSave({ description: panelDescription.trim() || null } as Partial<Task>)}
+      oninput={() => debouncedAutoSave({ description: panelDescription.trim() || null } as Partial<Task>)}
     ></textarea>
 
     <div class="flex flex-col gap-0 border-t border-border pt-2">
@@ -1097,15 +1246,19 @@ let kanbanCols = $derived(
     <div class="flex flex-col px-1.5 py-2">
       <span class="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-text-muted">Smart Lists</span>
       {#each smartLists as item}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <button
-          onclick={() => { taskStore.smartList = item.key; taskStore.search = ""; showSearch = false; showSidebar = false; }}
+          onclick={() => { taskStore.smartList = item.key; taskStore.search = ""; showSearch = false; showSidebar = false; clearSelection(); }}
+          ondrop={(e) => handleSidebarDrop(e, item.key)}
+          ondragover={(e) => handleSidebarDragOver(e, item.key)}
+          ondragleave={(e) => handleSidebarDragLeave(e, item.key)}
           class="group flex items-center gap-2.5 rounded-lg px-2.5 py-1.75 text-[13px] transition-colors
-            {taskStore.smartList === item.key && taskStore.filterTags.length === 0 && !taskStore.search ? 'bg-accent/10 text-accent font-medium' : 'text-text-secondary hover:bg-overlay-light hover:text-text-primary'}"
+            {sidebarDropTarget === item.key ? 'bg-accent/15 ring-1 ring-accent' : taskStore.smartList === item.key && taskStore.filterTags.length === 0 && !taskStore.search ? 'bg-accent/10 text-accent font-medium' : 'text-text-secondary hover:bg-overlay-light hover:text-text-primary'}"
         >
           <Icon
             src={item.icon}
             size="15"
-            className="shrink-0 {taskStore.smartList === item.key && taskStore.filterTags.length === 0 && !taskStore.search ? 'text-accent' : 'text-text-muted group-hover:text-text-secondary'}"
+            className="shrink-0 {sidebarDropTarget === item.key ? 'text-accent' : taskStore.smartList === item.key && taskStore.filterTags.length === 0 && !taskStore.search ? 'text-accent' : 'text-text-muted group-hover:text-text-secondary'}"
           />
           <span class="flex-1 text-left">{item.label}</span>
           <span class="min-w-5 text-right text-[11px] tabular-nums {taskStore.smartList === item.key && taskStore.filterTags.length === 0 && !taskStore.search ? 'text-accent/70' : 'text-text-muted'}">
@@ -1126,6 +1279,10 @@ let kanbanCols = $derived(
             else taskStore.selectTag(tag);
           }}
           onopencolorpicker={openColorPicker}
+          ondrop={handleSidebarDrop}
+          ondragover={handleSidebarDragOver}
+          ondragleave={handleSidebarDragLeave}
+          dropTarget={sidebarDropTarget}
         />
       </div>
     {/if}
@@ -1328,6 +1485,7 @@ let kanbanCols = $derived(
                 {@const hasChildren = subtasks.length > 0}
                 {@const isExpanded = expandedParents.has(task.id)}
                 {@const isCompleting = completingIds.has(task.id)}
+                {@const isSelected = selectedIds.has(task.id)}
                 <div role="listitem"
                   class="relative overflow-hidden transition-all duration-300 {draggingId === task.id ? 'opacity-40' : ''} {isCompleting ? 'max-h-0 opacity-0 scale-y-95' : 'max-h-40'}"
                   draggable="true"
@@ -1347,12 +1505,20 @@ let kanbanCols = $derived(
                     </div>
                   {/if}
 
-                  <TaskContextMenu {task} onAddSubtask={openAdd}>
+                  <TaskContextMenu
+                    {task}
+                    onAddSubtask={openAdd}
+                    selectedCount={isSelected ? selectedIds.size : 0}
+                    onBatchDue={batchSetDue}
+                    onBatchPriority={batchSetPriority}
+                    onBatchComplete={batchComplete}
+                    onBatchDelete={batchDelete}
+                  >
                     <button
                       class="relative flex w-full items-center gap-3 bg-bg px-4 py-2.5 text-left transition-colors duration-75 md:px-5
-                        {panelOpen && taskStore.selectedId === task.id ? 'bg-accent/5' : 'hover:bg-overlay-subtle'}"
+                        {isSelected ? 'bg-accent/8' : panelOpen && taskStore.selectedId === task.id ? 'bg-accent/5' : 'hover:bg-overlay-subtle'}"
                       style={swipeTaskId === task.id && swipeX !== 0 ? `transform: translateX(${swipeX}px)` : ""}
-                      onclick={() => openDetail(task)}
+                      onclick={(e) => handleTaskClick(task, e)}
                       ontouchstart={(e) => handleTouchStart(e, task.id)}
                       ontouchmove={handleTouchMove}
                       ontouchend={handleTouchEnd}

@@ -26,11 +26,23 @@ let {
   task,
   children,
   onAddSubtask,
+  selectedCount = 0,
+  onBatchDue,
+  onBatchPriority,
+  onBatchComplete,
+  onBatchDelete,
 }: {
   task: Task;
   children: import("svelte").Snippet;
   onAddSubtask?: (parentId: string) => void;
+  selectedCount?: number;
+  onBatchDue?: (due: string | undefined) => void;
+  onBatchPriority?: (priority: string) => void;
+  onBatchComplete?: () => void;
+  onBatchDelete?: () => void;
 } = $props();
+
+let isBatch = $derived(selectedCount > 1);
 
 let calendarOpen = $state(false);
 
@@ -46,13 +58,21 @@ function syncCalendarValue() {
 }
 
 async function setPriority(priority: string) {
-  await taskStore.update(task.id, {
-    priority: priority || undefined,
-  } as Partial<Task>);
+  if (isBatch && onBatchPriority) {
+    onBatchPriority(priority);
+  } else {
+    await taskStore.update(task.id, {
+      priority: priority || null,
+    } as Partial<Task>);
+  }
 }
 
 async function setDue(due: string | undefined) {
-  await taskStore.update(task.id, { due } as Partial<Task>);
+  if (isBatch && onBatchDue) {
+    onBatchDue(due);
+  } else {
+    await taskStore.update(task.id, { due } as Partial<Task>);
+  }
 }
 
 async function handleCalendarSelect(value: DateValue | undefined) {
@@ -315,19 +335,25 @@ const dateOptions: {
 
 			<ContextMenu.Separator class="mx-1.5 my-1 h-px bg-border" />
 
+			{#if isBatch}
+				<div class="px-2.5 pb-1">
+					<span class="text-[11px] font-medium text-accent">{selectedCount} tasks selected</span>
+				</div>
+			{/if}
+
 			<!-- Mark complete -->
-			{#if task.status !== "done"}
+			{#if task.status !== "done" || isBatch}
 				<ContextMenu.Item
 					class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-text-secondary outline-none data-[highlighted]:bg-overlay-light data-[highlighted]:text-success"
-					onSelect={() => taskStore.complete(task.id)}
+					onSelect={() => { if (isBatch && onBatchComplete) onBatchComplete(); else taskStore.complete(task.id); }}
 				>
 					<Icon src={FiCheck} size="15" />
-					Mark complete
+					Mark complete{isBatch ? ` (${selectedCount})` : ""}
 				</ContextMenu.Item>
 			{/if}
 
 			<!-- Add subtask -->
-			{#if onAddSubtask && !task.parentId}
+			{#if !isBatch && onAddSubtask && !task.parentId}
 				<ContextMenu.Item
 					class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-text-secondary outline-none data-[highlighted]:bg-overlay-light data-[highlighted]:text-text-primary"
 					onSelect={() => onAddSubtask?.(task.id)}
@@ -338,6 +364,7 @@ const dateOptions: {
 			{/if}
 
 			<!-- Reminders -->
+			{#if !isBatch}
 			<ContextMenu.Sub>
 				<ContextMenu.SubTrigger
 					class="flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-[13px] text-text-secondary outline-none data-[highlighted]:bg-overlay-light data-[highlighted]:text-text-primary data-[state=open]:bg-overlay-light"
@@ -376,16 +403,17 @@ const dateOptions: {
 					{/each}
 				</ContextMenu.SubContent>
 			</ContextMenu.Sub>
+			{/if}
 
 			<ContextMenu.Separator class="mx-1.5 my-1 h-px bg-border" />
 
 			<!-- Delete -->
 			<ContextMenu.Item
 				class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-text-secondary outline-none data-[highlighted]:bg-danger/10 data-[highlighted]:text-danger"
-				onSelect={handleDelete}
+				onSelect={() => { if (isBatch && onBatchDelete) onBatchDelete(); else handleDelete(); }}
 			>
 				<Icon src={FiTrash2} size="15" />
-				Delete
+				Delete{isBatch ? ` (${selectedCount})` : ""}
 			</ContextMenu.Item>
 		</ContextMenu.Content>
 	</ContextMenu.Portal>

@@ -17,11 +17,19 @@ let {
   filterTags,
   ontoggle,
   onopencolorpicker,
+  ondrop,
+  ondragover,
+  ondragleave,
+  dropTarget,
 }: {
   tags: string[];
   filterTags: string[];
   ontoggle: (tag: string, multi: boolean) => void;
   onopencolorpicker: (e: MouseEvent, tag: string) => void;
+  ondrop?: (e: DragEvent, tag: string) => void;
+  ondragover?: (e: DragEvent, tag: string) => void;
+  ondragleave?: (e: DragEvent, tag: string) => void;
+  dropTarget?: string | null;
 } = $props();
 
 let expandedGroups = $state(new Set<string>());
@@ -65,9 +73,14 @@ function toggleGroup(path: string) {
 		{@const tc = node.fullTag ? tagColorStore.get(node.fullTag) : null}
 		{@const hasChildren = node.children.length > 0}
 		{@const expanded = expandedGroups.has(node.path)}
+		{@const isDragTarget = node.fullTag && dropTarget === node.fullTag}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="group flex items-center rounded-lg transition-colors
-      {active ? 'bg-accent/10' : 'hover:bg-overlay-light'}"
+      {isDragTarget ? 'bg-accent/15 ring-1 ring-accent' : active ? 'bg-accent/10' : 'hover:bg-overlay-light'}"
+			ondrop={node.fullTag && ondrop ? (e) => ondrop!(e, node.fullTag!) : undefined}
+			ondragover={node.fullTag && ondragover ? (e) => ondragover!(e, node.fullTag!) : undefined}
+			ondragleave={node.fullTag && ondragleave ? (e) => ondragleave!(e, node.fullTag!) : undefined}
 		>
 			{#if hasChildren && node.fullTag}
 				<button
