@@ -66,6 +66,72 @@ function openColorPicker(e: MouseEvent, tag: string) {
   colorPickerTag = tag;
 }
 
+interface TagNode {
+  label: string;
+  fullTag: string | null; // null = group only (no exact tag match)
+  children: TagNode[];
+}
+
+let tagTree = $derived.by(() => {
+  const root: TagNode[] = [];
+  for (const tag of taskStore.allTags) {
+    const parts = tag.split("::");
+    let level = root;
+    let path = "";
+    for (let i = 0; i < parts.length; i++) {
+      path = path ? `${path}::${parts[i]}` : parts[i];
+      let node = level.find((n) => n.label === parts[i]);
+      if (!node) {
+        const isLeaf = i === parts.length - 1;
+        node = {
+          label: parts[i],
+          fullTag: isLeaf ? tag : null,
+          children: [],
+        };
+        level.push(node);
+      }
+      if (i === parts.length - 1) node.fullTag = tag;
+      level = node.children;
+    }
+  }
+  return root;
+});
+
+function tagDescendants(node: TagNode): string[] {
+  const tags: string[] = [];
+  if (node.fullTag) tags.push(node.fullTag);
+  for (const child of node.children) tags.push(...tagDescendants(child));
+  return tags;
+}
+
+function isTagActive(node: TagNode): boolean {
+  if (node.fullTag && taskStore.filterTags.includes(node.fullTag)) return true;
+  return node.children.some((c) => isTagActive(c));
+}
+
+function toggleTagNode(node: TagNode) {
+  const all = tagDescendants(node);
+  if (all.length === 0) return;
+  const anyActive = all.some((t) => taskStore.filterTags.includes(t));
+  if (anyActive) {
+    taskStore.filterTags = taskStore.filterTags.filter((t) => !all.includes(t));
+  } else {
+    // Toggle just this node's direct tag, or first descendant
+    const tag = node.fullTag ?? all[0];
+    taskStore.toggleTag(tag);
+    return;
+  }
+}
+
+let expandedTagGroups = $state(new Set<string>());
+
+function toggleTagGroup(label: string) {
+  const next = new Set(expandedTagGroups);
+  if (next.has(label)) next.delete(label);
+  else next.add(label);
+  expandedTagGroups = next;
+}
+
 function closeColorPicker(e: MouseEvent) {
   if (
     colorPickerTag &&
@@ -552,6 +618,63 @@ const priorityOptions = [
 ];
 </script>
 
+{#snippet tagTreeNodes(nodes: TagNode[], depth: number)}
+	{#each nodes as node}
+		{@const active = isTagActive(node)}
+		{@const tc = node.fullTag ? tagColorStore.get(node.fullTag) : null}
+		{@const hasChildren = node.children.length > 0}
+		{@const expanded = expandedTagGroups.has(node.label)}
+		<div class="group flex items-center rounded-lg transition-colors
+			{active ? 'bg-accent/10' : 'hover:bg-overlay-light'}">
+			{#if hasChildren}
+				<button
+					onclick={() => toggleTagGroup(node.label)}
+					class="flex shrink-0 items-center justify-center py-1.5 transition-colors"
+					style="padding-left:{10 + depth * 14}px"
+				>
+					<Icon src={FiChevronRight} size="11" className="shrink-0 transition-transform {expanded ? 'rotate-90' : ''} {active ? 'text-accent' : 'text-text-muted'}" />
+				</button>
+				<button
+					onclick={() => toggleTagNode(node)}
+					class="flex flex-1 items-center gap-2 py-1.5 text-[13px] transition-colors
+						{active ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}"
+				>
+					{#if tc}
+						<span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:{tc}"></span>
+					{/if}
+					<span>{node.label}</span>
+				</button>
+			{:else}
+				<button
+					onclick={() => { if (node.fullTag) taskStore.toggleTag(node.fullTag); }}
+					class="flex flex-1 items-center gap-2 py-1.5 text-[13px] transition-colors
+						{active ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}"
+					style="padding-left:{10 + depth * 14}px"
+				>
+					{#if tc}
+						<span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:{tc}"></span>
+					{:else}
+						<Icon src={FiTag} size="12" className="shrink-0 {active ? 'text-accent' : 'text-text-muted'}" />
+					{/if}
+					<span>{node.label}</span>
+				</button>
+			{/if}
+			{#if node.fullTag}
+				<button
+					onclick={(e) => openColorPicker(e, node.fullTag!)}
+					class="mr-1 flex h-5 w-5 items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-100 hover:bg-overlay-light"
+					title="Set color"
+				>
+					<span class="h-2 w-2 rounded-full {tc ? '' : 'border border-text-muted/40'}" style={tc ? `background:${tc}` : ""}></span>
+				</button>
+			{/if}
+		</div>
+		{#if hasChildren && expanded}
+			{@render tagTreeNodes(node.children, depth + 1)}
+		{/if}
+	{/each}
+{/snippet}
+
 {#snippet selectIndicator(selected: boolean)}
 	<span
 		class="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border-light {selected ? 'bg-accent border-accent' : ''}"
@@ -970,31 +1093,7 @@ const priorityOptions = [
 		{#if taskStore.allTags.length > 0}
 			<div class="flex flex-col px-1.5 py-2 border-t border-border">
 				<span class="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-text-muted">Tags</span>
-				{#each taskStore.allTags as tag}
-					{@const tc = tagColorStore.get(tag)}
-					<div class="group flex items-center rounded-lg transition-colors
-						{taskStore.filterTags.includes(tag) ? 'bg-accent/10' : 'hover:bg-overlay-light'}">
-						<button
-							onclick={() => taskStore.toggleTag(tag)}
-							class="flex flex-1 items-center gap-2.5 px-2.5 py-1.5 text-[13px] transition-colors
-								{taskStore.filterTags.includes(tag) ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}"
-						>
-							{#if tc}
-								<span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:{tc}"></span>
-							{:else}
-								<Icon src={FiTag} size="13" className="shrink-0 {taskStore.filterTags.includes(tag) ? 'text-accent' : 'text-text-muted'}" />
-							{/if}
-							<span>{tag}</span>
-						</button>
-						<button
-							onclick={(e) => openColorPicker(e, tag)}
-							class="mr-1 flex h-5 w-5 items-center justify-center rounded opacity-0 transition-opacity group-hover:opacity-100 hover:bg-overlay-light"
-							title="Set color"
-						>
-							<span class="h-2 w-2 rounded-full {tc ? '' : 'border border-text-muted/40'}" style={tc ? `background:${tc}` : ""}></span>
-						</button>
-					</div>
-				{/each}
+				{@render tagTreeNodes(tagTree, 0)}
 			</div>
 		{/if}
 	</div>
@@ -1058,6 +1157,7 @@ const priorityOptions = [
 			<h1 class="text-[15px] font-semibold text-text-primary">{smartListLabel()}</h1>
 			{#each taskStore.filterTags as tag}
 				{@const tc = tagColorStore.get(tag)}
+				{@const tagLabel = tag.includes("::") ? tag.split("::").pop() : tag}
 				<span class="flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] {tc ? '' : 'bg-accent/10 text-accent'}"
 					style={tc ? `background:${tc}18;color:${tc}` : ""}
 				>
@@ -1066,7 +1166,7 @@ const priorityOptions = [
 					{:else}
 						<Icon src={FiTag} size="10" />
 					{/if}
-					{tag}
+					{tagLabel}
 					<button onclick={() => taskStore.toggleTag(tag)} class="ml-0.5 hover:text-text-primary">
 						<Icon src={FiX} size="10" />
 					</button>
@@ -1219,13 +1319,14 @@ const priorityOptions = [
 													{#if task.tags && task.tags.length > 0}
 														{#each task.tags as tag}
 															{@const tc = tagColorStore.get(tag)}
+															{@const tagLabel = tag.includes("::") ? tag.split("::").pop() : tag}
 															<span class="flex items-center gap-0.5 text-[11px] text-text-muted">
 																{#if tc}
 																	<span class="h-1.5 w-1.5 rounded-full" style="background:{tc}"></span>
 																{:else}
 																	<Icon src={FiTag} size="9" />
 																{/if}
-																{tag}
+																{tagLabel}
 															</span>
 														{/each}
 													{/if}
@@ -1424,11 +1525,12 @@ const priorityOptions = [
 												{#if task.tags && task.tags.length > 0}
 													{#each task.tags as tag}
 														{@const tc = tagColorStore.get(tag)}
+														{@const tagLabel = tag.includes("::") ? tag.split("::").pop() : tag}
 														<span class="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px]"
 															style={tc ? `background:${tc}20;color:${tc}` : ""}
 															class:bg-overlay-light={!tc}
 															class:text-text-muted={!tc}
-														>{tag}</span>
+														>{tagLabel}</span>
 													{/each}
 												{/if}
 											</div>
