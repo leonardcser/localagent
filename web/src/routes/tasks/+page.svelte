@@ -69,6 +69,7 @@ function openColorPicker(e: MouseEvent, tag: string) {
 
 interface TagNode {
   label: string;
+  path: string; // unique key, e.g. "work::frontend"
   fullTag: string | null; // null = group only (no exact tag match)
   children: TagNode[];
 }
@@ -83,10 +84,10 @@ let tagTree = $derived.by(() => {
       path = path ? `${path}::${parts[i]}` : parts[i];
       let node = level.find((n) => n.label === parts[i]);
       if (!node) {
-        const isLeaf = i === parts.length - 1;
         node = {
           label: parts[i],
-          fullTag: isLeaf ? tag : null,
+          path,
+          fullTag: null,
           children: [],
         };
         level.push(node);
@@ -98,38 +99,17 @@ let tagTree = $derived.by(() => {
   return root;
 });
 
-function tagDescendants(node: TagNode): string[] {
-  const tags: string[] = [];
-  if (node.fullTag) tags.push(node.fullTag);
-  for (const child of node.children) tags.push(...tagDescendants(child));
-  return tags;
-}
-
 function isTagActive(node: TagNode): boolean {
   if (node.fullTag && taskStore.filterTags.includes(node.fullTag)) return true;
   return node.children.some((c) => isTagActive(c));
 }
 
-function toggleTagNode(node: TagNode) {
-  const all = tagDescendants(node);
-  if (all.length === 0) return;
-  const anyActive = all.some((t) => taskStore.filterTags.includes(t));
-  if (anyActive) {
-    taskStore.filterTags = taskStore.filterTags.filter((t) => !all.includes(t));
-  } else {
-    // Toggle just this node's direct tag, or first descendant
-    const tag = node.fullTag ?? all[0];
-    taskStore.toggleTag(tag);
-    return;
-  }
-}
-
 let expandedTagGroups = $state(new Set<string>());
 
-function toggleTagGroup(label: string) {
+function toggleTagGroup(path: string) {
   const next = new Set(expandedTagGroups);
-  if (next.has(label)) next.delete(label);
-  else next.add(label);
+  if (next.has(path)) next.delete(path);
+  else next.add(path);
   expandedTagGroups = next;
 }
 
@@ -624,12 +604,12 @@ const priorityOptions = [
 		{@const active = isTagActive(node)}
 		{@const tc = node.fullTag ? tagColorStore.get(node.fullTag) : null}
 		{@const hasChildren = node.children.length > 0}
-		{@const expanded = expandedTagGroups.has(node.label)}
+		{@const expanded = expandedTagGroups.has(node.path)}
 		<div class="group flex items-center rounded-lg transition-colors
 			{active ? 'bg-accent/10' : 'hover:bg-overlay-light'}">
 			<button
 				onclick={() => {
-					if (hasChildren) toggleTagGroup(node.label);
+					if (hasChildren) toggleTagGroup(node.path);
 					else if (node.fullTag) taskStore.toggleTag(node.fullTag);
 				}}
 				class="flex flex-1 items-center gap-2.5 px-2.5 py-1.5 text-[13px] transition-colors
