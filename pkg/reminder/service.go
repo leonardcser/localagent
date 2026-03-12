@@ -162,6 +162,8 @@ func parseDue(due string) (time.Time, bool) {
 	if err != nil {
 		return time.Time{}, false
 	}
+	// Default to 6am local time for date-only dues
+	t = t.Add(6 * time.Hour)
 	return t, false
 }
 
