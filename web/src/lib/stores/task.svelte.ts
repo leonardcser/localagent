@@ -248,7 +248,13 @@ function createTaskStore() {
   });
 
   function subtasksOf(id: string): Task[] {
-    return childrenMap.get(id) ?? [];
+    const subs = childrenMap.get(id) ?? [];
+    return [...subs].sort((a, b) => {
+      const aDone = a.status === "done" ? 1 : 0;
+      const bDone = b.status === "done" ? 1 : 0;
+      if (aDone !== bDone) return aDone - bDone;
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
   }
 
   function isParent(id: string): boolean {
