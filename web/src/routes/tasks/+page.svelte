@@ -677,7 +677,7 @@ let kanbanCols = $derived(
           class="flex shrink-0 items-center justify-center w-5 h-5 rounded transition-transform {expanded ? '' : '-rotate-90'}"
           style="margin-left:{4 + depth * 14}px"
         >
-          <Icon src={FiChevronRight} size="13" className="{active ? 'text-accent' : 'text-text-muted'}" />
+          <Icon src={FiChevronRight} size="13" className={active ? 'text-accent' : 'text-text-muted'} />
         </button>
         <button
           onclick={(e) => taskStore.toggleTag(node.fullTag!, e.metaKey || e.ctrlKey)}
@@ -1105,6 +1105,7 @@ let kanbanCols = $derived(
 <svelte:window onkeydown={handleKeydown} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
 <div class="flex h-full" onclick={closeColorPicker}>
   <!-- Desktop sidebar -->
   <div class="hidden w-52 shrink-0 flex-col border-r border-border bg-bg md:flex">
@@ -1803,6 +1804,7 @@ let kanbanCols = $derived(
 {#if colorPickerTag}
   {@const tc = tagColorStore.get(colorPickerTag)}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div
     data-color-picker
     class="fixed z-[100] grid grid-cols-5 gap-1.5 rounded-lg border border-border bg-bg-secondary p-2 shadow-elevated"
@@ -1814,6 +1816,7 @@ let kanbanCols = $derived(
         onclick={() => { tagColorStore.set(colorPickerTag!, color); colorPickerTag = null; }}
         class="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 {tc === color ? 'border-white' : 'border-transparent'}"
         style="background:{color}"
+        title={color}
       ></button>
     {/each}
     {#if tc}
