@@ -2,7 +2,7 @@
 import { onMount } from "svelte";
 import { taskStore, type SmartList } from "$lib/stores/task.svelte";
 import type { Task } from "$lib/api";
-import { Select } from "bits-ui";
+import { Select, Popover } from "bits-ui";
 import { Icon } from "svelte-icons-pack";
 import {
   FiSearch,
@@ -24,6 +24,7 @@ import {
   FiRepeat,
   FiClock,
   FiBell,
+  FiMoreHorizontal,
 } from "svelte-icons-pack/fi";
 import TaskContextMenu from "$lib/components/TaskContextMenu.svelte";
 import DatePicker from "$lib/components/DatePicker.svelte";
@@ -136,7 +137,7 @@ let swipeDirection: "horizontal" | "vertical" | null = null;
 const SWIPE_THRESHOLD = 80;
 const SWIPE_MAX = 120;
 
-let lastKeyD = 0;
+let moreMenuOpen = $state(false);
 
 onMount(async () => {
   await taskStore.load();
@@ -212,7 +213,7 @@ function handleTouchMove(e: TouchEvent) {
   if (swipeDirection === "vertical") return;
 
   e.preventDefault();
-  swipeX = Math.max(-SWIPE_MAX, Math.min(SWIPE_MAX, dx));
+  swipeX = Math.max(0, Math.min(SWIPE_MAX, dx));
 }
 
 async function handleTouchEnd() {
@@ -227,11 +228,6 @@ async function handleTouchEnd() {
     swipeX = 0;
     swipeTaskId = null;
     await taskStore.complete(id);
-  } else if (swipeX <= -SWIPE_THRESHOLD) {
-    swipeX = 0;
-    swipeTaskId = null;
-    await taskStore.remove(id);
-    if (panelOpen && taskStore.selectedId === id) closePanel();
   } else {
     swipeX = 0;
     swipeTaskId = null;
@@ -405,6 +401,25 @@ function priorityColor(p?: string): string {
   if (p === "medium") return "bg-warning";
   if (p === "low") return "bg-text-muted";
   return "";
+}
+
+function checkboxBorderColor(task: Task): string {
+  if (task.status === "done") return "border-success bg-success text-white";
+  if (task.priority === "high")
+    return "border-error text-transparent hover:border-error hover:text-error/50";
+  if (task.priority === "medium")
+    return "border-warning text-transparent hover:border-warning hover:text-warning/50";
+  if (task.priority === "low")
+    return "border-text-muted text-transparent hover:border-text-muted hover:text-text-muted/50";
+  return "border-border-light text-transparent hover:border-text-muted hover:text-text-muted/50";
+}
+
+function checkboxDoneColor(task: Task): string {
+  if (task.priority === "high") return "border-error bg-error text-white";
+  if (task.priority === "medium") return "border-warning bg-warning text-white";
+  if (task.priority === "low")
+    return "border-text-muted bg-text-muted text-white";
+  return "border-success bg-success text-white";
 }
 
 function isOverdue(due?: string): boolean {
@@ -609,17 +624,6 @@ function handleKeydown(e: KeyboardEvent) {
     return;
   }
 
-  if (
-    (e.key === "Delete" || e.key === "Backspace") &&
-    panelOpen &&
-    panelMode === "edit" &&
-    taskStore.selectedId
-  ) {
-    e.preventDefault();
-    handleDelete();
-    return;
-  }
-
   if (e.key === "ArrowDown" || e.key === "j") {
     e.preventDefault();
     navigateTask(1);
@@ -629,22 +633,6 @@ function handleKeydown(e: KeyboardEvent) {
     e.preventDefault();
     navigateTask(-1);
     return;
-  }
-
-  if (
-    e.key === "d" &&
-    panelOpen &&
-    panelMode === "edit" &&
-    taskStore.selectedId
-  ) {
-    const now = Date.now();
-    if (now - lastKeyD < 400) {
-      lastKeyD = 0;
-      e.preventDefault();
-      handleDelete();
-      return;
-    }
-    lastKeyD = now;
   }
 }
 
@@ -1091,7 +1079,7 @@ let kanbanCols = $derived(
                 onclick={(e) => { e.stopPropagation(); sub.status === "done" ? taskStore.update(sub.id, { status: "todo" }) : taskStore.complete(sub.id); }}
                 onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); sub.status === "done" ? taskStore.update(sub.id, { status: "todo" }) : taskStore.complete(sub.id); } }}
                 class="flex {mobile ? 'h-5 w-5' : 'h-4 w-4'} shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors
-                  {sub.status === 'done' ? 'border-success bg-success text-white' : 'border-border-light text-transparent hover:border-text-muted'}"
+                  {sub.status === 'done' ? checkboxDoneColor(sub) : checkboxBorderColor(sub)}"
               >
                 <Icon src={FiCheck} size={mobile ? "10" : "9"} />
               </span>
@@ -1334,14 +1322,8 @@ let kanbanCols = $derived(
                       <span class="ml-2 text-[12px] font-medium">Done</span>
                     </div>
                   {/if}
-                  {#if swipeTaskId === task.id && swipeX < 0}
-                    <div class="absolute inset-0 flex items-center justify-end bg-danger/15 px-4 text-danger">
-                      <span class="mr-2 text-[12px] font-medium">Delete</span>
-                      <Icon src={FiTrash2} size="16" />
-                    </div>
-                  {/if}
 
-                  <TaskContextMenu {task} onOpenDetail={openDetail} onAddSubtask={openAdd}>
+                  <TaskContextMenu {task} onAddSubtask={openAdd}>
                     <button
                       class="relative flex w-full items-center gap-3 bg-bg px-4 py-2.5 text-left transition-colors duration-75 md:px-5
                         {panelOpen && taskStore.selectedId === task.id ? 'bg-accent/5' : 'hover:bg-overlay-subtle'}"
@@ -1371,16 +1353,13 @@ let kanbanCols = $derived(
                           }
                         }}
                         class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
-                          {task.status === 'done' ? 'border-success bg-success text-white' : 'border-border-light text-transparent hover:border-text-muted hover:text-text-muted/50'}"
+                          {task.status === 'done' ? checkboxDoneColor(task) : checkboxBorderColor(task)}"
                       >
                         <Icon src={FiCheck} size="11" />
                       </span>
 
                       <span class="flex min-w-0 flex-1 flex-col gap-0.5">
                         <span class="flex items-center gap-1.5">
-                          {#if task.priority && task.status !== "done"}
-                            <span class="h-2 w-2 shrink-0 rounded-full {priorityColor(task.priority)}" title="{task.priority} priority"></span>
-                          {/if}
                           <span
                             class="truncate text-[13px] {task.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}"
                           >
@@ -1462,14 +1441,8 @@ let kanbanCols = $derived(
                           <span class="ml-2 text-[12px] font-medium">Done</span>
                         </div>
                       {/if}
-                      {#if swipeTaskId === sub.id && swipeX < 0}
-                        <div class="absolute inset-0 flex items-center justify-end bg-danger/15 px-4 text-danger">
-                          <span class="mr-2 text-[12px] font-medium">Delete</span>
-                          <Icon src={FiTrash2} size="16" />
-                        </div>
-                      {/if}
 
-                      <TaskContextMenu task={sub} onOpenDetail={openDetail}>
+                      <TaskContextMenu task={sub} >
                         <button
                           class="relative flex w-full items-center gap-3 bg-bg pl-10 pr-4 py-2 text-left transition-colors duration-75 md:pl-12 md:pr-5
                             {panelOpen && taskStore.selectedId === sub.id ? 'bg-accent/5' : 'hover:bg-overlay-subtle'}"
@@ -1500,16 +1473,13 @@ let kanbanCols = $derived(
                               }
                             }}
                             class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors duration-100
-                              {sub.status === 'done' ? 'border-success bg-success text-white' : 'border-border-light text-transparent hover:border-text-muted hover:text-text-muted/50'}"
+                              {sub.status === 'done' ? checkboxDoneColor(sub) : checkboxBorderColor(sub)}"
                           >
                             <Icon src={FiCheck} size="9" />
                           </span>
 
                           <span class="flex min-w-0 flex-1 flex-col gap-0.5">
                             <span class="flex items-center gap-1.5">
-                              {#if sub.priority && sub.status !== "done"}
-                                <span class="h-1.5 w-1.5 shrink-0 rounded-full {priorityColor(sub.priority)}"></span>
-                              {/if}
                               <span
                                 class="truncate text-[12px] {sub.status === 'done' ? 'text-text-muted line-through' : 'text-text-primary'}"
                               >
@@ -1572,7 +1542,7 @@ let kanbanCols = $derived(
 
               <div class="flex flex-1 flex-col gap-1.5 overflow-y-auto p-1.5">
                 {#each taskStore.kanbanColumns[col.key as keyof typeof taskStore.kanbanColumns] as task (task.id)}
-                  <TaskContextMenu {task} onOpenDetail={openDetail} onAddSubtask={openAdd}>
+                  <TaskContextMenu {task} onAddSubtask={openAdd}>
                     <div
                       draggable="true"
                       role="button"
@@ -1588,11 +1558,11 @@ let kanbanCols = $derived(
                       {#if dragOverTaskId === task.id && draggingId !== task.id}
                         <div class="pointer-events-none absolute inset-x-0 z-10 h-0.5 bg-accent {dragOverBefore ? '-top-1' : '-bottom-1'}"></div>
                       {/if}
+                      {#if task.priority}
+                        <div class="absolute left-0 top-2 bottom-2 w-[3px] rounded-full {priorityColor(task.priority)}"></div>
+                      {/if}
                       <div class="flex items-start justify-between gap-1.5">
                         <span class="text-[12px] leading-snug text-text-primary {task.status === 'done' ? 'line-through text-text-muted' : ''}">{task.title}</span>
-                        {#if task.priority}
-                          <span class="mt-0.5 h-2 w-2 shrink-0 rounded-full {priorityColor(task.priority)}" title="{task.priority} priority"></span>
-                        {/if}
                       </div>
                       {#if task.description}
                         <p class="text-[11px] leading-snug text-text-muted line-clamp-2">{task.description}</p>
@@ -1661,14 +1631,27 @@ let kanbanCols = $derived(
               <div class="flex items-center justify-between border-b border-border px-4 py-3">
                 <h2 class="text-[14px] font-semibold text-text-primary">Edit Task</h2>
                 <div class="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onclick={handleDelete}
-                    class="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-overlay-light hover:text-danger"
-                    title="Delete task"
-                  >
-                    <Icon src={FiTrash2} size="14" />
-                  </button>
+                  <Popover.Root bind:open={moreMenuOpen}>
+                    <Popover.Trigger
+                      class="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-overlay-light hover:text-text-secondary"
+                      title="More actions"
+                    >
+                      <Icon src={FiMoreHorizontal} size="15" />
+                    </Popover.Trigger>
+                    <Popover.Content
+                      class="z-50 min-w-36 rounded-xl border border-border bg-bg-secondary p-1.5 shadow-elevated backdrop-blur-sm"
+                      sideOffset={4}
+                      align="end"
+                    >
+                      <button
+                        class="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
+                        onclick={() => { moreMenuOpen = false; handleDelete(); }}
+                      >
+                        <Icon src={FiTrash2} size="15" />
+                        Delete
+                      </button>
+                    </Popover.Content>
+                  </Popover.Root>
                   <button
                     type="button"
                     onclick={closePanel}
@@ -1789,13 +1772,27 @@ let kanbanCols = $derived(
             <Icon src={FiArrowLeft} size="18" />
           </button>
           <span class="flex-1"></span>
-          <button
-            type="button"
-            onclick={handleDelete}
-            class="flex h-9 w-9 items-center justify-center rounded-lg text-text-muted hover:bg-overlay-light hover:text-danger"
-          >
-            <Icon src={FiTrash2} size="17" />
-          </button>
+          <Popover.Root bind:open={moreMenuOpen}>
+            <Popover.Trigger
+              class="flex h-9 w-9 items-center justify-center rounded-lg text-text-muted hover:bg-overlay-light hover:text-text-secondary"
+              title="More actions"
+            >
+              <Icon src={FiMoreHorizontal} size="18" />
+            </Popover.Trigger>
+            <Popover.Content
+              class="z-50 min-w-36 rounded-xl border border-border bg-bg-secondary p-1.5 shadow-elevated backdrop-blur-sm"
+              sideOffset={4}
+              align="end"
+            >
+              <button
+                class="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-[14px] text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger"
+                onclick={() => { moreMenuOpen = false; handleDelete(); }}
+              >
+                <Icon src={FiTrash2} size="16" />
+                Delete
+              </button>
+            </Popover.Content>
+          </Popover.Root>
         </div>
         {@render detailPanel(true)}
       </div>
