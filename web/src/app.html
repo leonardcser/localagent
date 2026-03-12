@@ -10,11 +10,18 @@
     <meta name="apple-mobile-web-app-title" content="localagent" />
     <link rel="manifest" href="/manifest.json" />
     <title>localagent</title>
+    <script>
+      // Prevent FOUC: apply mode class before paint (mode-watcher also does this but we need it for the loader)
+      (function() {
+        var mode = localStorage.getItem('mode-watcher-mode');
+        var dark = mode === '"dark"' || (!mode && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.add(dark ? 'dark' : 'light');
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      })();
+    </script>
     <style>
-      html { background-color: #000; }
-      @media (prefers-color-scheme: light) {
-        html { background-color: #fff; }
-      }
+      html { background-color: #0a0a0a; }
+      html.light { background-color: #fff; }
       #app-loader {
         position: fixed;
         inset: 0;
@@ -31,11 +38,9 @@
         border-radius: 50%;
         animation: spin 0.7s linear infinite;
       }
-      @media (prefers-color-scheme: light) {
-        #app-loader .spinner {
-          border-color: rgba(0,0,0,0.1);
-          border-top-color: rgba(0,0,0,0.5);
-        }
+      html.light #app-loader .spinner {
+        border-color: rgba(0,0,0,0.1);
+        border-top-color: rgba(0,0,0,0.5);
       }
       @keyframes spin {
         to { transform: rotate(360deg); }

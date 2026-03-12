@@ -30,7 +30,7 @@ const tc = $derived(tagColorStore.get(tag));
 				tagColorStore.set(tag, color);
 				onclose();
 			}}
-			class="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 {tc === color ? 'border-white' : 'border-transparent'}"
+			class="h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 {tc === color ? 'border-text-primary' : 'border-transparent'}"
 			style="background:{color}"
 			title={color}
 		></button>

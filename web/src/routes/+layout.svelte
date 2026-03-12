@@ -12,7 +12,10 @@ import {
   FiMenu,
   FiBell,
   FiBellOff,
+  FiSun,
+  FiMoon,
 } from "svelte-icons-pack/fi";
+import { ModeWatcher, toggleMode, mode } from "mode-watcher";
 import { push } from "$lib/stores/push.svelte";
 
 let { children } = $props();
@@ -54,6 +57,7 @@ function isActive(href: string): boolean {
 }
 </script>
 
+<ModeWatcher />
 <div class="fixed inset-0 flex flex-col md:flex-row">
   <!-- Mobile top bar -->
   <header
@@ -102,6 +106,21 @@ function isActive(href: string): boolean {
       {/each}
     </div>
     <div class="mt-auto flex flex-col gap-1 p-1.5 pb-[max(env(safe-area-inset-bottom,0px),6px)]">
+      <button
+        onclick={toggleMode}
+        class="flex w-full items-center rounded-md py-2 text-text-muted transition-colors duration-100 hover:bg-overlay-light hover:text-text-secondary
+          gap-2.5 px-2.5 md:justify-center md:gap-0 md:px-0"
+        title={mode.current === "light" ? "Switch to dark mode" : "Switch to light mode"}
+      >
+        <Icon
+          src={mode.current === "light" ? FiMoon : FiSun}
+          size="16"
+          className="shrink-0"
+        />
+        <span class="truncate text-[12px] md:hidden">
+          {mode.current === "light" ? "Dark mode" : "Light mode"}
+        </span>
+      </button>
       {#if push.supported}
         <button
           onclick={() => push.subscribe()}
@@ -114,7 +133,7 @@ function isActive(href: string): boolean {
           <Icon
             src={push.permission === "granted" ? FiBell : FiBellOff}
             size="16"
-            className="shrink-0 {push.permission === 'granted' ? 'text-green-400' : ''}"
+            className="shrink-0 {push.permission === 'granted' ? 'text-success' : ''}"
           />
           <span class="truncate text-[12px] md:hidden">
             {push.permission === "granted"
