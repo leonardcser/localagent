@@ -57,7 +57,7 @@ function isActive(href: string): boolean {
 }
 </script>
 
-<ModeWatcher />
+<ModeWatcher darkClassNames={["dark"]} lightClassNames={["light"]} />
 <div class="fixed inset-0 flex flex-col md:flex-row">
   <!-- Mobile top bar -->
   <header

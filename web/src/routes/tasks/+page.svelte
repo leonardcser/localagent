@@ -1426,7 +1426,7 @@ let kanbanCols = $derived(
 
                 <!-- Subtasks -->
                 {#if hasChildren && isExpanded}
-                  {@const sortedSubtasks = [...subtasks].sort((a, b) => (a.order || 0) - (b.order || 0))}
+                  {@const sortedSubtasks = subtasks}
                   {#each sortedSubtasks as sub (sub.id)}
                     <div role="listitem"
                       class="relative overflow-hidden {draggingId === sub.id ? 'opacity-40' : ''}"
