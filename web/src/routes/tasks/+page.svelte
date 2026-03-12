@@ -708,7 +708,7 @@ let kanbanCols = $derived(
       placeholder="Add notes..."
       rows={mobile ? 4 : 3}
       class="resize-none bg-transparent {mobile ? 'text-[14px]' : 'text-[13px]'} text-text-secondary placeholder:text-text-muted outline-none"
-      onblur={() => debouncedAutoSave({ description: panelDescription.trim() || undefined })}
+      onblur={() => debouncedAutoSave({ description: panelDescription.trim() || null } as Partial<Task>)}
     ></textarea>
 
     <div class="flex flex-col gap-0 border-t border-border pt-2">
@@ -774,7 +774,7 @@ let kanbanCols = $derived(
           value={panelPriority}
           onValueChange={(v) => {
             panelPriority = v;
-            autoSave({ priority: v || undefined } as Partial<Task>);
+            autoSave({ priority: v || null } as Partial<Task>);
           }}
         >
           <Select.Trigger
@@ -827,7 +827,7 @@ let kanbanCols = $derived(
           value={panelDue}
           onchange={(v) => {
             panelDue = v;
-            autoSave({ due: v || undefined } as Partial<Task>);
+            autoSave({ due: v || null } as Partial<Task>);
           }}
         />
       </div>
@@ -878,7 +878,7 @@ let kanbanCols = $derived(
           value={panelRecurrence}
           onchange={(v) => {
             panelRecurrence = v;
-            autoSave({ recurrence: v || undefined } as Partial<Task>);
+            autoSave({ recurrence: v || null } as Partial<Task>);
           }}
         />
       </div>
@@ -934,7 +934,7 @@ let kanbanCols = $derived(
           value={panelParentId}
           onValueChange={(v) => {
             panelParentId = v;
-            autoSave({ parentId: v || undefined } as Partial<Task>);
+            autoSave({ parentId: v || null } as Partial<Task>);
           }}
         >
           <Select.Trigger
