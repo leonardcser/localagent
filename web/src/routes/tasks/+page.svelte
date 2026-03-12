@@ -56,6 +56,36 @@ let quickAddFocused = $state(false);
 
 let showSidebar = $state(false);
 let showSearch = $state(false);
+
+const SIDEBAR_MIN = 180;
+const SIDEBAR_MAX = 320;
+const PANEL_MIN = 260;
+const PANEL_MAX = 480;
+
+let sidebarWidth = $state(208); // w-52 = 13rem = 208px
+let panelWidth = $state(320); // w-80 = 20rem = 320px
+let resizing = $state<"sidebar" | "panel" | null>(null);
+
+function startResize(which: "sidebar" | "panel") {
+  resizing = which;
+  const onMove = (e: MouseEvent) => {
+    if (which === "sidebar") {
+      sidebarWidth = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, e.clientX));
+    } else {
+      panelWidth = Math.min(
+        PANEL_MAX,
+        Math.max(PANEL_MIN, window.innerWidth - e.clientX),
+      );
+    }
+  };
+  const onUp = () => {
+    resizing = null;
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+  };
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
+}
 let colorPickerTag = $state<string | null>(null);
 let colorPickerPos = $state<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -1004,9 +1034,9 @@ let kanbanCols = $derived(
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
-<div class="flex h-full" onclick={closeColorPicker}>
+<div class="flex h-full {resizing ? 'select-none' : ''}" onclick={closeColorPicker}>
   <!-- Desktop sidebar -->
-  <div class="hidden w-52 shrink-0 flex-col border-r border-border bg-bg md:flex">
+  <div class="hidden shrink-0 flex-col border-r border-border bg-bg md:flex" style="width:{sidebarWidth}px">
     <div class="px-3 pt-3 pb-1">
       {#if showSearch}
         <div class="relative">
@@ -1075,6 +1105,13 @@ let kanbanCols = $derived(
       </div>
     {/if}
   </div>
+
+  <!-- Sidebar resize handle -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="hidden w-1 shrink-0 cursor-col-resize transition-colors hover:bg-accent/30 md:block {resizing === 'sidebar' ? 'bg-accent/40' : ''}"
+    onmousedown={() => startResize("sidebar")}
+  ></div>
 
   <!-- Main area -->
   <div class="flex flex-1 flex-col overflow-hidden">
@@ -1639,7 +1676,13 @@ let kanbanCols = $derived(
 
       <!-- Desktop detail panel -->
       {#if panelOpen}
-        <div class="hidden w-80 shrink-0 flex-col border-l border-border bg-bg md:flex">
+        <!-- Panel resize handle -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="hidden w-1 shrink-0 cursor-col-resize transition-colors hover:bg-accent/30 md:block {resizing === 'panel' ? 'bg-accent/40' : ''}"
+          onmousedown={() => startResize("panel")}
+        ></div>
+        <div class="hidden shrink-0 flex-col border-l border-border bg-bg md:flex" style="width:{panelWidth}px">
           {#if panelMode === "add"}
             <form onsubmit={handleAddSubmit} class="flex flex-1 flex-col overflow-hidden">
               <div class="flex items-center justify-between border-b border-border px-4 py-3">

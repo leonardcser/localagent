@@ -4,6 +4,7 @@ import { Calendar } from "bits-ui";
 import { type DateValue, parseDate } from "@internationalized/date";
 import type { Task } from "$lib/api";
 import { taskStore } from "$lib/stores/task.svelte";
+import { getBrowserLocale } from "$lib/utils";
 import { Icon } from "svelte-icons-pack";
 import {
   FiCheck,
@@ -211,6 +212,7 @@ const dateOptions: {
 								value={calendarValue}
 								onValueChange={handleCalendarSelect}
 								weekdayFormat="short"
+								locale={getBrowserLocale()}
 								fixedWeeks
 								class="w-full"
 							>

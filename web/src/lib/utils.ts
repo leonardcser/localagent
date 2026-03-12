@@ -42,3 +42,7 @@ export function formatTimestamp(ts: string): string {
 export function formatTime24(d: Date): string {
   return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
+
+export function getBrowserLocale(): string {
+  return navigator.language || "en-US";
+}

@@ -2,6 +2,7 @@
 import { Popover, Calendar } from "bits-ui";
 import { parseDate, type DateValue } from "@internationalized/date";
 import { Icon } from "svelte-icons-pack";
+import { getBrowserLocale } from "$lib/utils";
 import {
   FiCalendar,
   FiChevronLeft,
@@ -106,6 +107,7 @@ function formatDisplayDate(d: string): string {
         value={calendarValue}
         onValueChange={handleDateSelect}
         weekdayFormat="short"
+        locale={getBrowserLocale()}
         fixedWeeks
         class="w-full"
       >
