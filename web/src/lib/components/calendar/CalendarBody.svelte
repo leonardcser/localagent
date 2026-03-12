@@ -222,6 +222,8 @@ function handleGridMouseup() {
   endDay.setHours(Math.floor(endMin / 60), endMin % 60, 0, 0);
 
   dragPreview = null;
+  createTaskSearch = "";
+  createTaskDropdownOpen = false;
   createState = {
     startMs: startDay.getTime(),
     endMs: endDay.getTime(),
@@ -247,7 +249,37 @@ async function submitCreate() {
 }
 
 let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
+
+let createTaskSearch = $state("");
+let createTaskDropdownOpen = $state(false);
+
+let filteredTasks = $derived(
+  createTaskSearch
+    ? activeTasks.filter((t) =>
+        t.title.toLowerCase().includes(createTaskSearch.toLowerCase()),
+      )
+    : activeTasks,
+);
+
+function selectTask(task: { id: string; title: string }) {
+  if (!createState) return;
+  createState.taskId = task.id;
+  createTaskSearch = task.title;
+  createTaskDropdownOpen = false;
+}
+
+let todayDate = $state(new Date());
 </script>
+
+<svelte:window
+	onkeydown={(e) => {
+		if (e.key === "Escape" && createState) {
+			createState = null;
+			createTaskSearch = "";
+			createTaskDropdownOpen = false;
+		}
+	}}
+/>
 
 <div class="flex min-h-0 flex-1 flex-col">
   <!-- All-day events row -->
@@ -339,17 +371,17 @@ let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
       {/if}
 
       <!-- Half-row top padding -->
-      {#each Array.from({ length: numCols }) as _}
+      {#each Array.from({ length: numCols }) as _, colIdx}
         <div
-          class="border-b border-r border-border/50"
+          class="border-b border-r border-border/50 {isSameDay(addDays(viewStart, colIdx), todayDate) ? 'bg-accent/[0.03]' : ''}"
           style="height: {rowStartOffset}px"
         ></div>
       {/each}
 
       <!-- Hour cells -->
       {#each Array.from({ length: 24 }) as _}
-        {#each Array.from({ length: numCols }) as _}
-          <div class="border-b border-r border-border/50" style="height: {rowHeight}px"></div>
+        {#each Array.from({ length: numCols }) as _, colIdx}
+          <div class="border-b border-r border-border/50 {isSameDay(addDays(viewStart, colIdx), todayDate) ? 'bg-accent/[0.03]' : ''}" style="height: {rowHeight}px"></div>
         {/each}
       {/each}
     </div>
@@ -361,7 +393,7 @@ let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
   <div
     class="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]"
     role="presentation"
-    onclick={() => (createState = null)}
+    onclick={() => { createState = null; createTaskSearch = ""; createTaskDropdownOpen = false; }}
     onkeydown={() => {}}
   ></div>
   <div
@@ -412,16 +444,34 @@ let activeTasks = $derived(taskStore.tasks.filter((t) => t.status !== "done"));
 
     <div class="mb-3">
       <label for="create-block-task" class="mb-1 block text-[11px] text-text-muted">Task</label>
-      <select
-        id="create-block-task"
-        bind:value={createState.taskId}
-        class="w-full rounded-lg border border-border bg-bg-tertiary px-2 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
-      >
-        <option value="">Select a task…</option>
-        {#each activeTasks as task}
-          <option value={task.id}>{task.title}</option>
-        {/each}
-      </select>
+      <div class="relative">
+        <input
+          id="create-block-task"
+          type="text"
+          bind:value={createTaskSearch}
+          placeholder="Search tasks…"
+          autocomplete="off"
+          onfocus={() => (createTaskDropdownOpen = true)}
+          oninput={() => {
+            if (createState) createState.taskId = "";
+            createTaskDropdownOpen = true;
+          }}
+          class="w-full rounded-lg border border-border bg-bg-tertiary px-2 py-1.5 text-[12px] text-text-primary outline-none focus:border-accent"
+        />
+        {#if createTaskDropdownOpen && filteredTasks.length > 0}
+          <div class="absolute left-0 right-0 top-full z-10 mt-1 max-h-40 overflow-y-auto rounded-lg border border-border bg-bg-secondary shadow-elevated">
+            {#each filteredTasks as task}
+              <button
+                type="button"
+                class="w-full px-2 py-1.5 text-left text-[12px] text-text-primary hover:bg-overlay-light"
+                onmousedown={(e) => { e.preventDefault(); selectTask(task); }}
+              >
+                {task.title}
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
     </div>
 
     <div class="mb-4">

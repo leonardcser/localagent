@@ -1,6 +1,6 @@
 import type { Block, Task } from "./api";
 
-export type CalendarView = "day" | "3day" | "week";
+export type CalendarView = "day" | "3day" | "week" | "month";
 
 export interface CalendarEvent {
   id: string;
@@ -149,6 +149,15 @@ export function calculateNewEventTime(
   newStart.setHours(newHours, newMinutes % 60, 0, 0);
 
   return { startMs: newStart.getTime(), endMs: newStart.getTime() + duration };
+}
+
+export function getMonthStart(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+export function getMonthCalendarStart(date: Date): Date {
+  const first = getMonthStart(date);
+  return getWeekStart(first);
 }
 
 export function getWeekStart(date: Date): Date {

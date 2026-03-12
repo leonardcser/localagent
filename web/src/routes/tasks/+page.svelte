@@ -140,6 +140,15 @@ let lastKeyD = 0;
 
 onMount(async () => {
   await taskStore.load();
+  // Auto-expand parents with visible subtasks
+  const next = new Set(expandedParents);
+  for (const t of taskStore.filtered) {
+    if (t.parentId && !next.has(t.parentId)) {
+      next.add(t.parentId);
+    }
+  }
+  expandedParents = next;
+
   const selectParam = new URLSearchParams(window.location.search).get("select");
   const preselect = selectParam || taskStore.selectedId;
   if (preselect) {
@@ -151,6 +160,19 @@ onMount(async () => {
       history.replaceState({}, "", url.toString());
     }
   }
+});
+
+$effect(() => {
+  // Track dependencies
+  taskStore.smartList;
+  taskStore.filterTags;
+  taskStore.search;
+  // Auto-expand parents with visible subtasks
+  const next = new Set<string>();
+  for (const t of taskStore.filtered) {
+    if (t.parentId) next.add(t.parentId);
+  }
+  expandedParents = next;
 });
 
 const smartLists: { key: SmartList; label: string; icon: typeof FiSun }[] = [
@@ -258,7 +280,16 @@ function closePanel() {
 }
 
 function navigateTask(direction: -1 | 1) {
-  const list = taskStore.filtered;
+  // Build visible list: top-level + expanded subtasks
+  const list: Task[] = [];
+  for (const t of taskStore.topLevelFiltered) {
+    list.push(t);
+    if (expandedParents.has(t.id)) {
+      for (const sub of taskStore.subtasksOf(t.id)) {
+        list.push(sub);
+      }
+    }
+  }
   if (list.length === 0) return;
 
   if (!panelOpen || panelMode !== "edit") {
@@ -294,6 +325,36 @@ function debouncedAutoSave(patch: Partial<Task>) {
   saveTimer = setTimeout(() => autoSave(patch), 400);
 }
 
+let tagSuggestionOpen = $state(false);
+let tagInputEl = $state<HTMLInputElement | null>(null);
+
+let tagSuggestions = $derived.by(() => {
+  if (!tagSuggestionOpen || !panelTags) return [];
+  // Get the current tag being typed (after the last comma)
+  const parts = panelTags.split(",");
+  const current = parts[parts.length - 1].trim().toLowerCase();
+  if (!current) return [];
+  const existing = parts.slice(0, -1).map((t) => t.trim().toLowerCase());
+  return taskStore.allTags
+    .filter(
+      (t) =>
+        t.toLowerCase().includes(current) &&
+        !existing.includes(t.toLowerCase()),
+    )
+    .slice(0, 8);
+});
+
+function acceptTagSuggestion(tag: string) {
+  const parts = panelTags
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  parts[parts.length - 1] = tag;
+  panelTags = parts.join(", ") + ", ";
+  tagSuggestionOpen = false;
+  tagInputEl?.focus();
+}
+
 async function handleAddSubmit(e: SubmitEvent) {
   e.preventDefault();
   if (!panelTitle.trim()) return;
@@ -326,6 +387,8 @@ async function handleQuickAdd(e: KeyboardEvent) {
     title: quickAddValue.trim(),
     status: "todo",
     due,
+    tags:
+      taskStore.filterTags.length > 0 ? [...taskStore.filterTags] : undefined,
   });
   quickAddValue = "";
 }
@@ -597,6 +660,19 @@ const priorityOptions = [
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
 ];
+
+let kanbanCols = $derived(
+  taskStore.smartList === "done"
+    ? [
+        { key: "todo", label: "To Do", color: "text-text-secondary" },
+        { key: "doing", label: "In Progress", color: "text-accent" },
+        { key: "done", label: "Done", color: "text-success" },
+      ]
+    : [
+        { key: "todo", label: "To Do", color: "text-text-secondary" },
+        { key: "doing", label: "In Progress", color: "text-accent" },
+      ],
+);
 </script>
 
 {#snippet tagTreeNodes(nodes: TagNode[], depth: number)}
@@ -607,24 +683,44 @@ const priorityOptions = [
     {@const expanded = expandedTagGroups.has(node.path)}
     <div class="group flex items-center rounded-lg transition-colors
       {active ? 'bg-accent/10' : 'hover:bg-overlay-light'}">
-      <button
-        onclick={(e) => {
-          if (hasChildren) toggleTagGroup(node.path);
-          else if (node.fullTag) taskStore.toggleTag(node.fullTag, e.metaKey || e.ctrlKey);
-        }}
-        class="flex flex-1 items-center gap-2.5 px-2.5 py-1.5 text-[13px] transition-colors
-          {active ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}"
-        style="padding-left:{10 + depth * 14}px"
-      >
-        {#if tc}
-          <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:{tc}"></span>
-        {:else if hasChildren}
-          <Icon src={FiChevronRight} size="13" className="shrink-0 transition-transform {expanded ? 'rotate-90' : ''} {active ? 'text-accent' : 'text-text-muted'}" />
-        {:else}
-          <Icon src={FiTag} size="13" className="shrink-0 {active ? 'text-accent' : 'text-text-muted'}" />
-        {/if}
-        <span>{node.label}</span>
-      </button>
+      {#if hasChildren && node.fullTag}
+        <button
+          onclick={() => toggleTagGroup(node.path)}
+          class="flex shrink-0 items-center justify-center w-5 h-5 rounded transition-transform {expanded ? '' : '-rotate-90'}"
+          style="margin-left:{4 + depth * 14}px"
+        >
+          <Icon src={FiChevronRight} size="13" className="{active ? 'text-accent' : 'text-text-muted'}" />
+        </button>
+        <button
+          onclick={(e) => taskStore.toggleTag(node.fullTag!, e.metaKey || e.ctrlKey)}
+          class="flex flex-1 items-center gap-2.5 py-1.5 text-[13px] transition-colors
+            {active ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}"
+        >
+          {#if tc}
+            <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:{tc}"></span>
+          {/if}
+          <span>{node.label}</span>
+        </button>
+      {:else}
+        <button
+          onclick={(e) => {
+            if (hasChildren) toggleTagGroup(node.path);
+            else if (node.fullTag) taskStore.toggleTag(node.fullTag, e.metaKey || e.ctrlKey);
+          }}
+          class="flex flex-1 items-center gap-2.5 px-2.5 py-1.5 text-[13px] transition-colors
+            {active ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}"
+          style="padding-left:{10 + depth * 14}px"
+        >
+          {#if tc}
+            <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:{tc}"></span>
+          {:else if hasChildren}
+            <Icon src={FiChevronRight} size="13" className="shrink-0 transition-transform {expanded ? 'rotate-90' : ''} {active ? 'text-accent' : 'text-text-muted'}" />
+          {:else}
+            <Icon src={FiTag} size="13" className="shrink-0 {active ? 'text-accent' : 'text-text-muted'}" />
+          {/if}
+          <span>{node.label}</span>
+        </button>
+      {/if}
       {#if node.fullTag}
         <button
           onclick={(e) => openColorPicker(e, node.fullTag!)}
@@ -799,6 +895,7 @@ const priorityOptions = [
       </div>
 
       <!-- Reminders -->
+      {#if panelDue}
       <div class="flex items-center justify-between {py} border-b border-border/50">
         <span class="flex items-center {gap} {szLabel} text-text-secondary">
           <Icon src={FiBell} size={iconSz} className="text-text-muted" />
@@ -831,6 +928,7 @@ const priorityOptions = [
           {/each}
         </div>
       </div>
+      {/if}
 
       <!-- Recurrence -->
       <div class="flex items-center justify-between {py} border-b border-border/50">
@@ -853,16 +951,38 @@ const priorityOptions = [
           <Icon src={FiTag} size={iconSz} className="text-text-muted" />
           Tags
         </span>
-        <input
-          type="text"
-          bind:value={panelTags}
-          placeholder="work, personal"
-          class="{mobile ? 'w-40' : 'w-36'} rounded-lg border border-border bg-bg-tertiary px-2 py-1 {sz} text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
-          onblur={() => {
-            const tags = parseTags(panelTags);
-            autoSave({ tags: tags ?? [] } as Partial<Task>);
-          }}
-        />
+        <div class="relative {mobile ? 'w-40' : 'w-36'}">
+          <input
+            bind:this={tagInputEl}
+            type="text"
+            bind:value={panelTags}
+            placeholder="work, personal"
+            class="w-full rounded-lg border border-border bg-bg-tertiary px-2 py-1 {sz} text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
+            onfocus={() => (tagSuggestionOpen = true)}
+            oninput={() => (tagSuggestionOpen = true)}
+            onblur={() => {
+              setTimeout(() => (tagSuggestionOpen = false), 150);
+              const tags = parseTags(panelTags);
+              autoSave({ tags: tags ?? [] } as Partial<Task>);
+            }}
+          />
+          {#if tagSuggestions.length > 0}
+            <div class="absolute left-0 right-0 top-full z-50 mt-1 max-h-32 overflow-y-auto rounded-lg border border-border bg-bg-secondary shadow-elevated">
+              {#each tagSuggestions as suggestion}
+                <button
+                  type="button"
+                  class="w-full px-2 py-1.5 text-left text-[12px] text-text-primary hover:bg-overlay-light"
+                  onmousedown={(e) => {
+                    e.preventDefault();
+                    acceptTagSuggestion(suggestion);
+                  }}
+                >
+                  {suggestion}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
       </div>
 
       <!-- Parent -->
@@ -1433,11 +1553,7 @@ const priorityOptions = [
       {:else}
         <!-- Kanban View -->
         <div class="flex flex-1 gap-3 overflow-x-auto p-3">
-          {#each [
-            { key: "todo", label: "To Do", color: "text-text-secondary" },
-            { key: "doing", label: "In Progress", color: "text-accent" },
-            { key: "done", label: "Done", color: "text-success" },
-          ] as col (col.key)}
+          {#each kanbanCols as col (col.key)}
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
               class="flex w-64 shrink-0 flex-col rounded-xl border bg-bg-secondary transition-colors duration-100 {dragOverCol === col.key ? 'border-accent bg-accent/5' : 'border-border'}"

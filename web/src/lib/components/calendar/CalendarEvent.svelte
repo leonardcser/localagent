@@ -164,11 +164,11 @@ function handleEventMouseUp() {
           class="h-full rounded-sm border-l-2 px-1.5 pt-0.5 pb-1 text-left text-[11px] backdrop-blur-sm select-none overflow-hidden"
           style="background-color: color-mix(in srgb, {event.color} 15%, transparent); border-color: {event.color}; color: {event.color}"
         >
-          {#if durationMin >= 60}
+          {#if durationMin >= 30}
             <div class="truncate opacity-70">{formatTime(start)}</div>
           {/if}
           <div class="truncate font-semibold">{event.title}</div>
-          {#if event.note && durationMin >= 45}
+          {#if event.note && durationMin >= 30}
             <div class="truncate opacity-70">{event.note}</div>
           {/if}
 

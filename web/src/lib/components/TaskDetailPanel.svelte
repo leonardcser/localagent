@@ -65,6 +65,8 @@ $effect(() => {
   reminders = task?.reminders ?? [];
   status = task?.status ?? "todo";
   selectedParentId = task?.parentId ?? parentId;
+  // Trigger auto-grow after syncing description from task
+  requestAnimationFrame(() => autoGrow(descriptionEl));
 });
 
 const statusOptions = [
@@ -147,6 +149,14 @@ async function handleDelete() {
   }
 }
 
+let descriptionEl = $state<HTMLTextAreaElement | null>(null);
+
+function autoGrow(el: HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = el.scrollHeight + "px";
+}
+
 let taskBlocks = $derived(task ? blockStore.forTask(task.id) : []);
 let subtasks = $derived(task ? taskStore.subtasksOf(task.id) : []);
 </script>
@@ -177,14 +187,23 @@ let subtasks = $derived(task ? taskStore.subtasksOf(task.id) : []);
       onblur={() => {
         if (title.trim()) debouncedAutoSave({ title: title.trim() });
       }}
+      onkeydown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          (e.currentTarget as HTMLInputElement).blur();
+          descriptionEl?.focus();
+        }
+      }}
     />
 
     <textarea
+      bind:this={descriptionEl}
       bind:value={description}
       placeholder="Add notes..."
-      rows={mobile ? 4 : 3}
+      style="min-height: {mobile ? '5rem' : '4rem'}; overflow: hidden"
       class="resize-none bg-transparent {mobile ? 'text-[14px]' : 'text-[13px]'} text-text-secondary placeholder:text-text-muted outline-none"
       onblur={() => debouncedAutoSave({ description: description.trim() || undefined })}
+      oninput={() => autoGrow(descriptionEl)}
     ></textarea>
 
     <div class="flex flex-col gap-0 border-t border-border pt-2">
@@ -308,39 +327,41 @@ let subtasks = $derived(task ? taskStore.subtasksOf(task.id) : []);
         />
       </div>
 
-      <!-- Reminders -->
-      <div class="flex items-center justify-between {py} border-b border-border/50">
-        <span class="flex items-center {gap} {szLabel} text-text-secondary">
-          <Icon src={FiBell} size={iconSz} className="text-text-muted" />
-          Reminders
-        </span>
-        <div class="flex flex-wrap justify-end gap-1">
-          {#each [{ key: "0", label: "At due" }, { key: "15m", label: "15m" }, { key: "30m", label: "30m" }, { key: "1h", label: "1h" }, { key: "2h", label: "2h" }, { key: "1d", label: "1d" }, { key: "2d", label: "2d" }, { key: "1w", label: "1w" }] as opt}
-            {@const active = reminders.includes(opt.key)}
-            {@const isTimeBased = !["0", "1d", "2d", "1w"].includes(opt.key)}
-            {@const hasTime = due.includes("T")}
-            {#if !isTimeBased || hasTime}
-              <button
-                type="button"
-                class="rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors
-                  {active
-                    ? 'border-accent bg-accent/15 text-accent'
-                    : 'border-border bg-bg-tertiary text-text-muted hover:border-border-light hover:text-text-secondary'}"
-                onclick={() => {
-                  if (active) {
-                    reminders = reminders.filter((r) => r !== opt.key);
-                  } else {
-                    reminders = [...reminders, opt.key];
-                  }
-                  autoSave({ reminders } as Partial<Task>);
-                }}
-              >
-                {opt.label}
-              </button>
-            {/if}
-          {/each}
+      <!-- Reminders (only shown when due date is set) -->
+      {#if due}
+        <div class="flex items-center justify-between {py} border-b border-border/50">
+          <span class="flex items-center {gap} {szLabel} text-text-secondary">
+            <Icon src={FiBell} size={iconSz} className="text-text-muted" />
+            Reminders
+          </span>
+          <div class="flex flex-wrap justify-end gap-1">
+            {#each [{ key: "0", label: "At due" }, { key: "15m", label: "15m" }, { key: "30m", label: "30m" }, { key: "1h", label: "1h" }, { key: "2h", label: "2h" }, { key: "1d", label: "1d" }, { key: "2d", label: "2d" }, { key: "1w", label: "1w" }] as opt}
+              {@const active = reminders.includes(opt.key)}
+              {@const isTimeBased = !["0", "1d", "2d", "1w"].includes(opt.key)}
+              {@const hasTime = due.includes("T")}
+              {#if !isTimeBased || hasTime}
+                <button
+                  type="button"
+                  class="rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors
+                    {active
+                      ? 'border-accent bg-accent/15 text-accent'
+                      : 'border-border bg-bg-tertiary text-text-muted hover:border-border-light hover:text-text-secondary'}"
+                  onclick={() => {
+                    if (active) {
+                      reminders = reminders.filter((r) => r !== opt.key);
+                    } else {
+                      reminders = [...reminders, opt.key];
+                    }
+                    autoSave({ reminders } as Partial<Task>);
+                  }}
+                >
+                  {opt.label}
+                </button>
+              {/if}
+            {/each}
+          </div>
         </div>
-      </div>
+      {/if}
 
       <!-- Recurrence -->
       <div class="flex items-center justify-between {py} border-b border-border/50">
@@ -442,13 +463,14 @@ let subtasks = $derived(task ? taskStore.subtasksOf(task.id) : []);
           <BlockPicker oncreate={(startMs, endMs) => blockStore.add({ taskId: task!.id, startAtMs: startMs, endAtMs: endMs })} />
         </div>
         {#each taskBlocks as block}
+          {@const blockDate = new Date(block.startAtMs).toISOString().slice(0, 10)}
           <div class="flex items-center justify-between rounded-lg px-2 {mobile ? 'py-2' : 'py-1.5'} hover:bg-overlay-light">
-            <span class="{mobile ? 'text-[13px]' : 'text-[11px]'} text-text-secondary">
+            <a href="/calendar?date={blockDate}" class="{mobile ? 'text-[13px]' : 'text-[11px]'} text-text-secondary hover:text-accent transition-colors">
               <Icon src={FiClock} size="11" className="inline-block text-text-muted mr-1" />
               {new Date(block.startAtMs).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
               {formatTime24(new Date(block.startAtMs))}
               – {formatTime24(new Date(block.endAtMs))}
-            </span>
+            </a>
             <button
               onclick={() => blockStore.remove(block.id)}
               class="text-text-muted hover:text-error transition-colors"

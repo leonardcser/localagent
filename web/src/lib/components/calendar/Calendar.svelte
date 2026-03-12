@@ -4,6 +4,7 @@ import { blockStore } from "$lib/stores/block.svelte";
 import { taskStore } from "$lib/stores/task.svelte";
 import {
   getWeekStart,
+  getMonthCalendarStart,
   addDays,
   blockToEvent,
   taskToEvent,
@@ -12,6 +13,7 @@ import {
 } from "$lib/calendar";
 import CalendarHeader from "./CalendarHeader.svelte";
 import CalendarBody from "./CalendarBody.svelte";
+import CalendarMonthView from "./CalendarMonthView.svelte";
 import TaskDetailPanel from "$lib/components/TaskDetailPanel.svelte";
 import type { Task } from "$lib/api";
 
@@ -21,6 +23,8 @@ interface Props {
 }
 
 let { indexColWidth = 52, rowHeight = 48 }: Props = $props();
+
+const VALID_VIEWS: CalendarView[] = ["day", "3day", "week", "month"];
 
 let view = $state<CalendarView>("week");
 let currentDate = $state(new Date());
@@ -62,13 +66,20 @@ let viewStart = $derived.by(() => {
     currentDate.getMonth(),
     currentDate.getDate(),
   );
+  if (view === "month") return getMonthCalendarStart(d);
   return view === "week" ? getWeekStart(d) : d;
 });
 
-let viewEnd = $derived(addDays(viewStart, numCols));
+let viewEnd = $derived(addDays(viewStart, view === "month" ? 42 : numCols));
 
 function navigate(dir: -1 | 1) {
-  currentDate = addDays(currentDate, dir * numCols);
+  if (view === "month") {
+    const d = new Date(currentDate);
+    d.setMonth(d.getMonth() + dir);
+    currentDate = d;
+  } else {
+    currentDate = addDays(currentDate, dir * numCols);
+  }
 }
 
 function goToToday() {
@@ -76,8 +87,25 @@ function goToToday() {
 }
 
 onMount(() => {
-  if (window.innerWidth < 640) view = "day";
+  const savedView = localStorage.getItem("calendarView");
+  if (savedView && VALID_VIEWS.includes(savedView as CalendarView)) {
+    view = savedView as CalendarView;
+  } else if (window.innerWidth < 640) {
+    view = "day";
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const dateParam = params.get("date");
+  if (dateParam) {
+    const parsed = new Date(dateParam + "T00:00:00");
+    if (!isNaN(parsed.getTime())) currentDate = parsed;
+  }
+
   taskStore.load();
+});
+
+$effect(() => {
+  localStorage.setItem("calendarView", view);
 });
 
 $effect(() => {
@@ -116,14 +144,23 @@ let events = $derived.by(() => {
     setView={(v) => (view = v)}
   />
   <div class="flex flex-1 overflow-hidden">
-    <CalendarBody
-      {events}
-      {indexColWidth}
-      {rowHeight}
-      {viewStart}
-      {numCols}
-      onViewTask={openTaskDetail}
-    />
+    {#if view === "month"}
+      <CalendarMonthView
+        {events}
+        {viewStart}
+        {currentDate}
+        onViewTask={openTaskDetail}
+      />
+    {:else}
+      <CalendarBody
+        {events}
+        {indexColWidth}
+        {rowHeight}
+        {viewStart}
+        {numCols}
+        onViewTask={openTaskDetail}
+      />
+    {/if}
     {#if detailPanelOpen}
       <TaskDetailPanel
         task={detailPanelMode === "edit" ? detailTask : null}

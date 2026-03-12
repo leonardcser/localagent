@@ -94,6 +94,9 @@ function headerTitle(): string {
     }
     return `${MONTHS_SHORT[viewStart.getMonth()]} ${viewStart.getDate()} – ${MONTHS_SHORT[end.getMonth()]} ${end.getDate()}`;
   }
+  if (view === "month") {
+    return `${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+  }
   // week
   return `${MONTHS[viewStart.getMonth()]} ${viewStart.getFullYear()}`;
 }
@@ -102,6 +105,7 @@ const views: { key: CalendarView; label: string }[] = [
   { key: "day", label: "Day" },
   { key: "3day", label: "3D" },
   { key: "week", label: "Week" },
+  { key: "month", label: "Month" },
 ];
 </script>
 
@@ -125,7 +129,7 @@ const views: { key: CalendarView; label: string }[] = [
       class={cn(
         "ml-1 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors",
         isCurrentPeriod
-          ? "bg-accent text-white"
+          ? "bg-overlay-light text-text-muted cursor-default"
           : "bg-overlay-light text-text-secondary hover:bg-overlay-medium",
       )}
     >
@@ -156,6 +160,7 @@ const views: { key: CalendarView; label: string }[] = [
 </div>
 
 <!-- Day headers -->
+{#if view !== "month"}
 <div class="flex border-b border-border bg-bg-secondary py-1">
   <div
     class="flex items-center justify-center text-[11px] font-medium text-accent shrink-0"
@@ -190,3 +195,4 @@ const views: { key: CalendarView; label: string }[] = [
     {/each}
   </div>
 </div>
+{/if}
