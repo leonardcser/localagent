@@ -242,6 +242,7 @@ func gatewayCmd() {
 		})
 	}
 	sessions := agentLoop.GetSessionManager()
+	heartbeatService.SetSessionManager(sessions)
 	heartbeatService.SetHandler(func(prompt, channel, chatID string, isCronEvent bool) *tools.ToolResult {
 		if channel == "" || chatID == "" {
 			channel, chatID = "cli", "direct"
@@ -252,6 +253,15 @@ func gatewayCmd() {
 		if err != nil {
 			return tools.ErrorResult(fmt.Sprintf("Heartbeat error: %v", err))
 		}
+
+		// If the message tool was called during heartbeat, it already
+		// delivered the message to the user and persisted it to the
+		// target session. Return silent to avoid duplicate delivery.
+		if agentLoop.WasMessageToolCalled() {
+			sessions.TruncateHistory("heartbeat", prevLen)
+			return tools.SilentResult("Heartbeat delivered via message tool")
+		}
+
 		if isCronEvent {
 			return tools.NewToolResult(strings.TrimSpace(response))
 		}

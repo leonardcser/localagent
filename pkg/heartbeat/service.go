@@ -12,6 +12,7 @@ import (
 	"localagent/pkg/constants"
 	"localagent/pkg/logger"
 	"localagent/pkg/prompts"
+	"localagent/pkg/session"
 	"localagent/pkg/state"
 	"localagent/pkg/tools"
 )
@@ -39,6 +40,7 @@ type HeartbeatHandler func(prompt, channel, chatID string, isCronEvent bool) *to
 type HeartbeatService struct {
 	workspace  string
 	bus        *bus.MessageBus
+	sessions   *session.SessionManager
 	state      *state.Manager
 	handler    HeartbeatHandler
 	eventQueue *EventQueue
@@ -79,6 +81,14 @@ func (hs *HeartbeatService) SetBus(msgBus *bus.MessageBus) {
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
 	hs.bus = msgBus
+}
+
+// SetSessionManager sets the session manager for persisting heartbeat messages
+// to the target channel's session (so they survive page refresh and provide context).
+func (hs *HeartbeatService) SetSessionManager(sm *session.SessionManager) {
+	hs.mu.Lock()
+	defer hs.mu.Unlock()
+	hs.sessions = sm
 }
 
 // SetHandler sets the heartbeat handler.
@@ -228,8 +238,12 @@ func (hs *HeartbeatService) executeHeartbeat() {
 		return
 	}
 
-	// For cron events, always deliver (skip the silent check)
+	// For cron events, deliver unless already sent via message tool
 	if hp.isCronEvent {
+		if result.Silent {
+			hs.logInfo("Cron event: already delivered via message tool")
+			return
+		}
 		response := result.ForUser
 		if response == "" {
 			response = result.ForLLM
@@ -446,10 +460,13 @@ func (hs *HeartbeatService) sendResponse(response string) {
 	hs.sendResponseTo(platform, userID, response)
 }
 
-// sendResponseTo sends a response to a specific channel/chatID.
+// sendResponseTo sends a response to a specific channel/chatID and persists
+// it to the target session so it survives page refresh and provides context
+// for follow-up messages.
 func (hs *HeartbeatService) sendResponseTo(channel, chatID, response string) {
 	hs.mu.RLock()
 	msgBus := hs.bus
+	sm := hs.sessions
 	hs.mu.RUnlock()
 
 	if msgBus == nil {
@@ -459,6 +476,13 @@ func (hs *HeartbeatService) sendResponseTo(channel, chatID, response string) {
 
 	if channel == "" || chatID == "" {
 		return
+	}
+
+	// Persist to the target channel's session so the message survives
+	// page refresh and is included in follow-up conversation context.
+	if sm != nil {
+		sessionKey := fmt.Sprintf("%s:%s", channel, chatID)
+		sm.AddMessage(sessionKey, "assistant", response)
 	}
 
 	msgBus.PublishOutbound(bus.OutboundMessage{
