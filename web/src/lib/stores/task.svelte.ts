@@ -238,14 +238,33 @@ function createTaskStore() {
     return [...result].sort(sortTasks);
   });
 
+  function applyCompletedDateFilter(t: Task): boolean {
+    if (!t.doneAtMs) return true;
+    const doneDate = new Date(t.doneAtMs).toISOString().slice(0, 10);
+    switch (smartList) {
+      case "today":
+        return doneDate === todayStr();
+      case "tomorrow":
+        return doneDate === tomorrowStr();
+      case "next7":
+        return doneDate >= todayStr() && doneDate <= next7Str();
+      case "overdue":
+        return doneDate === todayStr();
+      case "inbox":
+        return !t.due;
+      case "all":
+      case "done":
+        return true;
+    }
+  }
+
   let completedFiltered = $derived.by(() => {
     if (smartList === "done" || search) return [];
-    let result: Task[];
+    let result = tasks.filter(
+      (t) => t.status === "done" && applyCompletedDateFilter(t),
+    );
     if (filterTags.length > 0) {
-      result = tasks.filter((t) => t.status === "done");
       result = applyTagViewFilter(result);
-    } else {
-      result = tasks.filter((t) => t.status === "done" && applyDateFilter(t));
     }
     result = applyOverlayFilters(result);
     return [...result].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
