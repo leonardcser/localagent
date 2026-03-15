@@ -376,6 +376,55 @@ func (s *Server) handleTaskDelete(c *echo.Context) error {
 	return c.JSON(http.StatusNotFound, map[string]string{"error": "task not found"})
 }
 
+func (s *Server) handleTaskBatchUpdate(c *echo.Context) error {
+	if s.todoService == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "tasks not available"})
+	}
+
+	var req struct {
+		IDs   []string       `json:"ids"`
+		Patch map[string]any `json:"patch"`
+	}
+	if err := c.Bind(&req); err != nil || len(req.IDs) == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "ids and patch required"})
+	}
+
+	updated, errors := s.todoService.BatchUpdate(req.IDs, req.Patch)
+	return c.JSON(http.StatusOK, map[string]any{"updated": updated, "errors": errors})
+}
+
+func (s *Server) handleTaskBatchComplete(c *echo.Context) error {
+	if s.todoService == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "tasks not available"})
+	}
+
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := c.Bind(&req); err != nil || len(req.IDs) == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "ids required"})
+	}
+
+	completed, errors := s.todoService.BatchComplete(req.IDs)
+	return c.JSON(http.StatusOK, map[string]any{"completed": completed, "errors": errors})
+}
+
+func (s *Server) handleTaskBatchDelete(c *echo.Context) error {
+	if s.todoService == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"error": "tasks not available"})
+	}
+
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := c.Bind(&req); err != nil || len(req.IDs) == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "ids required"})
+	}
+
+	deleted, errors := s.todoService.BatchDelete(req.IDs)
+	return c.JSON(http.StatusOK, map[string]any{"deleted": deleted, "errors": errors})
+}
+
 // --- Block handlers ---
 
 func (s *Server) handleBlockList(c *echo.Context) error {

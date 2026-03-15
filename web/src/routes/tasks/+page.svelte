@@ -250,31 +250,33 @@ function handleSidebarDragLeave(e: DragEvent, target: string) {
 
 // Batch operations for multi-select context menu
 async function batchSetDue(due: string | undefined) {
-  for (const id of selectedIds) {
-    await taskStore.update(id, { due } as Partial<Task>);
-  }
+  const ids = [...selectedIds];
   selectedIds = new Set();
+  await taskStore.batchUpdate(ids, { due } as Partial<Task>);
 }
 
 async function batchSetPriority(priority: string) {
-  for (const id of selectedIds) {
-    await taskStore.update(id, { priority: priority || "" } as Partial<Task>);
-  }
+  const ids = [...selectedIds];
   selectedIds = new Set();
+  await taskStore.batchUpdate(ids, {
+    priority: priority || "",
+  } as Partial<Task>);
 }
 
 async function batchComplete() {
-  for (const id of selectedIds) {
-    await animateComplete(id);
-  }
+  const ids = [...selectedIds];
+  // Animate all at once
+  completingIds = new Set([...completingIds, ...ids]);
   selectedIds = new Set();
+  await new Promise((r) => setTimeout(r, 400));
+  completingIds = new Set([...completingIds].filter((x) => !ids.includes(x)));
+  await taskStore.batchComplete(ids);
 }
 
 async function batchDelete() {
-  for (const id of selectedIds) {
-    await taskStore.remove(id);
-  }
+  const ids = [...selectedIds];
   selectedIds = new Set();
+  await taskStore.batchDelete(ids);
 }
 
 async function animateComplete(id: string) {
@@ -1515,7 +1517,7 @@ let kanbanCols = $derived(
                   >
                     <button
                       class="relative flex w-full items-center gap-3 bg-bg px-4 py-2.5 text-left transition-colors duration-75 md:px-5
-                        {isSelected ? 'bg-accent/8' : panelOpen && taskStore.selectedId === task.id ? 'bg-accent/5' : 'hover:bg-overlay-subtle'}"
+                        {isSelected ? 'bg-accent/15 ring-1 ring-accent/25' : panelOpen && taskStore.selectedId === task.id ? 'bg-accent/5' : 'hover:bg-overlay-subtle'}"
                       style={swipeTaskId === task.id && swipeX !== 0 ? `transform: translateX(${swipeX}px)` : ""}
                       onclick={(e) => handleTaskClick(task, e)}
                       ontouchstart={(e) => handleTouchStart(e, task.id)}

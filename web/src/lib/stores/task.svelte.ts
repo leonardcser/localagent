@@ -4,6 +4,9 @@ import {
   updateTask,
   completeTask,
   deleteTask,
+  batchUpdateTasks,
+  batchCompleteTasks,
+  batchDeleteTasks,
   type Task,
 } from "$lib/api";
 
@@ -378,6 +381,37 @@ function createTaskStore() {
     return update(id, { status } as Partial<Task>);
   }
 
+  async function batchUpdate(ids: string[], patch: Partial<Task>) {
+    const result = await batchUpdateTasks(ids, patch);
+    if (result?.updated) {
+      const map = new Map(result.updated.map((t) => [t.id, t]));
+      tasks = tasks.map((t) => map.get(t.id) ?? t);
+    }
+    return result;
+  }
+
+  async function batchComplete(ids: string[]) {
+    // Optimistic
+    tasks = tasks.map((t) =>
+      ids.includes(t.id) ? { ...t, status: "done", doneAtMs: Date.now() } : t,
+    );
+    const result = await batchCompleteTasks(ids);
+    if (result?.completed) {
+      const map = new Map(result.completed.map((t) => [t.id, t]));
+      tasks = tasks.map((t) => map.get(t.id) ?? t);
+    }
+    return result;
+  }
+
+  async function batchDelete(ids: string[]) {
+    const result = await batchDeleteTasks(ids);
+    if (result?.deleted) {
+      const set = new Set(result.deleted);
+      tasks = tasks.filter((t) => !set.has(t.id));
+    }
+    return result;
+  }
+
   function clearFilters() {
     filterPriority = "";
     persistPrefs();
@@ -481,6 +515,9 @@ function createTaskStore() {
     moveStatus,
     reorder,
     applyEvent,
+    batchUpdate,
+    batchComplete,
+    batchDelete,
   };
 }
 

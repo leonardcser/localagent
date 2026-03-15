@@ -96,6 +96,9 @@ func (s *Server) setupRoutes() {
 	s.echo.PUT("/api/tasks/:id", s.handleTaskUpdate)
 	s.echo.POST("/api/tasks/:id/done", s.handleTaskDone)
 	s.echo.DELETE("/api/tasks/:id", s.handleTaskDelete)
+	s.echo.POST("/api/tasks/batch/update", s.handleTaskBatchUpdate)
+	s.echo.POST("/api/tasks/batch/complete", s.handleTaskBatchComplete)
+	s.echo.POST("/api/tasks/batch/delete", s.handleTaskBatchDelete)
 
 	s.echo.GET("/api/blocks", s.handleBlockList)
 	s.echo.POST("/api/blocks", s.handleBlockCreate)

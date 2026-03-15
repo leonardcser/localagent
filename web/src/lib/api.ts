@@ -505,6 +505,58 @@ export async function deleteTask(id: string): Promise<boolean> {
   }
 }
 
+export async function batchUpdateTasks(
+  ids: string[],
+  patch: Partial<Task>,
+): Promise<{ updated: Task[]; errors: string[] } | null> {
+  if (DEV) return null;
+  try {
+    const res = await fetch("/api/tasks/batch/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, patch }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function batchCompleteTasks(
+  ids: string[],
+): Promise<{ completed: Task[]; errors: string[] } | null> {
+  if (DEV) return null;
+  try {
+    const res = await fetch("/api/tasks/batch/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function batchDeleteTasks(
+  ids: string[],
+): Promise<{ deleted: string[]; errors: string[] } | null> {
+  if (DEV) return null;
+  try {
+    const res = await fetch("/api/tasks/batch/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
 // --- Block API ---
 
 export interface Block {
