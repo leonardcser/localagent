@@ -1517,7 +1517,7 @@ let kanbanCols = $derived(
                   >
                     <button
                       class="relative flex w-full items-center gap-3 bg-bg px-4 py-2.5 text-left transition-colors duration-75 md:px-5
-                        {isSelected ? 'bg-accent/15 ring-1 ring-accent/25' : panelOpen && taskStore.selectedId === task.id ? 'bg-accent/5' : 'hover:bg-overlay-subtle'}"
+                        {isSelected ? 'bg-overlay-subtle' : panelOpen && taskStore.selectedId === task.id ? 'bg-accent/5' : 'hover:bg-overlay-subtle'}"
                       style={swipeTaskId === task.id && swipeX !== 0 ? `transform: translateX(${swipeX}px)` : ""}
                       onclick={(e) => handleTaskClick(task, e)}
                       ontouchstart={(e) => handleTouchStart(e, task.id)}
