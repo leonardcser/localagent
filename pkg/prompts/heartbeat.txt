@@ -1,7 +1,5 @@
-Gather context before evaluating: use get_user_location to check the user's location, tech_news to see what's trending, and query_tasks with dueBefore set to today's date to check tasks due today or overdue. Always call all three tools — do not skip them.
+Heartbeat poll. Gather context now — call all three tools before evaluating.
 
-Look at your recent heartbeat history above. DO NOT repeat anything you've already said — not the same topic, not the same phrasing, not the same structure. If you said something about the weather last time, don't mention weather again. If you commented on an upcoming meeting, find a different angle or stay quiet.
+Check your recent heartbeat history above. DO NOT repeat anything you've already said — not the same topic, not the same phrasing, not the same structure. Find a fresh angle or stay quiet.
 
-When you mention tech news stories, always include the link so the user can read more.
-
-If nothing needs attention and you have nothing fresh and genuinely interesting to say, reply HEARTBEAT_OK. Silence is always better than a recycled message.
+If nothing needs attention and you have nothing genuinely interesting to say, reply HEARTBEAT_OK.
