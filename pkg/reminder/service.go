@@ -73,17 +73,21 @@ func (s *Service) check() {
 		logger.Error("reminder: query tasks: %v", err)
 		return
 	}
-	defer rows.Close()
 
-	now := time.Now()
-	nowMs := now.UnixMilli()
-
+	var tasks []taskRow
 	for rows.Next() {
 		var t taskRow
 		if err := rows.Scan(&t.id, &t.title, &t.due, &t.reminders); err != nil {
 			continue
 		}
+		tasks = append(tasks, t)
+	}
+	rows.Close()
 
+	now := time.Now()
+	nowMs := now.UnixMilli()
+
+	for _, t := range tasks {
 		dueTime, hasTime := parseDue(t.due)
 		if dueTime.IsZero() {
 			continue
@@ -109,12 +113,10 @@ func (s *Service) check() {
 				continue // not yet
 			}
 
-			// Check if already sent
 			if s.alreadySent(t.id, offsetKey, fireAtMs) {
 				continue
 			}
 
-			// Send notification
 			body := fmt.Sprintf("Due %s", humanizeOffset(offsetKey))
 			s.push.SendPush(webchat.PushMessage{
 				Type:   "reminder",
