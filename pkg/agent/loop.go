@@ -43,7 +43,8 @@ type AgentLoop struct {
 	tools          *tools.ToolRegistry
 	activity       activity.Emitter
 	running        atomic.Bool
-	summarizing    sync.Map // Tracks which sessions are currently being summarized
+	mu             sync.Mutex // Serializes runAgentLoop to prevent races on shared tool state
+	summarizing    sync.Map   // Tracks which sessions are currently being summarized
 	stopCleanup    chan struct{}
 	database       *sql.DB
 	todoService    *todo.TodoService
@@ -409,6 +410,9 @@ func (al *AgentLoop) processSystemMessage(_ context.Context, msg bus.InboundMess
 // runAgentLoop is the core message processing logic.
 // It handles context building, LLM calls, tool execution, and response handling.
 func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (string, error) {
+	al.mu.Lock()
+	defer al.mu.Unlock()
+
 	// 0. Record last channel for heartbeat notifications (skip internal channels)
 	if opts.Channel != "" && opts.ChatID != "" {
 		// Don't record internal channels (cli, system, subagent)
