@@ -273,6 +273,20 @@ async function batchComplete() {
   await taskStore.batchComplete(ids);
 }
 
+async function batchSetStatus(status: string) {
+  const ids = [...selectedIds];
+  if (status === "done") {
+    completingIds = new Set([...completingIds, ...ids]);
+    selectedIds = new Set();
+    await new Promise((r) => setTimeout(r, 400));
+    completingIds = new Set([...completingIds].filter((x) => !ids.includes(x)));
+    await taskStore.batchComplete(ids);
+  } else {
+    selectedIds = new Set();
+    await taskStore.batchUpdate(ids, { status } as Partial<Task>);
+  }
+}
+
 async function batchDelete() {
   const ids = [...selectedIds];
   selectedIds = new Set();
@@ -1513,6 +1527,7 @@ let kanbanCols = $derived(
                     onBatchDue={batchSetDue}
                     onBatchPriority={batchSetPriority}
                     onBatchComplete={batchComplete}
+                    onBatchStatus={batchSetStatus}
                     onBatchDelete={batchDelete}
                   >
                     <button

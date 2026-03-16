@@ -30,6 +30,7 @@ let {
   onBatchDue,
   onBatchPriority,
   onBatchComplete,
+  onBatchStatus,
   onBatchDelete,
 }: {
   task: Task;
@@ -39,6 +40,7 @@ let {
   onBatchDue?: (due: string | undefined) => void;
   onBatchPriority?: (priority: string) => void;
   onBatchComplete?: () => void;
+  onBatchStatus?: (status: string) => void;
   onBatchDelete?: () => void;
 } = $props();
 
@@ -90,9 +92,23 @@ async function toggleReminder(key: string) {
   await taskStore.update(task.id, { reminders: next } as Partial<Task>);
 }
 
+async function setStatus(status: string) {
+  if (isBatch && onBatchStatus) {
+    onBatchStatus(status);
+  } else {
+    await taskStore.moveStatus(task.id, status);
+  }
+}
+
 async function handleDelete() {
   await taskStore.remove(task.id);
 }
+
+const statusOptions: { value: string; label: string; color: string }[] = [
+  { value: "todo", label: "To do", color: "text-text-secondary" },
+  { value: "doing", label: "In progress", color: "text-accent" },
+  { value: "done", label: "Done", color: "text-success" },
+];
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -341,16 +357,29 @@ const dateOptions: {
 				</div>
 			{/if}
 
-			<!-- Mark complete -->
-			{#if task.status !== "done" || isBatch}
-				<ContextMenu.Item
-					class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-text-secondary outline-none data-[highlighted]:bg-overlay-light data-[highlighted]:text-success"
-					onSelect={() => { if (isBatch && onBatchComplete) onBatchComplete(); else taskStore.complete(task.id); }}
-				>
-					<Icon src={FiCheck} size="15" />
-					Mark complete{isBatch ? ` (${selectedCount})` : ""}
-				</ContextMenu.Item>
-			{/if}
+			<!-- Status -->
+			<div class="px-2 pt-1 pb-0.5">
+				<span class="text-[10px] font-medium uppercase tracking-wider text-text-muted/70">Status</span>
+			</div>
+			<div class="flex items-center gap-0.5 px-1.5 pb-1.5">
+				{#each statusOptions as opt}
+					{@const isActive = task.status === opt.value}
+					<button
+						class="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium transition-colors
+							{isActive ? opt.color + ' bg-overlay-light' : 'text-text-muted hover:bg-overlay-light hover:text-text-secondary'}"
+						onclick={(e) => { e.preventDefault(); setStatus(opt.value); }}
+					>
+						{#if opt.value === "todo"}
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /></svg>
+						{:else if opt.value === "doing"}
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+						{:else}
+							<Icon src={FiCheck} size="14" />
+						{/if}
+						{opt.label}
+					</button>
+				{/each}
+			</div>
 
 			<!-- Add subtask -->
 			{#if !isBatch && onAddSubtask && !task.parentId}
