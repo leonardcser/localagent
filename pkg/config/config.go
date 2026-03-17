@@ -51,9 +51,10 @@ func (p ProviderConfig) ResolveAPIKey() string {
 }
 
 type HeartbeatConfig struct {
-	Enabled     bool              `json:"enabled"`
-	Interval    int               `json:"interval"` // minutes, min 5
-	ActiveHours *ActiveHoursConfig `json:"active_hours,omitempty"`
+	Enabled          bool               `json:"enabled"`
+	Interval         int                `json:"interval"`           // minutes, min 5
+	MaxDailyMessages int                `json:"max_daily_messages"` // 0 = use default (3)
+	ActiveHours      *ActiveHoursConfig `json:"active_hours,omitempty"`
 }
 
 type ActiveHoursConfig struct {

@@ -230,6 +230,7 @@ func gatewayCmd() {
 	heartbeatService := heartbeat.NewHeartbeatService(
 		cfg.WorkspacePath(),
 		cfg.Heartbeat.Interval,
+		cfg.Heartbeat.MaxDailyMessages,
 		cfg.Heartbeat.Enabled,
 	)
 	heartbeatService.SetBus(msgBus)

@@ -1,5 +1,5 @@
-Heartbeat poll. Gather context now — call all three tools before evaluating.
+Heartbeat poll. Gather context now — call all three tools before deciding.
 
-Check your recent heartbeat history above. DO NOT repeat anything you've already said — not the same topic, not the same phrasing, not the same structure. Find a fresh angle or stay quiet.
+Check your recent heartbeat history above. DO NOT repeat anything you've already said — not the same topic, not the same phrasing, not the same structure.
 
-If nothing needs attention and you have nothing genuinely interesting to say, reply HEARTBEAT_OK.
+Remember: every message is a phone notification. Only send if the user would genuinely thank you for the interruption. When in doubt, reply HEARTBEAT_OK.

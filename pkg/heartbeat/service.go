@@ -20,6 +20,7 @@ import (
 const (
 	minIntervalMinutes     = 5
 	defaultIntervalMinutes = 30
+	defaultMaxDaily        = 3
 	dedupWindow            = 24 * time.Hour
 )
 
@@ -52,13 +53,18 @@ type HeartbeatService struct {
 	// Active hours gating
 	activeHours *ActiveHours
 
+	// Daily message budget
+	maxDailyMessages int
+	dailySentCount   int
+	dailyResetDate   string // "2006-01-02" — resets when date changes
+
 	// Deduplication: suppress identical alerts within dedupWindow
 	lastAlertText   string
 	lastAlertSentAt time.Time
 }
 
 // NewHeartbeatService creates a new heartbeat service
-func NewHeartbeatService(workspace string, intervalMinutes int, enabled bool) *HeartbeatService {
+func NewHeartbeatService(workspace string, intervalMinutes, maxDailyMessages int, enabled bool) *HeartbeatService {
 	// Apply minimum interval
 	if intervalMinutes < minIntervalMinutes && intervalMinutes != 0 {
 		intervalMinutes = minIntervalMinutes
@@ -68,11 +74,16 @@ func NewHeartbeatService(workspace string, intervalMinutes int, enabled bool) *H
 		intervalMinutes = defaultIntervalMinutes
 	}
 
+	if maxDailyMessages <= 0 {
+		maxDailyMessages = defaultMaxDaily
+	}
+
 	return &HeartbeatService{
-		workspace: workspace,
-		interval:  time.Duration(intervalMinutes) * time.Minute,
-		enabled:   enabled,
-		state:     state.NewManager(workspace),
+		workspace:        workspace,
+		interval:         time.Duration(intervalMinutes) * time.Minute,
+		maxDailyMessages: maxDailyMessages,
+		enabled:          enabled,
+		state:            state.NewManager(workspace),
 	}
 }
 
@@ -205,6 +216,14 @@ func (hs *HeartbeatService) executeHeartbeat() {
 		return
 	}
 
+	// Daily budget hard cap: skip periodic heartbeats when budget is exhausted.
+	// Cron events always go through.
+	if !hp.isCronEvent && hs.budgetExhausted() {
+		sent, max := hs.dailySent()
+		hs.logInfo("Skipped: daily budget exhausted (%d/%d)", sent, max)
+		return
+	}
+
 	if handler == nil {
 		hs.logError("Heartbeat handler not configured")
 		return
@@ -277,8 +296,10 @@ func (hs *HeartbeatService) executeHeartbeat() {
 	}
 
 	hs.recordAlert(response)
+	hs.recordDailySend()
 	hs.sendResponse(response)
-	hs.logInfo("Heartbeat completed: %s", result.ForLLM)
+	sent, max := hs.dailySent()
+	hs.logInfo("Heartbeat completed (%d/%d daily): %s", sent, max, result.ForLLM)
 }
 
 const heartbeatToken = "HEARTBEAT_OK"
@@ -350,8 +371,11 @@ func (hs *HeartbeatService) buildPrompt() heartbeatPrompt {
 
 	now := time.Now()
 	tz, _ := now.Zone()
+	sent, max := hs.dailySent()
+	remaining := max - sent
+	budgetLine := fmt.Sprintf("Messages sent today: %d/%d. You have %d remaining — make them count.", sent, max, remaining)
 	return heartbeatPrompt{
-		text: fmt.Sprintf("%s\n\nCurrent time: %s (%s)", prompts.Heartbeat, now.Format("2006-01-02 15:04:05"), tz),
+		text: fmt.Sprintf("%s\n\n%s\n\nCurrent time: %s (%s)", prompts.Heartbeat, budgetLine, now.Format("2006-01-02 15:04:05"), tz),
 	}
 }
 
@@ -428,6 +452,35 @@ func parseTimeMinutes(t string) int {
 		return -1
 	}
 	return h*60 + m
+}
+
+// --- Daily budget ---
+
+// dailySent returns the number of messages sent today and the max allowed.
+// Resets the counter if the date has changed.
+func (hs *HeartbeatService) dailySent() (sent, max int) {
+	today := time.Now().Format("2006-01-02")
+	if hs.dailyResetDate != today {
+		hs.dailySentCount = 0
+		hs.dailyResetDate = today
+	}
+	return hs.dailySentCount, hs.maxDailyMessages
+}
+
+// budgetExhausted returns true if the daily message budget has been used up.
+func (hs *HeartbeatService) budgetExhausted() bool {
+	sent, max := hs.dailySent()
+	return sent >= max
+}
+
+// recordDailySend increments the daily message counter.
+func (hs *HeartbeatService) recordDailySend() {
+	today := time.Now().Format("2006-01-02")
+	if hs.dailyResetDate != today {
+		hs.dailySentCount = 0
+		hs.dailyResetDate = today
+	}
+	hs.dailySentCount++
 }
 
 // --- Deduplication ---
