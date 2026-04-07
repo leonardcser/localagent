@@ -22,7 +22,7 @@ type HTTPProvider struct {
 
 func NewHTTPProvider(apiKey, apiBase, proxy string) *HTTPProvider {
 	client := &http.Client{
-		Timeout: 120 * time.Second,
+		Timeout: 5 * time.Minute,
 	}
 
 	if proxy != "" {
