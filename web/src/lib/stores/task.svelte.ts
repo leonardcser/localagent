@@ -167,6 +167,14 @@ function createTaskStore() {
     // Then by priority
     const pDiff = getPriorityValue(a.priority) - getPriorityValue(b.priority);
     if (pDiff !== 0) return pDiff;
+    // Then by due date, earliest first
+    if (a.due && b.due) {
+      const dDiff = a.due.localeCompare(b.due);
+      if (dDiff !== 0) return dDiff;
+    }
+    // Then alphabetical by title
+    const tDiff = (a.title ?? "").localeCompare(b.title ?? "");
+    if (tDiff !== 0) return tDiff;
     return (a.order ?? 0) - (b.order ?? 0);
   }
 
