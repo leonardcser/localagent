@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"syscall"
 	"time"
 
 	"localagent/pkg/logger"
@@ -21,17 +23,19 @@ type HTTPProvider struct {
 }
 
 func NewHTTPProvider(apiKey, apiBase, proxy string) *HTTPProvider {
-	client := &http.Client{
-		Timeout: 5 * time.Minute,
+	transport := &http.Transport{
+		IdleConnTimeout: 30 * time.Second,
 	}
 
 	if proxy != "" {
-		proxyURL, err := url.Parse(proxy)
-		if err == nil {
-			client.Transport = &http.Transport{
-				Proxy: http.ProxyURL(proxyURL),
-			}
+		if proxyURL, err := url.Parse(proxy); err == nil {
+			transport.Proxy = http.ProxyURL(proxyURL)
 		}
+	}
+
+	client := &http.Client{
+		Timeout:   5 * time.Minute,
+		Transport: transport,
 	}
 
 	return &HTTPProvider{
@@ -39,6 +43,19 @@ func NewHTTPProvider(apiKey, apiBase, proxy string) *HTTPProvider {
 		apiBase:    strings.TrimRight(apiBase, "/"),
 		httpClient: client,
 	}
+}
+
+func isRetryableTransportError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, syscall.ECONNRESET) {
+		return true
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "connection reset") ||
+		strings.Contains(msg, "broken pipe") ||
+		strings.Contains(msg, "EOF")
 }
 
 func (p *HTTPProvider) Chat(ctx context.Context, messages []Message, tools []ToolDefinition, model string, options map[string]any) (*LLMResponse, error) {
@@ -69,17 +86,28 @@ func (p *HTTPProvider) Chat(ctx context.Context, messages []Message, tools []Too
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", p.apiBase+"/chat/completions", bytes.NewReader(jsonData))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+	doRequest := func() (*http.Response, error) {
+		req, err := http.NewRequestWithContext(ctx, "POST", p.apiBase+"/chat/completions", bytes.NewReader(jsonData))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		if p.apiKey != "" {
+			req.Header.Set("Authorization", "Bearer "+p.apiKey)
+		}
+		return p.httpClient.Do(req)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	if p.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+p.apiKey)
+	resp, err := doRequest()
+	if err != nil && isRetryableTransportError(err) {
+		logger.Warn("LLM request failed with transport error, retrying once: %v", err)
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("failed to send request: %w", ctx.Err())
+		case <-time.After(500 * time.Millisecond):
+		}
+		resp, err = doRequest()
 	}
-
-	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
