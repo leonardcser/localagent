@@ -54,9 +54,6 @@
       window.addEventListener("vite:preloadError", function() {
         window.location.reload();
       });
-      window.addEventListener("pageshow", function(e) {
-        if (e.persisted) window.location.reload();
-      });
     </script>
     <div style="display: contents">%sveltekit.body%</div>
   </body>
