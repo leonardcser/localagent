@@ -1,6 +1,6 @@
 <script lang="ts">
 import type { EventWithOverlap } from "$lib/calendar";
-import { addDays, isSameDay } from "$lib/calendar";
+import { addDays, isSameDay, formatHHMM } from "$lib/calendar";
 import { taskStore } from "$lib/stores/task.svelte";
 import { ContextMenu } from "bits-ui";
 import { Icon } from "svelte-icons-pack";
@@ -96,10 +96,6 @@ let displayHeight = $derived(
   Math.max(baseHeight + resizeDeltaY, rowHeight / 4),
 );
 
-function formatTime(d: Date): string {
-  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-}
-
 let end = $derived(new Date(event.endMs));
 let linkedTask = $derived(taskStore.tasks.find((t) => t.id === event.taskId));
 
@@ -175,14 +171,14 @@ function handleEventMouseUp() {
           style="background-color: color-mix(in srgb, {event.color} 15%, transparent); border-color: {event.color}; color: {event.color}"
         >
           {#if durationMin >= 30}
-            <div class="truncate leading-tight opacity-70">{formatTime(start)}</div>
+            <div class="truncate leading-tight opacity-70">{formatHHMM(start)}</div>
             <div class="truncate font-semibold leading-tight">{event.title}</div>
             {#if event.note && durationMin >= 45}
               <div class="truncate leading-tight opacity-70">{event.note}</div>
             {/if}
           {:else}
             <div class="truncate font-semibold leading-tight">
-              <span class="opacity-70">{formatTime(start)}</span> {event.title}
+              <span class="opacity-70">{formatHHMM(start)}</span> {event.title}
             </div>
           {/if}
 
@@ -211,7 +207,7 @@ function handleEventMouseUp() {
 
           <div class="mt-1.5 flex items-center gap-1.5 text-[11px] text-text-secondary">
             <Icon src={FiClock} size="11" className="shrink-0 text-text-muted" />
-            <span>{formatTime(start)} – {formatTime(end)}</span>
+            <span>{formatHHMM(start)} – {formatHHMM(end)}</span>
             <span class="text-text-muted">({durationMin}min)</span>
           </div>
 

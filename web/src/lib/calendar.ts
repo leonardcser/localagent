@@ -60,8 +60,7 @@ export function computeCalendarEventsOverlaps(
   const eventsByDay: Map<string, CalendarEvent[]> = new Map();
 
   for (const event of events) {
-    const d = new Date(event.startMs);
-    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const key = dayKey(new Date(event.startMs));
     const list = eventsByDay.get(key) ?? [];
     list.push(event);
     eventsByDay.set(key, list);
@@ -192,4 +191,79 @@ export function weekdayShort(index: number): string {
 /** Convert JS getDay() (0=Sun) to our index (0=Mon) */
 export function dayToIndex(jsDay: number): number {
   return jsDay === 0 ? 6 : jsDay - 1;
+}
+
+export const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+export const MONTHS_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+export function getISOWeek(d: Date): number {
+  const tmp = new Date(d.getTime());
+  tmp.setHours(0, 0, 0, 0);
+  tmp.setDate(tmp.getDate() + 3 - ((tmp.getDay() + 6) % 7));
+  const week1 = new Date(tmp.getFullYear(), 0, 4);
+  return (
+    1 +
+    Math.round(
+      ((tmp.getTime() - week1.getTime()) / 86400000 -
+        3 +
+        ((week1.getDay() + 6) % 7)) /
+        7,
+    )
+  );
+}
+
+export function dayKey(d: Date): string {
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+export function formatHHMM(d: Date | number): string {
+  const date = typeof d === "number" ? new Date(d) : d;
+  return `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+}
+
+export function formatMinutesHHMM(totalMinutes: number): string {
+  const h = Math.floor(totalMinutes / 60)
+    .toString()
+    .padStart(2, "0");
+  const m = (totalMinutes % 60).toString().padStart(2, "0");
+  return `${h}:${m}`;
+}
+
+/** Width of the browser's vertical scrollbar gutter, in CSS pixels. */
+export function measureScrollbarWidth(): number {
+  if (typeof document === "undefined") return 0;
+  const probe = document.createElement("div");
+  probe.style.cssText =
+    "position:absolute;top:-9999px;width:100px;height:100px;overflow:scroll;";
+  document.body.appendChild(probe);
+  const width = probe.offsetWidth - probe.clientWidth;
+  probe.remove();
+  return width;
 }

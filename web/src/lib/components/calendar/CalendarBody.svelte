@@ -4,6 +4,8 @@ import {
   calculateNewEventTime,
   addDays,
   isSameDay,
+  formatHHMM,
+  formatMinutesHHMM,
   type CalendarEvent as CalendarEventType,
 } from "$lib/calendar";
 import { blockStore } from "$lib/stores/block.svelte";
@@ -21,6 +23,7 @@ interface Props {
   rowHeight: number;
   viewStart: Date;
   numCols: number;
+  scrollbarGutter?: number;
   onViewTask?: (taskId: string) => void;
 }
 
@@ -30,6 +33,7 @@ let {
   rowHeight,
   viewStart,
   numCols,
+  scrollbarGutter = 0,
   onViewTask,
 }: Props = $props();
 
@@ -232,11 +236,6 @@ function handleGridMouseup() {
   };
 }
 
-function msToTimeStr(ms: number): string {
-  const d = new Date(ms);
-  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-}
-
 async function submitCreate() {
   if (!createState || !createState.taskId) return;
   await blockStore.add({
@@ -286,10 +285,10 @@ let todayDate = $state(new Date());
   {#if dayEvents.length > 0}
     <div
       class="grid shrink-0 auto-rows-min border-b border-border"
-      style="padding-left: {indexColWidth}px; grid-template-columns: repeat({numCols}, 1fr)"
+      style="padding-left: {indexColWidth}px; padding-right: {scrollbarGutter}px; grid-template-columns: repeat({numCols}, minmax(0, 1fr))"
     >
       {#each dayEventsByCol as col, colI}
-        <div class="min-h-[28px] border-r border-border/50 px-0.5 py-0.5">
+        <div class="min-h-[28px] min-w-0 border-r border-border/50 px-0.5 py-0.5">
           {#each col as evt}
             <CalendarDayEvent
               event={evt}
@@ -305,7 +304,8 @@ let todayDate = $state(new Date());
 
   <!-- Scrollable time grid -->
   <div
-    class="flex min-h-0 flex-1 items-start overflow-auto"
+    class="flex min-h-0 flex-1 items-start overflow-y-scroll overflow-x-hidden"
+    style="scrollbar-gutter: stable"
     bind:this={scrollableRef}
     onscroll={handleScroll}
   >
@@ -325,7 +325,7 @@ let todayDate = $state(new Date());
     <div
       class="relative grid flex-1 cursor-crosshair select-none"
       role="presentation"
-      style="grid-template-columns: repeat({numCols}, 1fr)"
+      style="grid-template-columns: repeat({numCols}, minmax(0, 1fr))"
       bind:this={calendarBodyRef}
       onmousedown={handleGridMousedown}
       onkeydown={() => {}}
@@ -363,9 +363,7 @@ let todayDate = $state(new Date());
           "
         >
           <span class="block px-1.5 pt-0.5 text-[10px] font-medium text-accent">
-            {Math.floor(previewStartMin / 60).toString().padStart(2, "0")}:{(previewStartMin % 60).toString().padStart(2, "0")}
-            –
-            {Math.floor(previewEndMin / 60).toString().padStart(2, "0")}:{(previewEndMin % 60).toString().padStart(2, "0")}
+            {formatMinutesHHMM(previewStartMin)} – {formatMinutesHHMM(previewEndMin)}
           </span>
         </div>
       {/if}
@@ -415,7 +413,7 @@ let todayDate = $state(new Date());
       <span class="mx-1 text-text-muted">·</span>
       <input
         type="time"
-        value={msToTimeStr(createState.startMs)}
+        value={formatHHMM(createState.startMs)}
         onchange={(e) => {
           if (!createState) return;
           const [h, m] = (e.target as HTMLInputElement).value.split(":").map(Number);
@@ -430,7 +428,7 @@ let todayDate = $state(new Date());
       <span class="mx-1 text-text-muted">–</span>
       <input
         type="time"
-        value={msToTimeStr(createState.endMs)}
+        value={formatHHMM(createState.endMs)}
         onchange={(e) => {
           if (!createState) return;
           const [h, m] = (e.target as HTMLInputElement).value.split(":").map(Number);

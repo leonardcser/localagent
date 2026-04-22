@@ -1,7 +1,14 @@
 <script lang="ts">
 import { Icon } from "svelte-icons-pack";
 import { FiChevronLeft, FiChevronRight } from "svelte-icons-pack/fi";
-import { addDays, isSameDay, weekdayShort, getWeekStart } from "$lib/calendar";
+import {
+  addDays,
+  isSameDay,
+  weekdayShort,
+  getISOWeek,
+  MONTHS,
+  MONTHS_SHORT,
+} from "$lib/calendar";
 import type { CalendarView } from "$lib/calendar";
 import { cn } from "$lib/utils";
 
@@ -11,6 +18,7 @@ interface Props {
   view: CalendarView;
   numCols: number;
   viewStart: Date;
+  scrollbarGutter?: number;
   navigate: (dir: -1 | 1) => void;
   goToToday: () => void;
   setView: (v: CalendarView) => void;
@@ -22,6 +30,7 @@ let {
   view,
   numCols,
   viewStart,
+  scrollbarGutter = 0,
   navigate,
   goToToday,
   setView,
@@ -34,52 +43,6 @@ let isCurrentPeriod = $derived.by(() => {
   const end = addDays(viewStart, numCols);
   return t >= viewStart && t < end;
 });
-
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-const MONTHS_SHORT = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-
-function getISOWeek(d: Date): number {
-  const tmp = new Date(d.getTime());
-  tmp.setHours(0, 0, 0, 0);
-  tmp.setDate(tmp.getDate() + 3 - ((tmp.getDay() + 6) % 7));
-  const week1 = new Date(tmp.getFullYear(), 0, 4);
-  return (
-    1 +
-    Math.round(
-      ((tmp.getTime() - week1.getTime()) / 86400000 -
-        3 +
-        ((week1.getDay() + 6) % 7)) /
-        7,
-    )
-  );
-}
 
 function headerTitle(): string {
   if (view === "day") {
@@ -161,7 +124,7 @@ const views: { key: CalendarView; label: string }[] = [
 
 <!-- Day headers -->
 {#if view !== "month"}
-<div class="flex border-b border-border bg-bg-secondary py-1">
+<div class="flex border-b border-border bg-bg-secondary py-1" style="padding-right: {scrollbarGutter}px">
   <div
     class="flex items-center justify-center text-[11px] font-medium text-accent shrink-0"
     style="width: {indexColWidth}px"
@@ -174,7 +137,7 @@ const views: { key: CalendarView; label: string }[] = [
   </div>
   <div
     class="grid flex-1"
-    style="grid-template-columns: repeat({numCols}, 1fr)"
+    style="grid-template-columns: repeat({numCols}, minmax(0, 1fr))"
   >
     {#each Array.from({ length: numCols }) as _, i}
       {@const day = addDays(viewStart, i)}

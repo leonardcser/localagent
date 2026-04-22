@@ -1,5 +1,5 @@
 <script lang="ts">
-import { addDays, isSameDay, weekdayShort } from "$lib/calendar";
+import { addDays, isSameDay, weekdayShort, dayKey } from "$lib/calendar";
 import type { CalendarEvent } from "$lib/calendar";
 
 interface Props {
@@ -31,8 +31,7 @@ let totalDays = $derived(numWeeks * 7);
 let eventsByDay = $derived.by(() => {
   const map = new Map<string, CalendarEvent[]>();
   for (const evt of events) {
-    const d = new Date(evt.startMs);
-    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const key = dayKey(new Date(evt.startMs));
     const list = map.get(key) ?? [];
     list.push(evt);
     map.set(key, list);
@@ -40,16 +39,12 @@ let eventsByDay = $derived.by(() => {
   return map;
 });
 
-function dayKey(d: Date): string {
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-}
-
 const MAX_CHIPS = 3;
 </script>
 
 <div class="flex flex-1 flex-col overflow-hidden">
 	<!-- Weekday header row -->
-	<div class="grid shrink-0 border-b border-border bg-bg-secondary" style="grid-template-columns: repeat(7, 1fr)">
+	<div class="grid shrink-0 border-b border-border bg-bg-secondary" style="grid-template-columns: repeat(7, minmax(0, 1fr))">
 		{#each Array.from({ length: 7 }) as _, i}
 			<div class="py-1.5 text-center text-[11px] font-medium text-text-muted">
 				{weekdayShort(i)}
@@ -58,7 +53,7 @@ const MAX_CHIPS = 3;
 	</div>
 
 	<!-- Day grid -->
-	<div class="grid flex-1 overflow-y-auto" style="grid-template-columns: repeat(7, 1fr); grid-template-rows: repeat({numWeeks}, 1fr)">
+	<div class="grid flex-1 overflow-y-auto" style="grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: repeat({numWeeks}, 1fr)">
 		{#each Array.from({ length: totalDays }) as _, dayIdx}
 			{@const day = addDays(viewStart, dayIdx)}
 			{@const isCurrentMonth = day.getMonth() === currentMonth}

@@ -8,6 +8,7 @@ import {
   addDays,
   blockToEvent,
   taskToEvent,
+  measureScrollbarWidth,
   type CalendarEvent,
   type CalendarView,
 } from "$lib/calendar";
@@ -28,6 +29,7 @@ const VALID_VIEWS: CalendarView[] = ["day", "3day", "week", "month"];
 
 let view = $state<CalendarView>("week");
 let currentDate = $state(new Date());
+let scrollbarGutter = $state(0);
 
 // Task detail panel
 let detailTask = $state<Task | null>(null);
@@ -87,6 +89,8 @@ function goToToday() {
 }
 
 onMount(() => {
+  scrollbarGutter = measureScrollbarWidth();
+
   const savedView = localStorage.getItem("calendarView");
   if (savedView && VALID_VIEWS.includes(savedView as CalendarView)) {
     view = savedView as CalendarView;
@@ -139,6 +143,7 @@ let events = $derived.by(() => {
     {view}
     {numCols}
     {viewStart}
+    {scrollbarGutter}
     {navigate}
     {goToToday}
     setView={(v) => (view = v)}
@@ -158,6 +163,7 @@ let events = $derived.by(() => {
         {rowHeight}
         {viewStart}
         {numCols}
+        {scrollbarGutter}
         onViewTask={openTaskDetail}
       />
     {/if}
