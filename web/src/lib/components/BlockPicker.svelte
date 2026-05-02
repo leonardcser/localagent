@@ -2,7 +2,7 @@
 import { Popover, Calendar } from "bits-ui";
 import { parseDate, type DateValue } from "@internationalized/date";
 import { Icon } from "svelte-icons-pack";
-import { getBrowserLocale } from "$lib/utils";
+import { getBrowserLocale, getLocaleWeekStartsOn } from "$lib/utils";
 import {
   FiCalendar,
   FiChevronLeft,
@@ -18,6 +18,8 @@ let {
 } = $props();
 
 let open = $state(false);
+const locale = getBrowserLocale();
+const weekStartsOn = getLocaleWeekStartsOn(locale);
 
 // Use today as default date
 function todayStr() {
@@ -107,7 +109,8 @@ function formatDisplayDate(d: string): string {
         value={calendarValue}
         onValueChange={handleDateSelect}
         weekdayFormat="short"
-        locale={getBrowserLocale()}
+        locale={locale}
+        {weekStartsOn}
         fixedWeeks
         class="w-full"
       >

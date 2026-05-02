@@ -4,7 +4,7 @@ import { Calendar } from "bits-ui";
 import { type DateValue, parseDate } from "@internationalized/date";
 import type { Task } from "$lib/api";
 import { taskStore } from "$lib/stores/task.svelte";
-import { getBrowserLocale } from "$lib/utils";
+import { getBrowserLocale, getLocaleWeekStartsOn } from "$lib/utils";
 import { Icon } from "svelte-icons-pack";
 import {
   FiCheck,
@@ -45,6 +45,8 @@ let {
 } = $props();
 
 let isBatch = $derived(selectedCount > 1);
+const locale = getBrowserLocale();
+const weekStartsOn = getLocaleWeekStartsOn(locale);
 
 let calendarOpen = $state(false);
 
@@ -253,7 +255,8 @@ const dateOptions: {
 								value={calendarValue}
 								onValueChange={handleCalendarSelect}
 								weekdayFormat="short"
-								locale={getBrowserLocale()}
+								locale={locale}
+								{weekStartsOn}
 								fixedWeeks
 								class="w-full"
 							>

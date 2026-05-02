@@ -1,6 +1,8 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+type WeekStartsOn = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -36,7 +38,23 @@ export function nowTimestamp(): string {
 export function formatTimestamp(ts: string): string {
   const d = new Date(ts);
   if (isNaN(d.getTime())) return ts;
-  return formatTime24(d);
+
+  const now = new Date();
+  const isToday =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+
+  if (isToday) {
+    return formatTime24(d);
+  }
+
+  return (
+    d.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    }) + `, ${formatTime24(d)}`
+  );
 }
 
 export function formatTime24(d: Date): string {
@@ -45,4 +63,31 @@ export function formatTime24(d: Date): string {
 
 export function getBrowserLocale(): string {
   return navigator.language || "en-US";
+}
+
+export function getLocaleWeekStartsOn(locale: string): WeekStartsOn {
+  try {
+    const localeInfo = new Intl.Locale(locale) as Intl.Locale & {
+      getWeekInfo?: () => { firstDay: number };
+      weekInfo?: { firstDay: number };
+    };
+
+    const weekInfo = localeInfo.getWeekInfo?.() ?? localeInfo.weekInfo;
+    if (weekInfo?.firstDay !== undefined) {
+      return (weekInfo.firstDay % 7) as WeekStartsOn;
+    }
+  } catch {
+    // Fall through to heuristic fallback below.
+  }
+
+  try {
+    const region = new Intl.Locale(locale).maximize().region;
+    if (region === "US") {
+      return 0;
+    }
+  } catch {
+    // Ignore and use default fallback.
+  }
+
+  return 1;
 }

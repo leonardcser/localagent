@@ -2,7 +2,7 @@
 import { Popover, Calendar } from "bits-ui";
 import { parseDate, type DateValue } from "@internationalized/date";
 import { Icon } from "svelte-icons-pack";
-import { getBrowserLocale } from "$lib/utils";
+import { getBrowserLocale, getLocaleWeekStartsOn } from "$lib/utils";
 import {
   FiCalendar,
   FiChevronLeft,
@@ -21,6 +21,8 @@ let {
 
 let open = $state(false);
 let timeValue = $state("");
+const locale = getBrowserLocale();
+const weekStartsOn = getLocaleWeekStartsOn(locale);
 
 // Parse "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM" into date part and time part
 function parseDueDate(v: string): { date: string; time: string } {
@@ -137,7 +139,8 @@ function formatDisplay(v: string): string {
         value={calendarValue}
         onValueChange={handleDateSelect}
         weekdayFormat="short"
-        locale={getBrowserLocale()}
+        locale={locale}
+        {weekStartsOn}
         fixedWeeks
         class="w-full"
       >
