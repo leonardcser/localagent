@@ -437,10 +437,8 @@ func setupCronTool(agentLoop *agent.AgentLoop, msgBus *bus.MessageBus, workspace
 	agentLoop.RegisterTool(cronTool)
 
 	cronService.SetOnJob(func(job *cron.CronJob) (string, error) {
-		result := cronTool.ExecuteJob(context.Background(), job)
-		return result, nil
+		return cronTool.ExecuteJob(context.Background(), job)
 	})
 
 	return cronService
 }
-

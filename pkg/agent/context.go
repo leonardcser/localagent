@@ -111,7 +111,7 @@ func (cb *ContextBuilder) buildToolsSection() string {
 	return sb.String()
 }
 
-func (cb *ContextBuilder) BuildSystemPrompt() string {
+func (cb *ContextBuilder) BuildSystemPrompt(includeHeartbeat bool) string {
 	parts := []string{}
 
 	// Core identity section
@@ -123,8 +123,12 @@ func (cb *ContextBuilder) BuildSystemPrompt() string {
 		parts = append(parts, bootstrapContent)
 	}
 
-	// Heartbeat behavior
-	parts = append(parts, prompts.HeartbeatSystem)
+	// Heartbeat behavior is only relevant for heartbeat polls. Applying it to
+	// normal user turns or cron jobs creates conflicting instructions that bias
+	// the model toward silence.
+	if includeHeartbeat {
+		parts = append(parts, prompts.HeartbeatSystem)
+	}
 
 	// Skills - show summary, AI can read full content with read_file tool
 	skillsSummary := cb.skillsLoader.BuildSkillsSummary()
@@ -161,10 +165,10 @@ func (cb *ContextBuilder) LoadBootstrapFiles() string {
 	return result.String()
 }
 
-func (cb *ContextBuilder) BuildMessages(history []providers.Message, summary string, currentMessage string, media []string, channel, chatID string) []providers.Message {
+func (cb *ContextBuilder) BuildMessages(history []providers.Message, summary string, currentMessage string, media []string, channel, chatID string, includeHeartbeat bool) []providers.Message {
 	messages := []providers.Message{}
 
-	systemPrompt := cb.BuildSystemPrompt()
+	systemPrompt := cb.BuildSystemPrompt(includeHeartbeat)
 
 	// Add Current Session info if provided
 	if channel != "" && chatID != "" {

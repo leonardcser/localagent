@@ -153,7 +153,6 @@ func NewAgentLoop(cfg *config.Config, msgBus *bus.MessageBus, provider providers
 	// Subagent doesn't need spawn/subagent tools to avoid recursion
 	subagentManager.SetTools(subagentTools)
 
-
 	// Create state manager for atomic state persistence
 	stateManager := state.NewManager(workspace)
 
@@ -452,6 +451,7 @@ func (al *AgentLoop) runAgentLoop(ctx context.Context, opts processOptions) (str
 		opts.Media,
 		opts.Channel,
 		opts.ChatID,
+		opts.NoHistory,
 	)
 
 	// 3. Save user message to session (skip if already persisted by channel)

@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ import (
 )
 
 const defaultJobTimeout = 10 * time.Minute
+const emptyAgentResponse = "I've completed processing but have no response to give."
 
 type JobExecutor interface {
 	ProcessDirectWithChannel(ctx context.Context, content, sessionKey, channel, chatID string) (string, error)
@@ -366,7 +368,7 @@ func (t *CronTool) wakeAction(args map[string]any) *ToolResult {
 	return SilentResult(fmt.Sprintf("Wake event enqueued (mode: %s)", mode))
 }
 
-func (t *CronTool) ExecuteJob(ctx context.Context, job *cron.CronJob) string {
+func (t *CronTool) ExecuteJob(ctx context.Context, job *cron.CronJob) (string, error) {
 	timeout := defaultJobTimeout
 	if job.Payload.TimeoutSeconds > 0 {
 		timeout = time.Duration(job.Payload.TimeoutSeconds) * time.Second
@@ -396,24 +398,32 @@ func (t *CronTool) ExecuteJob(ctx context.Context, job *cron.CronJob) string {
 			wake := job.WakeMode == "now"
 			enqueuer(fmt.Sprintf("cron:%s", job.ID), job.Payload.Text, channel, chatID, wake)
 		}
-		return "ok"
+		return "ok", nil
 	}
 
 	if job.Payload.Kind == "agentTurn" {
 		sessionKey := fmt.Sprintf("cron-%s", job.ID)
 		response, err := t.executor.ProcessDirectWithChannel(ctx, job.Payload.Message, sessionKey, channel, chatID)
 		if err != nil {
-			return fmt.Sprintf("Error: %v", err)
+			return "", err
+		}
+
+		// Cron jobs either need to produce a direct response or explicitly
+		// deliver via the message tool. Treat the generic empty-response
+		// fallback as a failure so the scheduler records an error instead of
+		// announcing a fabricated success message.
+		if !t.executor.WasMessageToolCalled() && strings.TrimSpace(response) == emptyAgentResponse {
+			return "", errors.New("agent completed without a user-facing response")
 		}
 
 		if job.Delivery != nil && job.Delivery.Mode == "announce" && response != "" && !t.executor.WasMessageToolCalled() {
 			t.announceResult(channel, chatID, job, response)
 		}
 
-		return "ok"
+		return "ok", nil
 	}
 
-	return fmt.Sprintf("unknown payload kind: %s", job.Payload.Kind)
+	return "", fmt.Errorf("unknown payload kind: %s", job.Payload.Kind)
 }
 
 func (t *CronTool) announceResult(channel, chatID string, job *cron.CronJob, response string) {
