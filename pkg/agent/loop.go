@@ -93,6 +93,7 @@ func createToolRegistry(workspace string, cfg *config.Config, msgBus *bus.Messag
 	registry.Register(tools.NewQueryTasksTool(todoService))
 	registry.Register(tools.NewAddTaskTool(todoService))
 	registry.Register(tools.NewModifyTasksTool(todoService))
+	registry.Register(tools.NewListTaskTagsTool(todoService))
 
 	// Block tools
 	registry.Register(tools.NewAddBlockTool(todoService))

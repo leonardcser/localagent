@@ -142,6 +142,42 @@ func (s *TodoService) GetTask(id string) *Task {
 	return s.getTask(id)
 }
 
+// TagCount represents a tag and the number of tasks using it.
+type TagCount struct {
+	Tag   string `json:"tag"`
+	Count int    `json:"count"`
+}
+
+// ListTaskTags returns distinct tags across all tasks with their usage counts,
+// sorted by descending count then alphabetically.
+func (s *TodoService) ListTaskTags() []TagCount {
+	rows, err := s.q.ListTasks(context.Background())
+	if err != nil {
+		return nil
+	}
+	counts := make(map[string]int)
+	for _, r := range rows {
+		var tags []string
+		if err := json.Unmarshal([]byte(r.Tags), &tags); err != nil {
+			continue
+		}
+		for _, t := range tags {
+			counts[t]++
+		}
+	}
+	out := make([]TagCount, 0, len(counts))
+	for tag, n := range counts {
+		out = append(out, TagCount{Tag: tag, Count: n})
+	}
+	slices.SortFunc(out, func(a, b TagCount) int {
+		if a.Count != b.Count {
+			return b.Count - a.Count
+		}
+		return strings.Compare(a.Tag, b.Tag)
+	})
+	return out
+}
+
 // ListTasks returns tasks, optionally filtered by status and tag.
 func (s *TodoService) ListTasks(status string, tag string) []Task {
 	return s.QueryTasks(TaskQuery{Status: status, Tag: tag})

@@ -135,6 +135,35 @@ func (t *QueryTasksTool) Execute(_ context.Context, args map[string]any) *ToolRe
 	return SilentResult(string(data))
 }
 
+// --- list_task_tags ---
+
+type ListTaskTagsTool struct{ baseTodoTool }
+
+func NewListTaskTagsTool(service *todo.TodoService) *ListTaskTagsTool {
+	return &ListTaskTagsTool{baseTodoTool{service}}
+}
+
+func (t *ListTaskTagsTool) Name() string { return "list_task_tags" }
+func (t *ListTaskTagsTool) Description() string {
+	return "List distinct tags used across tasks with usage counts, sorted by count descending."
+}
+
+func (t *ListTaskTagsTool) Parameters() map[string]any {
+	return map[string]any{
+		"type":       "object",
+		"properties": map[string]any{},
+	}
+}
+
+func (t *ListTaskTagsTool) Execute(_ context.Context, _ map[string]any) *ToolResult {
+	tags := t.service.ListTaskTags()
+	if tags == nil {
+		tags = []todo.TagCount{}
+	}
+	data, _ := json.MarshalIndent(map[string]any{"tags": tags}, "", "  ")
+	return SilentResult(string(data))
+}
+
 // --- add_task ---
 
 type AddTaskTool struct{ baseTodoTool }
@@ -176,6 +205,11 @@ func (t *AddTaskTool) Parameters() map[string]any {
 				"items":       map[string]any{"type": "string"},
 				"description": "Tags for categorization.",
 			},
+			"reminders": map[string]any{
+				"type":        "array",
+				"items":       map[string]any{"type": "string"},
+				"description": "Reminder timestamps (ISO 8601) for this task.",
+			},
 			"parentId": map[string]any{
 				"type":        "string",
 				"description": "Parent task ID to create this as a subtask.",
@@ -206,6 +240,9 @@ func (t *AddTaskTool) Execute(_ context.Context, args map[string]any) *ToolResul
 	}
 	if v, ok := args["tags"]; ok {
 		task.Tags = toStringSliceFromAny(v)
+	}
+	if v, ok := args["reminders"]; ok {
+		task.Reminders = toStringSliceFromAny(v)
 	}
 	if v, ok := args["parentId"].(string); ok {
 		task.ParentID = v
@@ -278,6 +315,11 @@ func (t *ModifyTasksTool) Parameters() map[string]any {
 				"items":       map[string]any{"type": "string"},
 				"description": "New tags (action=update).",
 			},
+			"reminders": map[string]any{
+				"type":        "array",
+				"items":       map[string]any{"type": "string"},
+				"description": "New reminder timestamps (action=update).",
+			},
 			"parentId": map[string]any{
 				"type":        "string",
 				"description": "New parent task ID, empty string to remove parent (action=update).",
@@ -323,7 +365,7 @@ func (t *ModifyTasksTool) Execute(_ context.Context, args map[string]any) *ToolR
 	case "update":
 		patch := buildPatch(args)
 		if len(patch) == 0 {
-			return ErrorResult("no fields to update — provide at least one of: title, description, priority, due, recurrence, status, tags, parentId")
+			return ErrorResult("no fields to update — provide at least one of: title, description, priority, due, recurrence, status, tags, reminders, parentId")
 		}
 		tasks, errs := t.service.BatchUpdate(ids, patch)
 		result.Tasks = tasks
@@ -353,6 +395,9 @@ func buildPatch(args map[string]any) map[string]any {
 	}
 	if v, ok := args["tags"]; ok {
 		patch["tags"] = v
+	}
+	if v, ok := args["reminders"]; ok {
+		patch["reminders"] = v
 	}
 	return patch
 }
