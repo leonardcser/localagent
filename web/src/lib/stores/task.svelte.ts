@@ -160,18 +160,17 @@ function createTaskStore() {
     const aDone = a.status === "done" ? 1 : 0;
     const bDone = b.status === "done" ? 1 : 0;
     if (aDone !== bDone) return aDone - bDone;
-    // Tasks with due dates first
+    // Dated tasks come first, ordered chronologically so overdue tasks lead.
     const aHasDue = a.due ? 0 : 1;
     const bHasDue = b.due ? 0 : 1;
     if (aHasDue !== bHasDue) return aHasDue - bHasDue;
-    // Then by priority
-    const pDiff = getPriorityValue(a.priority) - getPriorityValue(b.priority);
-    if (pDiff !== 0) return pDiff;
-    // Then by due date, earliest first
     if (a.due && b.due) {
       const dDiff = a.due.localeCompare(b.due);
       if (dDiff !== 0) return dDiff;
     }
+    // Use priority to order tasks with the same due date or no due date.
+    const pDiff = getPriorityValue(a.priority) - getPriorityValue(b.priority);
+    if (pDiff !== 0) return pDiff;
     // Then alphabetical by title
     const tDiff = (a.title ?? "").localeCompare(b.title ?? "");
     if (tDiff !== 0) return tDiff;
