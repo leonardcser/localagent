@@ -301,7 +301,7 @@ func gatewayCmd() {
 
 	healthServer := health.NewServer(cfg.Gateway.Host, cfg.Gateway.Port)
 	healthServer.RegisterCheck("llm", func() (bool, string) {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.Provider.APIBase+"/v1/models", nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(cfg.Provider.APIBase, "/")+"/models", nil)
 		if err != nil {
 			return false, err.Error()
 		}

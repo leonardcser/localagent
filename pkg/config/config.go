@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -199,6 +200,12 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	applyEnvOverrides(cfg)
+
+	base := strings.TrimRight(cfg.Provider.APIBase, "/")
+	if u, err := url.Parse(base); err == nil && u.Host != "" && u.Path == "" {
+		base += "/v1"
+	}
+	cfg.Provider.APIBase = base
 
 	return cfg, nil
 }
